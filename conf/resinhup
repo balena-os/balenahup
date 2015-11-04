@@ -1,0 +1,20 @@
+[General]
+supported_machines: raspberry-pi2
+known_images: 
+
+[config.json]
+possible_locations: /boot /mnt/conf
+
+[rootfs]
+to_keep_files: /.rce/key.json
+    /etc/dropbear/dropbear_rsa_host_key
+    /etc/machine-id
+    /var/lib/systemd/random-seed
+    /var/lib/dropbear/authorized_keys
+    /var/lib/connman
+
+[fetcher]
+remote: http://build1.dev.resin.io/~andrei/
+workspace: /tmp/resinhup
+updatefilename: resin-image-raspberrypi2-20151007224316.hup.tar
+update_file_fingerprints: ./resin-boot ./resin-root
