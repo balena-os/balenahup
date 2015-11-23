@@ -1,6 +1,7 @@
 [General]
 supported_machines: raspberry-pi2
 known_images: 
+host_bind_mount: /host
 
 [config.json]
 possible_locations: /boot /mnt/conf

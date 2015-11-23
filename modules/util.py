@@ -26,8 +26,11 @@ def check_if_root():
     else:
         return False
 
-def getRootDevice():
-    rootdev = os.stat('/')[stat.ST_DEV]
+def getRootDevice(conffile):
+    root_mount = getConfigurationItem(conffile, 'General', 'host_bind_mount')
+    if not root_mount:
+        root_mount = '/'
+    rootdev = os.stat(root_mount)[stat.ST_DEV]
     rootmajor=os.major(rootdev)
     rootminor=os.minor(rootdev)
     root="%d:%d" % (rootmajor, rootminor)
@@ -38,15 +41,15 @@ def getRootDevice():
             return dev
     return None
 
-def getBootDevice():
+def getBootDevice(conffile):
     # First search by label
     bootdevice = getDevice("resin-boot")
     if not bootdevice:
         # The bootdevice is the first partition on the same device with the root device
-        match = re.match(r"(.*?)(\d+$)", getRootDevice())
+        match = re.match(r"(.*?)(\d+$)", getRootDevice(conffile))
         if match:
             root = match.groups()[0]
-            idx = 1 # boot partition is always the first one ??? is it?
+            idx = 1 # TODO boot partition is always the first one ??? is it?
             bootdevice = str(root) + str(int(idx) - 1)
             log.debug("Couldn't find the boot partition by label. We guessed it as " + bootdevice)
             return bootdevice
@@ -206,14 +209,17 @@ def getConfigurationItem(conffile, section, option):
     return config.get(section, option)
 
 def getConfJsonPath(conffile):
+    root_mount = getConfigurationItem(conffile, 'General', 'host_bind_mount')
+    if not root_mount:
+        root_mount = '/'
     possible_locations = getConfigurationItem(conffile, 'config.json', 'possible_locations')
     if not possible_locations:
         return None
     possible_locations = possible_locations.split()
     for location in possible_locations:
-        if os.path.isfile(os.path.join(location, 'config.json')):
+        if os.path.isfile(os.path.normpath(root_mount + "/" + location + '/config.json')):
             log.debug("Detected config.json in " + location)
-            return os.path.join(location, 'config.json')
+            return os.path.normpath(root_mount + "/" + location + '/config.json')
     return None
 
 def runningDevice(conffile):

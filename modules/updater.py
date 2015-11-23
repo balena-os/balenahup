@@ -42,7 +42,7 @@ class Updater:
     #   - if resin-root not found then we simply decrease the index for current root partition and use that
     #   - if resin-root is found we use that device
     def toUpdateRootDevice(self):
-        currentRootDevice = getRootDevice()
+        currentRootDevice = getRootDevice(self.conf)
         currentRootLabel = getPartitionLabel(currentRootDevice)
         if currentRootLabel == "resin-root":
             updateRootDevice = getDevice("resin-updt")
@@ -84,7 +84,7 @@ class Updater:
         if not self.toUpdateRootDevice():
             # This means that the current device is not labeled as it should be (old hostOS)
             # We assume this is resin-root and we rerun the update root device detection
-            setDeviceLabel(getRootDevice(), "resin-root")
+            setDeviceLabel(getRootDevice(self.conf), "resin-root")
             if not self.toUpdateRootDevice():
                 log.error("Can't find the update rootfs device")
                 return False
@@ -117,38 +117,42 @@ class Updater:
 
     def rootfsOverlay(self):
         log.info("Started rootfs overlay...")
-        # ERASE ME
+        # ERASE ME TODO
         #return True
+        root_mount = getConfigurationItem(self.conf, 'General', 'host_bind_mount')
+        if not root_mount:
+            root_mount = '/'
         overlay = getConfigurationItem(self.conf, "rootfs", "to_keep_files").split()
         for oitem in overlay:
             oitem = oitem.strip()
+            oitem_full_path = os.path.normpath(root_mount + "/" + oitem)
             if not oitem or oitem.startswith("#"):
                 continue
-            log.debug("Will overlay " + oitem)
-            if not os.path.exists:
-                log.warn(oitem + " was not found in your current mounted rootfs.")
+            log.debug("Will overlay " + oitem_full_path)
+            if not os.path.exists(oitem_full_path):
+                log.warn(oitem_full_path + " was not found in your current mounted rootfs.")
                 continue
-            if os.path.isfile(oitem):
+            if os.path.isfile(oitem_full_path):
                 if os.path.exists(self.tempRootMountpoint + oitem):
                     log.warn(self.tempRootMountpoint + oitem + " already exists. File will be overwritten.")
                 try:
-                    shutil.copy(oitem, self.tempRootMountpoint + os.path.dirname(oitem))
+                    shutil.copy(oitem_full_path, self.tempRootMountpoint + os.path.dirname(oitem))
                 except:
-                    log.warn("Could not copy " + oitem)
+                    log.warn("Could not copy " + oitem_full_path)
                     return False
-            elif os.path.isdir(oitem):
+            elif os.path.isdir(oitem_full_path):
                 if os.path.exists(self.tempRootMountpoint + oitem):
                     log.warn(self.tempRootMountpoint + oitem + " already exists.")
                     return False
                 try:
-                    shutil.copytree(oitem, self.tempRootMountpoint + oitem)
+                    shutil.copytree(oitem_full_path, self.tempRootMountpoint + oitem)
                 except:
-                    log.warn("Could not copy " + oitem)
+                    log.warn("Could not copy " + oitem_full_path)
                     return False
             else:
-                log.warn (oitem + " is an unhandled path")
+                log.warn (oitem_full_path + " is an unhandled path")
                 return False
-            log.debug("Overlayed " + oitem + " in " + self.tempRootMountpoint)
+            log.debug("Overlayed " + oitem_full_path + " in " + self.tempRootMountpoint)
         return True
 
     def updateRootfs(self):
@@ -165,7 +169,7 @@ class Updater:
         log.info("Started to upgrade boot files...")
         bootfiles = self.fetcher.getBootFiles()
 
-        bootdevice = getBootDevice()
+        bootdevice = getBootDevice(self.conf)
 
         # Make sure the temp boot directory is unmounted
         if isMounted(self.tempBootMountpoint):
@@ -231,4 +235,4 @@ class Updater:
         log.info("Cleanup updater...")
         if isMounted(self.tempRootMountpoint):
             umount(self.tempRootMountpoint)
-        remount(getBootDevice(), 'ro')
+        remount(getBootDevice(self.conf), 'ro')
