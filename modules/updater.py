@@ -117,8 +117,6 @@ class Updater:
 
     def rootfsOverlay(self):
         log.info("Started rootfs overlay...")
-        # ERASE ME TODO
-        #return True
         root_mount = getConfigurationItem(self.conf, 'General', 'host_bind_mount')
         if not root_mount:
             root_mount = '/'

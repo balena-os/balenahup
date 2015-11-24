@@ -88,8 +88,6 @@ def setDeviceLabel(device, label):
     return False
 
 def formatEXT3(path, label):
-    # ERASE ME
-    #return True
     log.debug("Will format " + path + " as EXT3 and set its label as " + label)
     if not os.path.exists(path):
         return False

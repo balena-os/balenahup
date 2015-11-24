@@ -103,8 +103,6 @@ class tarFetcher:
 
     def unpackRootfs(self, location):
         log.info("Unpack rootfs started... this can take a couple of seconds or even minutes...")
-        # ERASE ME
-        #return True
         update = tarfile.open(self.rootfsarchive)
         update.extractall(location)
         log.debug("Unpacked rootfs " + self.rootfsarchive + " in " + location)
