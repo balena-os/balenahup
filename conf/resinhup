@@ -3,6 +3,11 @@ supported_machines: raspberry-pi2
 known_images: 
 host_bind_mount: /host
 
+[FingerPrintScanner]
+defaultFingerPrintFile: /resinOS-fingerprints
+whitelist: /var/lib/rce
+    /var/lib/docker
+
 [config.json]
 possible_locations: /boot /mnt/conf
 
