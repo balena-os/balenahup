@@ -10,6 +10,7 @@
 
 import logging
 from util import *
+from bootconf import *
 import re
 import os
 import shutil
@@ -226,6 +227,14 @@ class Updater:
         if not self.updateBoot():
             log.error("Could not update boot.")
             return False
+        # Configure bootloader to use the updated rootfs
+        if runningDevice(self.conf) == 'raspberry-pi2':
+            b = BCMRasberryPiBootloader(self.conf)
+            if not b.configure(getRootDevice(self.conf), self.toUpdateRootDevice()[0]):
+                log.error("Could not configure bootloader.")
+                return False
+        else:
+            log.warn("No bootloader configuration support for this board.")
         log.info("Finished to upgrade system.")
         return True
 

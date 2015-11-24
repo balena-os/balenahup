@@ -232,3 +232,18 @@ def runningDevice(conffile):
 
     log.warn("Failed to detect board")
     return None
+
+def getMountPoint(path):
+    path = os.path.abspath(path)
+    while not os.path.ismount(path):
+        path = os.path.dirname(path)
+    return path
+
+def mountHasFlag(path, flag):
+    with open('/proc/mounts') as f:
+        for line in f:
+            device, mount_point, filesystem, flags, __, __ = line.split()
+            flags = flags.split(',')
+            if mount_point == path:
+                return flag in flags
+    return False
