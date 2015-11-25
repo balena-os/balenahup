@@ -51,10 +51,15 @@ class FingerPrintScanner(object):
                 if os.path.join(os.path.join(root,filename)) in whitelist_fingerprints:
                     log.debug("FingerPrintScanner: Ignored " + os.path.join(root,filename) + " as it was found whitelisted.")
                     continue
-                with open(os.path.join(root,filename)) as f:
-                    filecontent = f.read()
-                    filemd5 = hashlib.md5(filecontent).hexdigest()
-                    self.fingerprints[os.path.join(root, filename)] = filemd5
+
+                # Compute the md5 if the file
+                hash = hashlib.md5()
+                with open(os.path.join(root, filename), "rb") as f:
+                    for block in iter(lambda: f.read(4096), b""):
+                        hash.update(block)
+                filemd5 = hash.hexdigest()
+                self.fingerprints[os.path.join(root, filename)] = filemd5
+
     def printFingerPrints(self):
         fingerprints = "# File MD5SUM\t\t\t\tFilepath\n"
         sorted_fingerprints = sorted(self.fingerprints.items(), key=operator.itemgetter(0))
