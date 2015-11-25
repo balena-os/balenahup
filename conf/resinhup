@@ -1,18 +1,39 @@
 [General]
+; This variable is used to stop running the updater on unsupported boards
 supported_machines: raspberry-pi2
-known_images: 
+; Support for running the updater in a docker container where the rootfs is bind mounted
 host_bind_mount: /host
 
 [FingerPrintScanner]
+; New host OS versions come with the original fingerprints embedded - this define its default location
 defaultFingerPrintFile: /resinOS-fingerprints
-whitelist: /var/lib/rce
-    /var/lib/docker
+; Whitelist contains absolute paths for directories or files that won't be considered when calculating the host OS fingerprints
+whitelist:
+    /.bash_history
+    /var/lib/connman
+    /home/root
+    /etc/timestamp
+    /etc/udev/cache.data
+    /etc/udev-cache.tar.gz
+    /.rnd
+    /var/lib/dbus/machine-id
+    /var/lib/systemd/random-seed
+    /var/lib/urandom/random-seed
+    /etc/passwd-
+    /etc/machine-id
+    /var/log
+    /etc/wpa_supplicant/entropy.bin
+    /.rce/key.json
 
 [config.json]
+; The updated needs the json so it will lookup for it in these locations
 possible_locations: /boot /mnt/conf
 
 [rootfs]
-to_keep_files: /.rce/key.json
+; These are files that we want to copy from old rootfs to the new / updated on
+; Only absolute paths
+; Destination path in the update rootfs can be changed by using src:dst format
+to_keep_files:
     /etc/dropbear/dropbear_rsa_host_key
     /etc/machine-id
     /var/lib/systemd/random-seed
