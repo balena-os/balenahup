@@ -108,7 +108,7 @@ class Updater:
                     return False
         else:
             os.makedirs(self.tempRootMountpoint)
-        if not mount(updateDevice, self.tempRootMountpoint):
+        if not mount(what=updateDevice, where=self.tempRootMountpoint):
             return False
 
         # Unpack the rootfs archive
@@ -177,13 +177,13 @@ class Updater:
 
         # Make sure the boot partition dev is mounted
         if not isMounted(bootdevice):
-            if not mount(bootdevice, self.tempBootMountpoint):
+            if not mount(what=bootdevice, where=self.tempBootMountpoint):
                 return False
 
         # We need to make sure the boot partition mountpoint is rw
         bootmountpoint = getMountpoint(bootdevice)
         if not os.access(bootmountpoint, os.W_OK | os.R_OK):
-            if not remount(bootmountpoint, 'rw'):
+            if not mount(what='', where=bootmountpoint, mounttype='', mountoptions='remount,rw')
                 return False
             # It *should* be fine now
             if not os.access(bootmountpoint, os.W_OK | os.R_OK):
@@ -242,4 +242,4 @@ class Updater:
         log.info("Cleanup updater...")
         if isMounted(self.tempRootMountpoint):
             umount(self.tempRootMountpoint)
-        remount(getBootDevice(self.conf), 'ro')
+        mount(what='', where=getBootDevice(self.conf), mounttype='', mountoptions='remount,ro')

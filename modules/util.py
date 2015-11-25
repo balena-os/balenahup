@@ -138,24 +138,19 @@ def umount(dev):
     log.warn("Failed to unmount " + dev)
     return False
 
-def mount(dev, path):
-    child = subprocess.Popen("mount " + dev + " " + path, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+def mount(what, where, mounttype='', mountoptions=''):
+    if mounttype:
+        mounttype = "-t " + mounttype
+    if mountoptions:
+        mountoptions = "-o " + mountoptions
+    cmd = "mount " + mounttype + " " + mountoptions + " " + what + " " + where
+    child = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     out, err = child.communicate()
     if child.returncode == 0:
-        log.debug("Mounted " + dev + " in " + path)
+        log.debug("Mounted " + what + " in " + where + ".")
         return True
 
-    log.warn("Failed to mount " + dev + " in " + path)
-    return False
-
-def remount(path, options):
-    child = subprocess.Popen("mount -o remount," + options + " " + path, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    out, err = child.communicate()
-    if child.returncode == 0:
-        log.debug("Remounted " + path + " with options additional options: " + options)
-        return True
-
-    log.warn("Failed to remount " + path + " with additional options: " + options)
+    log.warn("Failed to mount " + what + " in " + where + ".")
     return False
 
 def getMountpoint(dev):

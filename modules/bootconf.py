@@ -24,7 +24,8 @@ class BootloaderConfigurator(object):
             return False
         mountPoint = getMountPoint(configurationFile)
         if mountHasFlag(mountPoint, 'ro'):
-            remount(mountPoint, 'rw')
+            if not mount(what='', where=mountPoint, mountoptions="remount,rw"):
+                return False
         lines = []
         with open(configurationFile) as infile:
             for line in infile:
