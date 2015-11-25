@@ -27,7 +27,7 @@ whitelist:
 
 [config.json]
 ; The updated needs the json so it will lookup for it in these locations
-possible_locations: /boot /mnt/conf
+possible_locations: /mnt/conf
 
 [rootfs]
 ; These are files that we want to copy from old rootfs to the new / updated on
