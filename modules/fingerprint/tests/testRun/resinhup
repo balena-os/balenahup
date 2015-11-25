@@ -1,0 +1,5 @@
+[FingerPrintScanner]
+defaultFingerPrintFile: /resinOS-fingerprints
+whitelist:
+     ./fingerprint/tests/testRun/tree/dir3
+     ./fingerprint/tests/testRun/tree/dir2/file3
