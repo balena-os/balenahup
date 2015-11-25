@@ -202,7 +202,7 @@ class Updater:
         # We need to make sure the boot partition mountpoint is rw
         bootmountpoint = getMountpoint(bootdevice)
         if not os.access(bootmountpoint, os.W_OK | os.R_OK):
-            if not mount(what='', where=bootmountpoint, mounttype='', mountoptions='remount,rw')
+            if not mount(what='', where=bootmountpoint, mounttype='', mountoptions='remount,rw'):
                 return False
             # It *should* be fine now
             if not os.access(bootmountpoint, os.W_OK | os.R_OK):
