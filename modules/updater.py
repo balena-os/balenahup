@@ -121,37 +121,56 @@ class Updater:
         root_mount = getConfigurationItem(self.conf, 'General', 'host_bind_mount')
         if not root_mount:
             root_mount = '/'
-        overlay = getConfigurationItem(self.conf, "rootfs", "to_keep_files").split()
+
+        # Read the overlay configuration and test that we have something to overlay
+        overlay = getConfigurationItem(self.conf, "rootfs", "to_keep_files")
+        if not overlay:
+            log.warn("Nothing configured to overlay.")
+            return True
+        overlay = overlay.split()
+
+        # Perform overlay
         for oitem in overlay:
             oitem = oitem.strip()
-            oitem_full_path = os.path.normpath(root_mount + "/" + oitem)
-            if not oitem or oitem.startswith("#"):
+            if not oitem or oitem.startswith("#") or oitem.startswith(";"):
                 continue
-            log.debug("Will overlay " + oitem_full_path)
-            if not os.path.exists(oitem_full_path):
-                log.warn(oitem_full_path + " was not found in your current mounted rootfs.")
+            oitem = oitem.split(":") # Handle cases where we have src:dst
+            src = oitem[0]
+            try:
+                # If we got a "src:dst" format
+                dst = oitem[1]
+            except:
+                # We got a "src" format
+                dst = src
+            src_full_path = os.path.normpath(root_mount + "/" + src)
+            log.debug("Will overlay " + src_full_path)
+            if not os.path.exists(src_full_path):
+                log.warn(src_full_path + " was not found in your current mounted rootfs. Can't overlay.")
                 continue
-            if os.path.isfile(oitem_full_path):
-                if os.path.exists(self.tempRootMountpoint + oitem):
-                    log.warn(self.tempRootMountpoint + oitem + " already exists. File will be overwritten.")
+            if os.path.isfile(src_full_path):
+                # Handle file
+                if os.path.exists(self.tempRootMountpoint + dst):
+                    log.warn(self.tempRootMountpoint + dst + " already exists. Destination file will be overwritten.")
                 try:
-                    shutil.copy(oitem_full_path, self.tempRootMountpoint + os.path.dirname(oitem))
+                    shutil.copy(src_full_path, self.tempRootMountpoint + os.path.dirname(dst))
                 except:
-                    log.warn("Could not copy " + oitem_full_path)
+                    log.warn("Could not copy " + src_full_path)
                     return False
-            elif os.path.isdir(oitem_full_path):
-                if os.path.exists(self.tempRootMountpoint + oitem):
-                    log.warn(self.tempRootMountpoint + oitem + " already exists.")
+            elif os.path.isdir(src_full_path):
+                # Handle directory
+                if os.path.exists(self.tempRootMountpoint + dst):
+                    log.warn(self.tempRootMountpoint + dst + " already exists.")
                     return False
                 try:
-                    shutil.copytree(oitem_full_path, self.tempRootMountpoint + oitem)
+                    shutil.copytree(src_full_path, self.tempRootMountpoint + dst)
                 except:
-                    log.warn("Could not copy " + oitem_full_path)
+                    log.warn("Could not copy " + src_full_path)
                     return False
             else:
-                log.warn (oitem_full_path + " is an unhandled path")
+                # Don't handle something else
+                log.warn (src_full_path + " is an unhandled path")
                 return False
-            log.debug("Overlayed " + oitem_full_path + " in " + self.tempRootMountpoint)
+            log.debug("Overlayed " + src_full_path + " in " + self.tempRootMountpoint)
         return True
 
     def updateRootfs(self):

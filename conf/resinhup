@@ -37,6 +37,7 @@ to_keep_files:
     /etc/dropbear/dropbear_rsa_host_key
     /etc/machine-id
     /var/lib/systemd/random-seed
+    /var/lib/urandom/random-seed:/var/lib/systemd/random-seed
     /var/lib/dropbear/authorized_keys
     /var/lib/connman
 
