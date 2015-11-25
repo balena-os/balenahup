@@ -20,7 +20,7 @@ from modules.updater import *
 from argparse import ArgumentParser
 import logging
 
-default_resinhup_conf_file = "/etc/resinhup"
+default_resinhup_conf_file = "/etc/resinhup.conf"
 
 def main():
     '''

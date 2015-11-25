@@ -106,7 +106,7 @@ class MyTest(unittest.TestCase):
         mountpoint = "./fingerprint/tests/testRun/tree/dir1"
         mount(what="tmpfs", where=mountpoint, mounttype="tmpfs")
 
-        conf = "./fingerprint/tests/testRun/resinhup"
+        conf = "./fingerprint/tests/testRun/resinhup.conf"
         scanner = FingerPrintScanner("./fingerprint/tests/testRun/tree", conf)
         scanner.scan()
 
