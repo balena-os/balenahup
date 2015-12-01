@@ -11,7 +11,6 @@
 import unittest
 import os
 import logging
-import hashlib
 import operator
 from util import *
 from colorlogging import *
@@ -52,13 +51,7 @@ class FingerPrintScanner(object):
                     log.debug("FingerPrintScanner: Ignored " + os.path.join(root,filename) + " as it was found whitelisted.")
                     continue
 
-                # Compute the md5 if the file
-                hash = hashlib.md5()
-                with open(os.path.join(root, filename), "rb") as f:
-                    for block in iter(lambda: f.read(4096), b""):
-                        hash.update(block)
-                filemd5 = hash.hexdigest()
-                self.fingerprints[os.path.join(root, filename)] = filemd5
+                self.fingerprints[os.path.join(root, filename)] = getmd5(os.path.join(root, filename))
 
     def printFingerPrints(self):
         fingerprints = "# File MD5SUM\t\t\t\tFilepath\n"

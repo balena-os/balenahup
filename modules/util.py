@@ -17,6 +17,7 @@ from glob import glob
 import subprocess
 import re
 import string
+import hashlib
 
 log = logging.getLogger(__name__)
 
@@ -242,3 +243,13 @@ def mountHasFlag(path, flag):
             if mount_point == path:
                 return flag in flags
     return False
+
+# Compute the md5 of a file
+def getmd5(inputfile, blocksize=4096):
+    if not os.path.isfile(inputfile):
+        return None
+    hash = hashlib.md5()
+    with open(inputfile, "rb") as f:
+        for block in iter(lambda: f.read(blocksize), b""):
+            hash.update(block)
+    return hash.hexdigest()
