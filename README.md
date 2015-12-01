@@ -45,7 +45,6 @@ Run the container automatically:
 Want to contribute? Great! Throw pull requests at us.
 
 ## Todos
- - Develop mechanism for known footprints
  - Add support for other resin supported targets
  - Handle special cases (old cases) of config.json
 

@@ -15,6 +15,7 @@ import sys
 import meta.resinhupmeta as meta
 from modules.colorlogging import *
 from modules.util import *
+from modules.fingerprint import *
 from fetcher.tar import *
 from modules.updater import *
 from argparse import ArgumentParser
@@ -38,6 +39,8 @@ def main():
                       help = "Force the device name and skip device detection")
     parser.add_argument('-c', '--configuration-file', action = 'store', dest = 'conf', default = default_resinhup_conf_file,
                       help = "Configuration file to be used. Default: " + default_resinhup_conf_file)
+    parser.add_argument('-f', '--force-fingerprint', action = 'store_true', dest = 'force_fingerprint', default = False,
+                      help = "Avoid fingerprint check and force update. Do it on your own risk.")
     args = parser.parse_args()
 
     # Logger
@@ -54,7 +57,7 @@ def main():
 
     # Error if not root
     if not check_if_root():
-        log.error("Updater not ran as root. Some tasks will fail.")
+        log.error("Updater not ran as root.")
         return False
 
     # Debug message for configuration file
@@ -79,6 +82,18 @@ def main():
         log.error(device + " is not a supported device for resinhup.")
         return False
     log.debug(device + " is a supported device for resinhup.")
+
+    # Check the image fingerprint
+    if not args.force_fingerprint:
+        root_mount = getConfigurationItem(args.conf, 'General', 'host_bind_mount')
+        if not root_mount:
+            root_mount = '/'
+        images_fingerprint_path = os.path.join(os.path.dirname(sys.modules[__name__].__file__), "modules/fingerprint/known-images")
+        scanner = FingerPrintScanner(root_mount, args.conf, images_fingerprint_path)
+        scanner.scan()
+        if not scanner.validateFingerPrints():
+            log.error("Cannot validate current image fingerprint.")
+            return False
 
     f = tarFetcher(args.conf)
     if not f.unpack(downloadFirst=True):
