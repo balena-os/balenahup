@@ -45,6 +45,8 @@ Run the container automatically:
 Want to contribute? Great! Throw pull requests at us.
 
 ## Todos
+ - Safety checks for "to be updated" partition (size, existent fs etc.)
+ - Use the boot file from a directory in the rootfs update partition called "/assets"
  - Add support for other resin supported targets
  - Handle special cases (old cases) of config.json
 
