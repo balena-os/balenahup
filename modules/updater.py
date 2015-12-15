@@ -14,6 +14,7 @@ from bootconf import *
 import re
 import os
 import shutil
+import string
 
 class Updater:
     def __init__(self, fetcher, conf):
@@ -237,14 +238,53 @@ class Updater:
 
         if os.path.isfile(os.path.join(root_mount, "mnt/data-disk/config.json")) and os.path.isfile(os.path.join(root_mount, "etc/resin.conf")):
             # We are in the case were we used to have config.json in btrfs partition
+
+            variablesmap = {
+                'API_ENDPOINT': 'apiEndpoint',
+                'REGISTRY_ENDPOINT': 'registryEndpoint',
+                'PUBNUB_SUBSCRIBE_KEY': 'pubnubSubscribeKey',
+                'PUBNUB_PUBLISH_KEY': 'pubnubPublishKey',
+                'MIXPANEL_TOKEN': 'mixpanelToken',
+                'LISTEN_PORT': 'vpnPort'
+            };
+
+            config = os.path.join(root_mount, "mnt/data-disk/config.json")
+            tmpconfig = "/tmp/config.json"
+            resinconf = os.path.join(root_mount, "etc/resin.conf")
+
+            shutil.copy(config, tmpconfig) # Work on a copy
+
+            # Make sure everything in resin.conf is in json
+            with open(resinconf) as resinconffile:
+                for line in resinconffile:
+                    variable = line.split('=')[0]
+                    if not variable in variablesmap:
+                        continue
+                    value = line.split('=')[1]
+                    mappedvariable = variablesmap[variable]
+                    command = "jq '." + mappedvariable + "=\"" + value.strip() + "\"' " + tmpconfig + " > /tmp/tempconfig.json"
+                    child = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+                    out, err = child.communicate()
+                    shutil.copy("/tmp/tempconfig.json", tmpconfig)
+
+            # Handle VPN address separately as we didn't have it in resin.conf
+            command = "jq --raw-output '.registryEndpoint' " + tmpconfig
+            child = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+            registryEndpoint, err = child.communicate()
+            vpnEndpoint = registryEndpoint.strip().replace('registry','vpn')
+            command = "cat " + tmpconfig + " | jq '.vpnEndpoint=\"" + vpnEndpoint + "\"' > /tmp/tempconfig.json"
+            child = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+            out, err = child.communicate()
+            shutil.copy("/tmp/tempconfig.json", tmpconfig)
+
             configPartition = getConfigPartition(self.conf)
             if not configPartition:
                 return False
             if not formatVFAT(configPartition, "resin-conf"):
                 return False
-            if not mcopy(dev=configPartition, src=os.path.join(root_mount, "mnt/data-disk/config.json"), dst="::/config.json"):
+            if not mcopy(dev=configPartition, src=tmpconfig, dst="::/config.json"):
                 return False
-            os.remove(os.path.join(root_mount, "mnt/data-disk/config.json"))
+            os.remove(tmpconfig)
             return True
         return False
 
