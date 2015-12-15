@@ -26,14 +26,6 @@ class Updater:
             os.makedirs(self.tempBootMountpoint)
         self.conf = conf
 
-    def getRootUpdateDevice(self):
-        currentroot = util.root_device()
-        # If current root device is resin-root we will update resin-updt (and the other way around)
-        if partition_label(currentroot) == 'resin-root':
-            updateRootDeviceLabel = 'resin-updt'
-        else:
-            updateRootDeviceLabel = 'resin-root'
-
     # The logic here is the following:
     # Check the current root partition:
     # - if current root label is resin-root then we search for resin-updt device
