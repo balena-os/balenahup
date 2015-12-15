@@ -1,8 +1,7 @@
 FROM resin/rpi-raspbian:jessie
 
 # Install the dependencies
-RUN apt-get update
-RUN apt-get install python python-requests python-sh jq -y
+RUN apt-get update && apt-get install btrfs-tools mtools dosfstools python python-requests python-sh jq -y && rm -rf /var/lib/apt/lists/*
 
 # Add the current directoy in the container
 ADD . /app

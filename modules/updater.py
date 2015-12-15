@@ -230,6 +230,59 @@ class Updater:
                 return False
         return True
 
+    def fixOldConfigJson(self):
+        root_mount = getConfigurationItem(self.conf, 'General', 'host_bind_mount')
+        if not root_mount:
+            root_mount = '/'
+
+        if os.path.isfile(os.path.join(root_mount, "mnt/data-disk/config.json")) and os.path.isfile(os.path.join(root_mount, "etc/resin.conf")):
+            # We are in the case were we used to have config.json in btrfs partition
+            configPartition = getConfigPartition(self.conf)
+            if not configPartition:
+                return False
+            if not formatVFAT(configPartition, "resin-conf"):
+                return False
+            if not mcopy(dev=configPartition, src=os.path.join(root_mount, "mnt/data-disk/config.json"), dst="::/config.json"):
+                return False
+            os.remove(os.path.join(root_mount, "mnt/data-disk/config.json"))
+            return True
+        return False
+
+    def fixFsLabels(self):
+        log.info("Fixing the labels of all the filesystems...")
+
+        # resin-boot
+        if not getDevice("resin-boot"):
+            bootdevice = getBootPartition(self.conf)
+            if not bootdevice:
+                return False
+            if not setVFATDeviceLabel(bootdevice, "resin-boot"):
+                return False
+
+        # resin-root should be already labeled in unpackNewRootfs
+        if not getDevice("resin-root"):
+            return False
+
+        # resin-updt should be already labeled in unpackNewRootfs
+        if not getDevice("resin-updt"):
+            return False
+
+        # resin-conf
+        if not getDevice("resin-conf"):
+            if not self.fixOldConfigJson():
+                return False
+
+        # resin-data
+        if not getDevice("resin-data"):
+            log.warning("Can't label btrfs partition. You need to do it manually on host OS with: btrfs filesystem label <X> resin-data .")
+            #btrfspartition = getBTRFSPartition(self.conf)
+            #if not btrfspartition:
+            #    return False
+            #if not setBTRFSDeviceLabel(btrfspartition, "resin-data"):
+            #    return False
+
+        return True
+
     def upgradeSystem(self):
         log.info("Started to upgrade system.")
         if not self.updateRootfs():
@@ -237,6 +290,9 @@ class Updater:
             return False
         if not self.updateBoot():
             log.error("Could not update boot.")
+            return False
+        if not self.fixFsLabels():
+            log.error("Could not fix/setup fs labels.")
             return False
         # Configure bootloader to use the updated rootfs
         if runningDevice(self.conf) == 'raspberry-pi2':

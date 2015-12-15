@@ -38,7 +38,7 @@ def getRootPartition(conffile):
     for f in glob("/sys/class/block/*/dev"):
         if file(f).read().strip() == root:
             dev = "/dev/" + os.path.basename(os.path.dirname(f))
-            log.debug("Found root device: " + dev)
+            log.debug("Found root partition: " + dev)
             return dev
     return None
 
@@ -51,7 +51,7 @@ def getBootPartition(conffile):
         if match:
             root = match.groups()[0]
             idx = 1 # TODO boot partition is always the first one ??? is it?
-            bootdevice = str(root) + str(int(idx) - 1)
+            bootdevice = str(root) + str(int(idx))
             log.debug("Couldn't find the boot partition by label. We guessed it as " + bootdevice)
             return bootdevice
     else:
@@ -79,9 +79,42 @@ def setDeviceLabel(device, label):
     log.warn("Will label " + device + " as " + label)
     if not os.path.exists(device):
         return False
-    if not userConfirm("Setting label for" + device + " as " + label):
+    if not userConfirm("Setting label for " + device + " as " + label):
         return False
     child = subprocess.Popen("e2label " + device + " " + label, stdout=subprocess.PIPE, shell=True)
+    out = child.communicate()[0].strip()
+    if child.returncode == 0:
+        log.warn("Labeled " + device + " as " + label)
+        return True
+    return False
+
+def setVFATDeviceLabel(device, label):
+    log.warn("Will label " + device + " as " + label)
+    if not os.path.exists(device):
+        return False
+    if not userConfirm("Setting label for " + device + " as " + label):
+        return False
+    child = subprocess.Popen("dosfslabel " + device + " " + label, stdout=subprocess.PIPE, shell=True)
+    out = child.communicate()[0].strip()
+    if child.returncode == 0:
+        log.warn("Labeled " + device + " as " + label)
+        return True
+    return False
+
+def setBTRFSDeviceLabel(device, label):
+    log.warn("Will label " + device + " as " + label)
+    if not os.path.exists(device):
+        return False
+
+    # If mounted we need to specify the mountpoint in btrfs command
+    if isMounted(device):
+        device = getMountpoint(device)
+        if not device:
+            return False
+
+    if not userConfirm("Setting label for " + device + " as " + label):
+        return False
+    child = subprocess.Popen("btrfs filesystem label " + device + " " + label, stdout=subprocess.PIPE, shell=True)
     out = child.communicate()[0].strip()
     if child.returncode == 0:
         log.warn("Labeled " + device + " as " + label)
@@ -98,6 +131,19 @@ def formatEXT3(path, label):
     out = child.communicate()[0].strip()
     if child.returncode == 0:
         log.debug("Formatted " + path + " as EXT3")
+        return True
+    return False
+
+def formatVFAT(path, label):
+    log.debug("Will format " + path + " as VFAT and set its label as " + label)
+    if not os.path.exists(path):
+        return False
+    if not userConfirm("Formatting " + path + " as VFAT and set its label as " + label):
+        return False
+    child = subprocess.Popen("mkfs.vfat -n " + label + " -S 512 " + path, stdout=subprocess.PIPE, shell=True)
+    out = child.communicate()[0].strip()
+    if child.returncode == 0:
+        log.debug("Formatted " + path + " as VFAT")
         return True
     return False
 
@@ -253,3 +299,53 @@ def getmd5(inputfile, blocksize=4096):
         for block in iter(lambda: f.read(blocksize), b""):
             hash.update(block)
     return hash.hexdigest()
+
+def getRootDevice(conffile):
+    rootpartition = getRootPartition(conffile)
+    if not rootpartition:
+        return None
+    if rootpartition.startswith("sd"):
+        rootdevice = rootpartition[:-1]
+    else:
+        rootdevice = rootpartition[:-2]
+    log.debug("Found root device: " + rootdevice + ".")
+    return rootdevice
+
+def getExtendedPartition(conffile):
+    rootdevice = getRootDevice(conffile)
+    if not rootdevice:
+        return None
+    child = subprocess.Popen("fdisk -l | grep \"Ext'd\" | awk '{print $1}' | grep " + rootdevice , stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    out, err = child.communicate()
+    if out:
+        log.debug("Detected extended partition: " + out.strip())
+        return out.strip()
+    return None
+
+def getConfigPartition(conffile):
+    # Extended +1
+    extendedPartition = getExtendedPartition(conffile)
+    if not extendedPartition:
+        return None
+    match = re.match(r"(.*?)(\d+$)", extendedPartition)
+    root = match.groups()[0]
+    idx = match.groups()[1]
+    return str(root) + str(int(idx) + 1)
+
+def getBTRFSPartition(conffile):
+    # Extended +2
+    extendedPartition = getExtendedPartition(conffile)
+    if not extendedPartition:
+        return None
+    match = re.match(r"(.*?)(\d+$)", extendedPartition)
+    root = match.groups()[0]
+    idx = match.groups()[1]
+    return str(root) + str(int(idx) + 2)
+
+def mcopy(dev, src, dst):
+    child = subprocess.Popen("mcopy -i " + dev + " " + src + " " + dst , stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    out, err = child.communicate()
+    if child.returncode != 0:
+        log.debug("Failed to mcopy in " + dev);
+        return False
+    return True
