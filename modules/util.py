@@ -42,7 +42,7 @@ def getRootPartition(conffile):
             return dev
     return None
 
-def getBootDevice(conffile):
+def getBootPartition(conffile):
     # First search by label
     bootdevice = getDevice("resin-boot")
     if not bootdevice:

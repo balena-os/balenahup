@@ -187,7 +187,7 @@ class Updater:
         log.info("Started to upgrade boot files...")
         bootfiles = self.fetcher.getBootFiles()
 
-        bootdevice = getBootDevice(self.conf)
+        bootdevice = getBootPartition(self.conf)
 
         # Make sure the temp boot directory is unmounted
         if isMounted(self.tempBootMountpoint):
@@ -261,4 +261,4 @@ class Updater:
         log.info("Cleanup updater...")
         if isMounted(self.tempRootMountpoint):
             umount(self.tempRootMountpoint)
-        mount(what='', where=getBootDevice(self.conf), mounttype='', mountoptions='remount,ro')
+        mount(what='', where=getBootPartition(self.conf), mounttype='', mountoptions='remount,ro')
