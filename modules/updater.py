@@ -43,7 +43,7 @@ class Updater:
     #   - if resin-root not found then we simply decrease the index for current root partition and use that
     #   - if resin-root is found we use that device
     def toUpdateRootDevice(self):
-        currentRootDevice = getRootDevice(self.conf)
+        currentRootDevice = getRootPartition(self.conf)
         currentRootLabel = getPartitionLabel(currentRootDevice)
         if currentRootLabel == "resin-root":
             updateRootDevice = getDevice("resin-updt")
@@ -85,7 +85,7 @@ class Updater:
         if not self.toUpdateRootDevice():
             # This means that the current device is not labeled as it should be (old hostOS)
             # We assume this is resin-root and we rerun the update root device detection
-            setDeviceLabel(getRootDevice(self.conf), "resin-root")
+            setDeviceLabel(getRootPartition(self.conf), "resin-root")
             if not self.toUpdateRootDevice():
                 log.error("Can't find the update rootfs device")
                 return False
@@ -249,7 +249,7 @@ class Updater:
         # Configure bootloader to use the updated rootfs
         if runningDevice(self.conf) == 'raspberry-pi2':
             b = BCMRasberryPiBootloader(self.conf)
-            if not b.configure(getRootDevice(self.conf), self.toUpdateRootDevice()[0]):
+            if not b.configure(getRootPartition(self.conf), self.toUpdateRootDevice()[0]):
                 log.error("Could not configure bootloader.")
                 return False
         else:

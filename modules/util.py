@@ -27,7 +27,7 @@ def check_if_root():
     else:
         return False
 
-def getRootDevice(conffile):
+def getRootPartition(conffile):
     root_mount = getConfigurationItem(conffile, 'General', 'host_bind_mount')
     if not root_mount:
         root_mount = '/'
@@ -47,7 +47,7 @@ def getBootDevice(conffile):
     bootdevice = getDevice("resin-boot")
     if not bootdevice:
         # The bootdevice is the first partition on the same device with the root device
-        match = re.match(r"(.*?)(\d+$)", getRootDevice(conffile))
+        match = re.match(r"(.*?)(\d+$)", getRootPartition(conffile))
         if match:
             root = match.groups()[0]
             idx = 1 # TODO boot partition is always the first one ??? is it?
