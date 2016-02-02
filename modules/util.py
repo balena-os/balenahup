@@ -158,6 +158,7 @@ def getInput(helpmsg, valids = []):
 
 def userConfirm(name):
     log.warn(name)
+    return True # No interactive mode anymore
     selection = getInput("Are you sure?", ["no","yes"])
     if selection == "yes":
         return True
