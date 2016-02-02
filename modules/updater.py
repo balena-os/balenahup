@@ -335,7 +335,7 @@ class Updater:
             log.error("Could not fix/setup fs labels.")
             return False
         # Configure bootloader to use the updated rootfs
-        if runningDevice(self.conf) == 'raspberry-pi2':
+        if runningDevice(self.conf) == 'raspberry-pi' or runningDevice(self.conf) == 'raspberry-pi2':
             b = BCMRasberryPiBootloader(self.conf)
             if not b.configure(getRootPartition(self.conf), self.toUpdateRootDevice()[0]):
                 log.error("Could not configure bootloader.")

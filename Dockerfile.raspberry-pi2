@@ -6,4 +6,4 @@ RUN apt-get update && apt-get install btrfs-tools mtools dosfstools python pytho
 # Add the current directoy in the container
 ADD . /app
 
-CMD python /app/resinhup.py --config /app/conf/resinhup --debug
+CMD python /app/resinhup.py --config /app/conf/resinhup.conf --debug
