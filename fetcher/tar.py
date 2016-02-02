@@ -22,8 +22,9 @@ class tarFetcher:
     def __init__ (self, conffile):
         self.remote = getConfigurationItem(conffile, 'fetcher', 'remote')
         self.workspace = getConfigurationItem(conffile, 'fetcher', 'workspace')
-        self.remotefile = self.remote + "/" + getConfigurationItem(conffile, 'fetcher', 'updatefilename')
-        self.workspacefile = os.path.join(self.workspace, "update.tar")
+        machine = runningDevice(conffile)
+        self.remotefile = os.path.join(self.remote, "resinos-" + machine, "resinhup.tar.gz")
+        self.workspacefile = os.path.join(self.workspace, "resinhup.tar.gz")
         self.workspaceunpack = os.path.join(self.workspace, "update")
         self.bootfilesdir = os.path.join(self.workspace, "update/resin-boot")
         self.update_file_fingerprints = getConfigurationItem(conffile, 'fetcher', 'update_file_fingerprints').split()
@@ -45,6 +46,7 @@ class tarFetcher:
 
         try:
             log.info("Download started... this can take a couple of minutes...")
+            log.debug("Downloading " + self.remotefile + " ...")
             r = requests.get(self.remotefile, stream=True)
         except:
             log.error("Can't download update file.")
@@ -91,7 +93,7 @@ class tarFetcher:
 
         log.info("Unpack started... this can take a couple of seconds...")
 
-        update = tarfile.open(self.workspacefile)
+        update = tarfile.open(name=self.workspacefile, mode='r:*')
         update.extractall(self.workspaceunpack)
 
         # Save the rootfs filename of easy access
