@@ -94,6 +94,8 @@ def main():
         if not scanner.validateFingerPrints():
             log.error("Cannot validate current image fingerprint.")
             return False
+        else:
+            log.info("Fingerprint validation succeeded.")
 
     f = tarFetcher(args.conf)
     if not f.unpack(downloadFirst=True):

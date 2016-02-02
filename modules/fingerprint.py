@@ -70,7 +70,13 @@ class FingerPrintScanner(object):
         if len(self.fingerprints) == 0:
             self.scan()
 
+        # Compute default file for fingerprints
         defaultFingerPrintFile = getConfigurationItem(self.conf, "FingerPrintScanner", "defaultFingerPrintFile")
+        root_mount = getConfigurationItem(self.conf, 'General', 'host_bind_mount')
+        if not root_mount:
+            root_mount = '/'
+        defaultFingerPrintFile = os.path.join(root_mount, defaultFingerPrintFile)
+
         if defaultFingerPrintFile and os.path.isfile(defaultFingerPrintFile):
             # Host OS fingerprint present on filesystem
             with open(defaultFingerPrintFile) as infile:
