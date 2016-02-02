@@ -1,0 +1,9 @@
+FROM resin/rpi-raspbian:jessie
+
+# Install the dependencies
+RUN apt-get update && apt-get install btrfs-tools mtools dosfstools python python-requests python-sh jq -y && rm -rf /var/lib/apt/lists/*
+
+# Add the current directoy in the container
+ADD . /app
+
+CMD python /app/resinhup.py --config /app/conf/resinhup.conf --debug
