@@ -84,7 +84,7 @@ def main():
     log.debug(device + " is a supported device for resinhup.")
 
     # Check the image fingerprint
-    if not args.force_fingerprint:
+    if not args.force_fingerprint and not os.getenv('RESINHUP_FORCE'):
         root_mount = getConfigurationItem(args.conf, 'General', 'host_bind_mount')
         if not root_mount:
             root_mount = '/'
@@ -96,6 +96,8 @@ def main():
             return False
         else:
             log.info("Fingerprint validation succeeded.")
+    else:
+        log.debug("Fingerprint scan avoided due to flag or env.")
 
     f = tarFetcher(args.conf)
     if not f.unpack(downloadFirst=True):
