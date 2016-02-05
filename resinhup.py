@@ -110,6 +110,7 @@ def main():
         log.error("Could not upgrade your system")
         return False
     u.cleanup()
+    return True
 
 if __name__ == "__main__":
     if not main():
