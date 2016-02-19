@@ -249,6 +249,33 @@ def getConfigurationItem(conffile, section, option):
         return None
     return config.get(section, option)
 
+def getSectionOptions(conffile, section):
+    if not os.path.isfile(conffile):
+        log.error("Configuration file " + conffile + " not found.")
+        return None
+    config = ConfigParser.ConfigParser()
+    try:
+        config.read(conffile)
+    except:
+        log.error("Cannot read configuration file " + conffile)
+        return None
+    return config.options(section)
+
+def setConfigurationItem(conffile, section, option, value):
+    if not os.path.isfile(conffile):
+        log.error("Configuration file " + conffile + " not found.")
+        return None
+    config = ConfigParser.ConfigParser()
+    try:
+        config.read(conffile)
+        config.set(section, option, value)
+        with open(conffile, 'wb') as cf:
+            config.write(cf)
+    except:
+        log.error("Cannot set required configuration value in " + conffile)
+        return False
+    return True
+
 def getConfJsonPath(conffile):
     root_mount = getConfigurationItem(conffile, 'General', 'host_bind_mount')
     if not root_mount:
@@ -348,5 +375,28 @@ def mcopy(dev, src, dst):
     out, err = child.communicate()
     if child.returncode != 0:
         log.debug("Failed to mcopy in " + dev);
+        return False
+    return True
+
+def jsonAttributeExists(json, attribute):
+    child = subprocess.Popen("jq --raw-output \"." + attribute + " // empty\" " + json , stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    out, err = child.communicate()
+    if child.returncode != 0:
+        log.debug("Failed to check for " + attribute + " in " + json + ".");
+        return False
+    if out:
+        return True
+    else:
+        return False
+
+def jsonSetAttribute(json, attribute, value):
+    if not os.path.isfile(json):
+        return False
+    with open(json, 'r') as configfd:
+        configcontent = configfd.read().replace('\n', '')
+    child = subprocess.Popen('echo "' + configcontent + '" | jq ".' + attribute + '=\\"' + value + '\\"" > ' + json , stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    out, err = child.communicate()
+    if child.returncode != 0:
+        log.debug("Failed to set " + attribute + " in " + json + ".");
         return False
     return True
