@@ -323,6 +323,25 @@ class Updater:
 
         return True
 
+    def verifyConfigJson(self):
+        log.info("Verifying and fixing config.json")
+        ctype = getConfigurationItem(self.conf, 'config.json', 'type')
+        if not ctype:
+            log.error("Don't know if staging/production.")
+            return False
+        try:
+            options = getSectionOptions(self.conf, ctype)
+            configjsonpath = getConfJsonPath(self.conf)
+            for option in options:
+                if not jsonAttributeExists(configjsonpath, option):
+                    value = getConfigurationItem(self.conf, ctype, option)
+                    log.debug("Fixing config.json: " + option + "=" + value + ".")
+                    jsonSetAttribute(configjsonpath, option, value)
+        except:
+            log.error("Error while verifying config.json.")
+            return False
+        return True
+
     def upgradeSystem(self):
         log.info("Started to upgrade system.")
         if not self.updateRootfs():
@@ -333,6 +352,9 @@ class Updater:
             return False
         if not self.fixFsLabels():
             log.error("Could not fix/setup fs labels.")
+            return False
+        if not self.verifyConfigJson():
+            log.error("Could not verify config.json.")
             return False
         # Configure bootloader to use the updated rootfs
         if runningDevice(self.conf) == 'raspberry-pi' or runningDevice(self.conf) == 'raspberry-pi2':
