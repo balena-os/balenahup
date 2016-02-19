@@ -41,6 +41,8 @@ def main():
                       help = "Configuration file to be used. Default: " + default_resinhup_conf_file)
     parser.add_argument('-f', '--force-fingerprint', action = 'store_true', dest = 'force_fingerprint', default = False,
                       help = "Avoid fingerprint check and force update. Do it on your own risk.")
+    parser.add_argument('-s', '--staging', action = 'store_true', dest = 'staging', default = False,
+                      help = "Validate and configure config.json against staging values.")
     args = parser.parse_args()
 
     # Logger
@@ -98,6 +100,14 @@ def main():
             log.info("Fingerprint validation succeeded.")
     else:
         log.debug("Fingerprint scan avoided due to flag or env.")
+
+    # Staging / production
+    if args.staging:
+        if not setConfigurationItem(args.conf, "config.json", "type", "staging"):
+            return False
+    else
+        if not setConfigurationItem(args.conf, "config.json", "type", "production"):
+            return False
 
     f = tarFetcher(args.conf)
     if not f.unpack(downloadFirst=True):
