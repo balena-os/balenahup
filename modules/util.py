@@ -20,6 +20,7 @@ import string
 import hashlib
 import unittest
 import shutil
+import json
 
 log = logging.getLogger(__name__)
 
@@ -251,6 +252,33 @@ def getConfigurationItem(conffile, section, option):
         return None
     return config.get(section, option)
 
+def getSectionOptions(conffile, section):
+    if not os.path.isfile(conffile):
+        log.error("Configuration file " + conffile + " not found.")
+        return None
+    config = ConfigParser.ConfigParser()
+    try:
+        config.read(conffile)
+    except:
+        log.error("Cannot read configuration file " + conffile)
+        return None
+    return config.options(section)
+
+def setConfigurationItem(conffile, section, option, value):
+    if not os.path.isfile(conffile):
+        log.error("Configuration file " + conffile + " not found.")
+        return None
+    config = ConfigParser.ConfigParser()
+    try:
+        config.read(conffile)
+        config.set(section, option, value)
+        with open(conffile, 'wb') as cf:
+            config.write(cf)
+    except:
+        log.error("Cannot set required configuration value in " + conffile)
+        return False
+    return True
+
 def getConfJsonPath(conffile):
     root_mount = getConfigurationItem(conffile, 'General', 'host_bind_mount')
     if not root_mount:
@@ -351,6 +379,49 @@ def mcopy(dev, src, dst):
     if child.returncode != 0:
         log.debug("Failed to mcopy in " + dev);
         return False
+    return True
+
+def jsonAttributeExists(json, attribute):
+    # Load the decoded json file
+    try:
+        with open(json, 'r') as fd:
+            configjson = json.load(fd)
+    except:
+        log.error("jsonSetAttribute: Can't read or decode " + json + ".")
+        return False
+
+    return attribute in configjson.keys()
+
+def jsonSetAttribute(json, attribute, value, onlyIfNotDefined=False):
+    # Load the decoded json file
+    try:
+        with open(json, 'r') as fd:
+            configjson = json.load(fd)
+    except:
+        log.error("jsonSetAttribute: Can't read or decode " + json + ".")
+        return False
+
+    # Handle onlyIfNotDefined
+    if attribute in configjson.keys():
+        if onlyIfNotDefined:
+            log.error("jsonSetAttribute: " + attribute + " already defined.")
+            return False
+        else:
+            log.warn("jsonSetAttribute: " + attribute + " will be overwritten.")
+
+    configjson[atttribute] = value # Set the required attribute
+
+    # Write new json to a tmp file
+    try:
+        with open(json+'.hup.tmp', 'w') as fd:
+            configjson = json.dump(configjson, fd)
+    except:
+        log.error("jsonSetAttribute: Can't write or encode to " + json + ".")
+        return False
+
+    os.rename(json+'.hup.tmp', json) # Atomic rename file
+
+    log.debug("jsonSetAttribute: Successfully set " + attribute + " to " + value + " in " + json + ".")
     return True
 
 def safeCopy(src, dst):
