@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 #
 # ** License **
@@ -142,22 +142,11 @@ class Updater:
                 continue
             if os.path.isfile(src_full_path):
                 # Handle file
-                if os.path.exists(self.tempRootMountpoint + dst):
-                    log.warn(self.tempRootMountpoint + dst + " already exists. Destination file will be overwritten.")
-                try:
-                    shutil.copy(src_full_path, self.tempRootMountpoint + os.path.dirname(dst))
-                except:
-                    log.warn("Could not copy " + src_full_path)
+                if not safeCopy(src_full_path, self.tempRootMountpoint + os.path.dirname(dst)):
                     return False
             elif os.path.isdir(src_full_path):
                 # Handle directory
-                if os.path.exists(self.tempRootMountpoint + dst):
-                    log.warn(self.tempRootMountpoint + dst + " already exists.")
-                    return False
-                try:
-                    shutil.copytree(src_full_path, self.tempRootMountpoint + dst)
-                except:
-                    log.warn("Could not copy " + src_full_path)
+                if not safeCopy(src_full_path, self.tempRootMountpoint + dst)
                     return False
             else:
                 # Don't handle something else
@@ -205,30 +194,20 @@ class Updater:
             # All these files are relative to bootfilesdir
             src = os.path.join(self.fetcher.bootfilesdir, bootfile)
             dst = os.path.join(bootmountpoint, bootfile)
-            if not os.path.exists(os.path.dirname(dst)):
-                try:
-                    os.makedirs(os.path.dirname(dst))
-                except:
-                    log.warn("Can't create path " + os.path.dirname(dst))
-                    return False
             if os.path.isfile(dst):
                 if isTextFile(src) and isTextFile(dst):
                     log.warn("Test file " + bootfile + " already exists in boot partition. Will backup.")
                     try:
-                        shutil.move(dst, dst + ".hup.old")
+                        os.rename(dst, dst + ".hup.old")
                     except Exception as s:
                         log.warn("Can't backup " + dst)
                         log.warn(str(s))
                         return False
                 else:
                     log.warn("Non-text file " + bootfile + " will be overwritten.")
-            try:
-                shutil.copy(src, dst)
-                log.debug("Copied " + src + " to " + dst)
-            except Exception as s:
-                log.warn("Can't copy " + src + " to " + dst)
-                log.warn(str(s))
+            if not safeCopy(src, dst):
                 return False
+            log.debug("Copied " + src + " to " + dst)
         return True
 
     def fixOldConfigJson(self):
@@ -252,7 +231,7 @@ class Updater:
             tmpconfig = "/tmp/config.json"
             resinconf = os.path.join(root_mount, "etc/resin.conf")
 
-            shutil.copy(config, tmpconfig) # Work on a copy
+            safeCopy(config, tmpconfig) # Work on a copy
 
             # Make sure everything in resin.conf is in json
             with open(resinconf) as resinconffile:
@@ -265,7 +244,7 @@ class Updater:
                     command = "jq '." + mappedvariable + "=\"" + value.strip() + "\"' " + tmpconfig + " > /tmp/tempconfig.json"
                     child = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
                     out, err = child.communicate()
-                    shutil.copy("/tmp/tempconfig.json", tmpconfig)
+                    safeCopy("/tmp/tempconfig.json", tmpconfig)
 
             # Handle VPN address separately as we didn't have it in resin.conf
             command = "jq --raw-output '.registryEndpoint' " + tmpconfig
@@ -275,7 +254,7 @@ class Updater:
             command = "cat " + tmpconfig + " | jq '.vpnEndpoint=\"" + vpnEndpoint + "\"' > /tmp/tempconfig.json"
             child = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
             out, err = child.communicate()
-            shutil.copy("/tmp/tempconfig.json", tmpconfig)
+            safeCopy("/tmp/tempconfig.json", tmpconfig)
 
             configPartition = getConfigPartition(self.conf)
             if not configPartition:
