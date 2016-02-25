@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 #
 # ** License **
@@ -8,7 +8,7 @@
 # Author: Andrei Gherzan <andrei@resin.io>
 #
 
-import ConfigParser
+import configparser
 import sys
 import logging
 import os
@@ -18,6 +18,8 @@ import subprocess
 import re
 import string
 import hashlib
+import unittest
+import shutil
 
 log = logging.getLogger(__name__)
 
@@ -76,7 +78,7 @@ def getDevice(label):
     return None
 
 def setDeviceLabel(device, label):
-    log.warn("Will label " + device + " as " + label)
+    log.warning("Will label " + device + " as " + label)
     if not os.path.exists(device):
         return False
     if not userConfirm("Setting label for " + device + " as " + label):
@@ -84,12 +86,12 @@ def setDeviceLabel(device, label):
     child = subprocess.Popen("e2label " + device + " " + label, stdout=subprocess.PIPE, shell=True)
     out = child.communicate()[0].strip()
     if child.returncode == 0:
-        log.warn("Labeled " + device + " as " + label)
+        log.warning("Labeled " + device + " as " + label)
         return True
     return False
 
 def setVFATDeviceLabel(device, label):
-    log.warn("Will label " + device + " as " + label)
+    log.warning("Will label " + device + " as " + label)
     if not os.path.exists(device):
         return False
     if not userConfirm("Setting label for " + device + " as " + label):
@@ -97,12 +99,12 @@ def setVFATDeviceLabel(device, label):
     child = subprocess.Popen("dosfslabel " + device + " " + label, stdout=subprocess.PIPE, shell=True)
     out = child.communicate()[0].strip()
     if child.returncode == 0:
-        log.warn("Labeled " + device + " as " + label)
+        log.warning("Labeled " + device + " as " + label)
         return True
     return False
 
 def setBTRFSDeviceLabel(device, label):
-    log.warn("Will label " + device + " as " + label)
+    log.warning("Will label " + device + " as " + label)
     if not os.path.exists(device):
         return False
 
@@ -117,7 +119,7 @@ def setBTRFSDeviceLabel(device, label):
     child = subprocess.Popen("btrfs filesystem label " + device + " " + label, stdout=subprocess.PIPE, shell=True)
     out = child.communicate()[0].strip()
     if child.returncode == 0:
-        log.warn("Labeled " + device + " as " + label)
+        log.warning("Labeled " + device + " as " + label)
         return True
     return False
 
@@ -157,7 +159,7 @@ def getInput(helpmsg, valids = []):
     return s
 
 def userConfirm(name):
-    log.warn(name)
+    log.warning(name)
     return True # No interactive mode anymore
     selection = getInput("Are you sure?", ["no","yes"])
     if selection == "yes":
@@ -183,7 +185,7 @@ def umount(dev):
         log.debug("Unmounted " + dev)
         return True
 
-    log.warn("Failed to unmount " + dev)
+    log.warning("Failed to unmount " + dev)
     return False
 
 def mount(what, where, mounttype='', mountoptions=''):
@@ -198,7 +200,7 @@ def mount(what, where, mounttype='', mountoptions=''):
         log.debug("Mounted " + what + " in " + where + ".")
         return True
 
-    log.warn("Failed to mount " + what + " in " + where + ".")
+    log.warning("Failed to mount " + what + " in " + where + ".")
     return False
 
 def getMountpoint(dev):
@@ -273,7 +275,7 @@ def runningDevice(conffile):
         log.debug("Detected board: " + out.strip())
         return out.strip()
 
-    log.warn("Failed to detect board")
+    log.warning("Failed to detect board")
     return None
 
 def getMountPoint(path):
@@ -350,3 +352,134 @@ def mcopy(dev, src, dst):
         log.debug("Failed to mcopy in " + dev);
         return False
     return True
+
+def safeCopy(src, dst):
+    if os.path.isfile(src):
+        return safeFileCopy(src, dst)
+    elif os.path.isdir(src):
+        return safeDirCopy(src, dst)
+    else:
+        log.error("Unknown src target to copy " + src + ".")
+        return False
+
+def safeDirCopy(src, dst):
+    # src must be a dir
+    if not os.path.isdir(src):
+        log.error("Can't copy source as " + src + " is not a directory.")
+        return False
+
+    # dst must not exist
+    if os.path.isdir(dst):
+        log.error("Can't copy to an existent directory " + dst + " .")
+        return False
+
+    # Copy each file in the structure of src to dst
+    for root, dirs, files in os.walk(src):
+            for name in files:
+                srcfullpath = os.path.join(root, name)
+                dstfullpath = os.path.join(dst, os.path.relpath(srcfullpath, src))
+                print(srcfullpath + " -> " + dstfullpath)
+                if not safeFileCopy(srcfullpath, dstfullpath):
+                    return False
+    return True
+
+def safeFileCopy(src, dst):
+    # src must be a file
+    if not os.path.isfile(src):
+        log.error("safeFileCopy: Can't copy source as " + src + " is not a file.")
+        return False
+
+    # Make sure dst is either non-existent or a file (which we overwrite)
+    if os.path.exists(dst):
+        if os.path.isfile(dst):
+            log.warning("safeFileCopy: Destination file " + dst + " already exists. Will overwrite.")
+        elif os.path.isdir(dst):
+            log.error("safeFileCopy: Destination target " + dst + " is a directory.")
+            return False
+        else:
+            log.error("safeFileCopy: Destination target " + dst + " is unknown.")
+            return False
+
+    # Copy file to dst.tmp
+    if not os.path.isdir(os.path.dirname(dst)):
+        try:
+            os.makedirs(os.path.dirname(dst))
+        except:
+            log.error("safeFileCopy: Failed to create directories structure for destination " + dst + ".")
+            return False
+    with open(src, 'rb') as srcfd, open(dst + ".tmp", "wb") as dsttmpfd:
+        try:
+            shutil.copyfileobj(srcfd, dsttmpfd)
+        except:
+            log.error("safeFileCopy: Failed to copy " + src + ".")
+            return False
+        os.fsync(dsttmpfd)
+
+    # Rename and sync filesystem to disk
+    os.rename(dst + ".tmp", dst)
+    os.sync()
+
+    return True
+
+class TestSafeFileCopy(unittest.TestCase):
+    def testSafeFileCopyNormal(self):
+        src = "./util/safefilecopy/file1"
+        dst = "./util/safefilecopy/file1.test"
+        self.assertTrue(safeFileCopy(src, dst))
+        os.remove(dst) # cleanup
+
+    def testSafeFileCopySrcInvalid(self):
+        src = "./util/safefilecopy/none"
+        dst = "./util/safefilecopy/file1.test"
+        self.assertFalse(safeFileCopy(src, dst))
+
+    def testSafeFileCopyOverwrite(self):
+        src = "./util/safefilecopy/file1"
+        dst = "./util/safefilecopy/file2"
+        with open(dst,'w') as f:
+            f.write("file2")
+        self.assertTrue(safeFileCopy(src, dst))
+        with open(dst,'r') as f:
+            content = f.read()
+        self.assertTrue(content == 'file1')
+        os.remove(dst) # cleanup
+
+    def testSafeFileCopySrcDir(self):
+        src = "./util/safefilecopy/dir1"
+        dst = "./util/safefilecopy/file2"
+        self.assertFalse(safeFileCopy(src, dst))
+
+    def testSafeFileCopyDstDir(self):
+        src = "./util/safefilecopy/file1"
+        dst = "./util/safefilecopy/dir1"
+        self.assertFalse(safeFileCopy(src, dst))
+
+    def testSafeFileCopyToDirStr(self):
+        src = "./util/safefilecopy/dir1/file2"
+        dst = "./util/safefilecopy/dir2/dir3/file4"
+        self.assertTrue(safeFileCopy(src, dst))
+        self.assertTrue(os.path.isfile(dst))
+        with open(dst,'r') as f:
+            content = f.read()
+        self.assertTrue(content == 'file2')
+        shutil.rmtree("./util/safefilecopy/dir2") # cleanup
+
+class TestSafeDirCopy(unittest.TestCase):
+    def testSafeDirCopyNormal(self):
+        src = "./util/safedircopy/dir1"
+        dst = "./util/safedircopy/dir3"
+        self.assertTrue(safeDirCopy(src, dst))
+        shutil.rmtree(dst) # cleanup
+
+    def testSafeDirCopyDstExistent(self):
+        src = "./util/safedircopy/dir1"
+        dst = "./util/safedircopy/dir1"
+        self.assertFalse(safeDirCopy(src, dst))
+
+    def testSafeDirCopyFile(self):
+        src = "./util/safedircopy/dir1/file2"
+        dst = "./util/safedircopy/dir3"
+        self.assertFalse(safeDirCopy(src, dst))
+
+if __name__ == '__main__':
+    unittest.main()
