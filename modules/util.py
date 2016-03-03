@@ -415,6 +415,7 @@ def jsonSetAttribute(json, attribute, value, onlyIfNotDefined=False):
     try:
         with open(json+'.hup.tmp', 'w') as fd:
             configjson = json.dump(configjson, fd)
+            os.fsync(fd)
     except:
         log.error("jsonSetAttribute: Can't write or encode to " + json + ".")
         return False
