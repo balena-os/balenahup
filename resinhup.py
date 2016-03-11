@@ -105,7 +105,7 @@ def main():
     if args.staging:
         if not setConfigurationItem(args.conf, "config.json", "type", "staging"):
             return False
-    else
+    else:
         if not setConfigurationItem(args.conf, "config.json", "type", "production"):
             return False
 

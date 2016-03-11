@@ -137,7 +137,7 @@ class MyTest(unittest.TestCase):
         # Cleanup mount
         umount(mountpoint)
 
-        print scanner.printFingerPrints()
+        print(scanner.printFingerPrints())
 
         whitelist_fingerprints = getConfigurationItem(conf, "FingerPrintScanner", "whitelist").split()
         fingerprints = scanner.getFingerPrints()

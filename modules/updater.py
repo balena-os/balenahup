@@ -146,7 +146,7 @@ class Updater:
                     return False
             elif os.path.isdir(src_full_path):
                 # Handle directory
-                if not safeCopy(src_full_path, self.tempRootMountpoint + dst)
+                if not safeCopy(src_full_path, self.tempRootMountpoint + dst):
                     return False
             else:
                 # Don't handle something else
