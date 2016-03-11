@@ -9,8 +9,8 @@
 #
 
 import logging
-from util import *
-from bootconf import *
+from .util import *
+from .bootconf import *
 import re
 import os
 import shutil

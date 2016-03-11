@@ -9,7 +9,7 @@
 #
 
 import logging
-from util import *
+from .util import *
 
 class BootloaderConfigurator(object):
     def __init__ (self, conf):

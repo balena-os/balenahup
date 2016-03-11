@@ -12,8 +12,8 @@ import unittest
 import os
 import logging
 import operator
-from util import *
-from colorlogging import *
+from .util import *
+from .colorlogging import *
 
 class FingerPrintScanner(object):
     def __init__(self, root, conf, images_fingerprint_path, skipMountPoints=True):
