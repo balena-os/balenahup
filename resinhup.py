@@ -28,7 +28,8 @@ def main():
     Main
     '''
     # Parse arguments
-    parser = ArgumentParser(add_help=False, version = meta.version, description=meta.description)
+    parser = ArgumentParser(add_help=False, description=meta.description)
+    parser.add_argument('-v', '--version', action='version', version = meta.version)
     parser.add_argument('-h', '--help', action='help',
                       help = 'Print this message and exit')
     parser.add_argument('-d', '--debug', action="store_true", dest = 'debug', default = False,
