@@ -63,7 +63,7 @@ def getBootPartition(conffile):
 
 def getPartitionLabel(device):
     child = subprocess.Popen("lsblk -n -o label " + device, stdout=subprocess.PIPE, shell=True)
-    label = child.communicate()[0].strip()
+    label = child.communicate()[0].decode().strip()
     if child.returncode == 0 and label != "":
         log.debug("Found label " + label + " for device " + device)
         return label
@@ -72,7 +72,7 @@ def getPartitionLabel(device):
 
 def getDevice(label):
     child = subprocess.Popen("blkid -l -o device -t LABEL=\"" + label + "\"", stdout=subprocess.PIPE, shell=True)
-    device = child.communicate()[0].strip()
+    device = child.communicate()[0].decode().strip()
     if child.returncode == 0 and device != "":
         log.debug("Found device " + device + " for label " + label)
         return device
@@ -85,7 +85,7 @@ def setDeviceLabel(device, label):
     if not userConfirm("Setting label for " + device + " as " + label):
         return False
     child = subprocess.Popen("e2label " + device + " " + label, stdout=subprocess.PIPE, shell=True)
-    out = child.communicate()[0].strip()
+    out = child.communicate()[0].decode().strip()
     if child.returncode == 0:
         log.warning("Labeled " + device + " as " + label)
         return True
@@ -98,7 +98,7 @@ def setVFATDeviceLabel(device, label):
     if not userConfirm("Setting label for " + device + " as " + label):
         return False
     child = subprocess.Popen("dosfslabel " + device + " " + label, stdout=subprocess.PIPE, shell=True)
-    out = child.communicate()[0].strip()
+    out = child.communicate()[0].decode().strip()
     if child.returncode == 0:
         log.warning("Labeled " + device + " as " + label)
         return True
@@ -118,7 +118,7 @@ def setBTRFSDeviceLabel(device, label):
     if not userConfirm("Setting label for " + device + " as " + label):
         return False
     child = subprocess.Popen("btrfs filesystem label " + device + " " + label, stdout=subprocess.PIPE, shell=True)
-    out = child.communicate()[0].strip()
+    out = child.communicate()[0].decode().strip()
     if child.returncode == 0:
         log.warning("Labeled " + device + " as " + label)
         return True
@@ -131,7 +131,7 @@ def formatEXT3(path, label):
     if not userConfirm("Formatting " + path + " as EXT3 and set its label as " + label):
         return False
     child = subprocess.Popen("mkfs.ext3 -L " + label + " " + path, stdout=subprocess.PIPE, shell=True)
-    out = child.communicate()[0].strip()
+    out = child.communicate()[0].decode().strip()
     if child.returncode == 0:
         log.debug("Formatted " + path + " as EXT3")
         return True
@@ -144,7 +144,7 @@ def formatVFAT(path, label):
     if not userConfirm("Formatting " + path + " as VFAT and set its label as " + label):
         return False
     child = subprocess.Popen("mkfs.vfat -n " + label + " -S 512 " + path, stdout=subprocess.PIPE, shell=True)
-    out = child.communicate()[0].strip()
+    out = child.communicate()[0].decode().strip()
     if child.returncode == 0:
         log.debug("Formatted " + path + " as VFAT")
         return True
@@ -170,7 +170,7 @@ def userConfirm(name):
 def isMounted(dev):
     p = subprocess.Popen(['df', '-h'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     p1, err = p.communicate()
-    pattern = p1
+    pattern = p1.decode()
 
     if pattern.find(dev) == -1:
         log.debug(dev + " is not mounted")
@@ -300,8 +300,8 @@ def runningDevice(conffile):
     child = subprocess.Popen("jq -r .deviceType " + conf, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     out, err = child.communicate()
     if out:
-        log.debug("Detected board: " + out.strip())
-        return out.strip()
+        log.debug("Detected board: " + out.decode().strip())
+        return out.decode().strip()
 
     log.warning("Failed to detect board")
     return None
@@ -349,8 +349,8 @@ def getExtendedPartition(conffile):
     child = subprocess.Popen("fdisk -l | grep \"Ext'd\" | awk '{print $1}' | grep " + rootdevice , stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     out, err = child.communicate()
     if out:
-        log.debug("Detected extended partition: " + out.strip())
-        return out.strip()
+        log.debug("Detected extended partition: " + out.decode().strip())
+        return out.decode().strip()
     return None
 
 def getConfigPartition(conffile):
