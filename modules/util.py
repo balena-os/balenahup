@@ -244,7 +244,7 @@ def getConfigurationItem(conffile, section, option):
     if not os.path.isfile(conffile):
         log.error("Configuration file " + conffile + " not found.")
         return None
-    config = ConfigParser.ConfigParser()
+    config = configparser.ConfigParser()
     try:
         config.read(conffile)
     except:
@@ -256,7 +256,7 @@ def getSectionOptions(conffile, section):
     if not os.path.isfile(conffile):
         log.error("Configuration file " + conffile + " not found.")
         return None
-    config = ConfigParser.ConfigParser()
+    config = configparser.ConfigParser()
     try:
         config.read(conffile)
     except:
@@ -268,7 +268,7 @@ def setConfigurationItem(conffile, section, option, value):
     if not os.path.isfile(conffile):
         log.error("Configuration file " + conffile + " not found.")
         return None
-    config = ConfigParser.ConfigParser()
+    config = configparser.ConfigParser()
     try:
         config.read(conffile)
         config.set(section, option, value)
