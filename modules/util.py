@@ -495,19 +495,19 @@ def safeFileCopy(src, dst):
 
 class TestSafeFileCopy(unittest.TestCase):
     def testSafeFileCopyNormal(self):
-        src = "./util/safefilecopy/file1"
-        dst = "./util/safefilecopy/file1.test"
+        src = "./modules/util/safefilecopy/file1"
+        dst = "./modules/util/safefilecopy/file1.test"
         self.assertTrue(safeFileCopy(src, dst))
         os.remove(dst) # cleanup
 
     def testSafeFileCopySrcInvalid(self):
-        src = "./util/safefilecopy/none"
-        dst = "./util/safefilecopy/file1.test"
+        src = "./modules/util/safefilecopy/none"
+        dst = "./modules/util/safefilecopy/file1.test"
         self.assertFalse(safeFileCopy(src, dst))
 
     def testSafeFileCopyOverwrite(self):
-        src = "./util/safefilecopy/file1"
-        dst = "./util/safefilecopy/file2"
+        src = "./modules/util/safefilecopy/file1"
+        dst = "./modules/util/safefilecopy/file2"
         with open(dst,'w') as f:
             f.write("file2")
         self.assertTrue(safeFileCopy(src, dst))
@@ -517,40 +517,40 @@ class TestSafeFileCopy(unittest.TestCase):
         os.remove(dst) # cleanup
 
     def testSafeFileCopySrcDir(self):
-        src = "./util/safefilecopy/dir1"
-        dst = "./util/safefilecopy/file2"
+        src = "./modules/util/safefilecopy/dir1"
+        dst = "./modules/util/safefilecopy/file2"
         self.assertFalse(safeFileCopy(src, dst))
 
     def testSafeFileCopyDstDir(self):
-        src = "./util/safefilecopy/file1"
-        dst = "./util/safefilecopy/dir1"
+        src = "./modules/util/safefilecopy/file1"
+        dst = "./modules/util/safefilecopy/dir1"
         self.assertFalse(safeFileCopy(src, dst))
 
     def testSafeFileCopyToDirStr(self):
-        src = "./util/safefilecopy/dir1/file2"
-        dst = "./util/safefilecopy/dir2/dir3/file4"
+        src = "./modules/util/safefilecopy/dir1/file2"
+        dst = "./modules/util/safefilecopy/dir2/dir3/file4"
         self.assertTrue(safeFileCopy(src, dst))
         self.assertTrue(os.path.isfile(dst))
         with open(dst,'r') as f:
             content = f.read()
         self.assertTrue(content == 'file2')
-        shutil.rmtree("./util/safefilecopy/dir2") # cleanup
+        shutil.rmtree("./modules/util/safefilecopy/dir2") # cleanup
 
 class TestSafeDirCopy(unittest.TestCase):
     def testSafeDirCopyNormal(self):
-        src = "./util/safedircopy/dir1"
-        dst = "./util/safedircopy/dir3"
+        src = "./modules/util/safedircopy/dir1"
+        dst = "./modules/util/safedircopy/dir3"
         self.assertTrue(safeDirCopy(src, dst))
         shutil.rmtree(dst) # cleanup
 
     def testSafeDirCopyDstExistent(self):
-        src = "./util/safedircopy/dir1"
-        dst = "./util/safedircopy/dir1"
+        src = "./modules/util/safedircopy/dir1"
+        dst = "./modules/util/safedircopy/dir1"
         self.assertFalse(safeDirCopy(src, dst))
 
     def testSafeDirCopyFile(self):
-        src = "./util/safedircopy/dir1/file2"
-        dst = "./util/safedircopy/dir3"
+        src = "./modules/util/safedircopy/dir1/file2"
+        dst = "./modules/util/safedircopy/dir3"
         self.assertFalse(safeDirCopy(src, dst))
 
 if __name__ == '__main__':
