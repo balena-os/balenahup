@@ -30,12 +30,12 @@ class FingerPrintScanner(object):
             if self.skipMountPoints:
                 if log.getEffectiveLevel() == logging.DEBUG:
                     # Filter out from dirs the mountpoints = stay on same filesystem
-                    temp_dirs = filter(lambda dir: not os.path.ismount(os.path.join(root, dir)), dirs)
+                    temp_dirs = list(filter(lambda dir: not os.path.ismount(os.path.join(root, dir)), dirs))
                     if set(dirs) != set(temp_dirs):
                         log.debug("FingerPrintScanner: Ignored these directories as they were mountpoint: " + ', '.join(set(dirs) - set(temp_dirs)))
                     dirs[:] = temp_dirs[:]
                     # Filter out whitelist
-                    temp_dirs = filter(lambda dir: not os.path.join(root, dir) in whitelist_fingerprints, dirs)
+                    temp_dirs = list(filter(lambda dir: not os.path.join(root, dir) in whitelist_fingerprints, dirs))
                     if set(dirs) != set(temp_dirs):
                         log.debug("FingerPrintScanner: Ignored these directories as they were whitelisted: " + ', '.join(set(dirs) - set(temp_dirs)))
                     dirs[:] = temp_dirs[:]
