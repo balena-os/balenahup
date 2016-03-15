@@ -127,11 +127,11 @@ class MyTest(unittest.TestCase):
         log.addHandler(ch)
 
         # Test that it ignores mountpoints
-        mountpoint = "./fingerprint/tests/testRun/tree/dir1"
+        mountpoint = "./modules/fingerprint/tests/testRun/tree/dir1"
         mount(what="tmpfs", where=mountpoint, mounttype="tmpfs")
 
-        conf = "./fingerprint/tests/testRun/resinhup.conf"
-        scanner = FingerPrintScanner("./fingerprint/tests/testRun/tree", conf, "./fingerprint/tests/testRun")
+        conf = "./modules/fingerprint/tests/testRun/resinhup.conf"
+        scanner = FingerPrintScanner("./modules/fingerprint/tests/testRun/tree", conf, "./modules/fingerprint/tests/testRun")
         scanner.scan()
 
         # Cleanup mount
@@ -143,7 +143,7 @@ class MyTest(unittest.TestCase):
         fingerprints = scanner.getFingerPrints()
 
         # Check on known file
-        self.assertTrue(fingerprints['./fingerprint/tests/testRun/tree/dir4/file1'] == '68b329da9893e34099c7d8ad5cb9c940')
+        self.assertTrue(fingerprints['./modules/fingerprint/tests/testRun/tree/dir4/file1'] == '68b329da9893e34099c7d8ad5cb9c940')
 
         for filename,filemd5 in fingerprints.items():
             self.assertFalse(filename in whitelist_fingerprints)
