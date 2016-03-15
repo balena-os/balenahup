@@ -272,7 +272,7 @@ def setConfigurationItem(conffile, section, option, value):
     try:
         config.read(conffile)
         config.set(section, option, value)
-        with open(conffile, 'wb') as cf:
+        with open(conffile, 'w') as cf:
             config.write(cf)
     except:
         log.error("Cannot set required configuration value in " + conffile)
