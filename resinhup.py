@@ -103,6 +103,7 @@ def main():
         log.debug("Fingerprint scan avoided due to flag or env.")
 
     # Staging / production
+    log.info("Configure update as " + ("staging" if args.staging else "production") + ".")
     if args.staging:
         if not setConfigurationItem(args.conf, "config.json", "type", "staging"):
             return False
