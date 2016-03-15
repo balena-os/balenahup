@@ -247,10 +247,10 @@ def getConfigurationItem(conffile, section, option):
     config = configparser.ConfigParser()
     try:
         config.read(conffile)
+        return config.get(section, option)
     except:
-        log.error("Cannot read configuration file " + conffile)
+        log.warning("Cannot get from configuration file " + conffile + ", section " + section + ", option " + option + ".")
         return None
-    return config.get(section, option)
 
 def getSectionOptions(conffile, section):
     if not os.path.isfile(conffile):
