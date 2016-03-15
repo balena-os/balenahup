@@ -38,11 +38,12 @@ def getRootPartition(conffile):
     rootmajor=os.major(rootdev)
     rootminor=os.minor(rootdev)
     root="%d:%d" % (rootmajor, rootminor)
-    for f in glob("/sys/class/block/*/dev"):
-        if file(f).read().strip() == root:
-            dev = "/dev/" + os.path.basename(os.path.dirname(f))
-            log.debug("Found root partition: " + dev)
-            return dev
+    for filepath in glob("/sys/class/block/*/dev"):
+        with open(filepath) as fd:
+            if fd.read().strip() == root:
+                dev = "/dev/" + os.path.basename(os.path.dirname(filepath))
+                log.debug("Found root partition: " + dev + ".")
+                return dev
     return None
 
 def getBootPartition(conffile):
