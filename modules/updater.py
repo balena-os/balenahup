@@ -231,21 +231,15 @@ class Updater:
                         continue
                     value = line.split('=')[1]
                     mappedvariable = variablesmap[variable]
-                    command = "jq '." + mappedvariable + "=\"" + value.strip() + "\"' " + tmpconfig + " > /tmp/tempconfig.json"
-                    child = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-                    out, err = child.communicate()
-                    safeCopy("/tmp/tempconfig.json", tmpconfig)
+                    jsonSetAttribute(tmpconfig, mappedvariable, value.strip(), onlyIfNotDefined=True)
 
             # Handle VPN address separately as we didn't have it in resin.conf
-            command = "jq --raw-output '.registryEndpoint' " + tmpconfig
-            child = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-            registryEndpoint, err = child.communicate()
-            vpnEndpoint = registryEndpoint.strip().replace('registry','vpn')
-            command = "cat " + tmpconfig + " | jq '.vpnEndpoint=\"" + vpnEndpoint + "\"' > /tmp/tempconfig.json"
-            child = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-            out, err = child.communicate()
-            safeCopy("/tmp/tempconfig.json", tmpconfig)
+            # Compute vpn endpoint based on registry endpoint and write it to json
+            registryEndpoint = jsonGetAttribute(tmpconfig, 'registryEndpoint')
+            vpnEndpoint = registryEndpoint.strip().replace('registry', 'vpn')
+            jsonSetAttribute(tmpconfig, 'vpnEndpoint', vpnEndpoint, onlyIfNotDefined=True)
 
+            # Handle config partition and write tmpconfig in it
             configPartition = getConfigPartition(self.conf)
             if not configPartition:
                 return False
@@ -255,6 +249,7 @@ class Updater:
                 return False
             os.remove(tmpconfig)
             return True
+
         return False
 
     def fixFsLabels(self):

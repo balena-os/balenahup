@@ -382,24 +382,39 @@ def mcopy(dev, src, dst):
         return False
     return True
 
-def jsonAttributeExists(json, attribute):
-    # Load the decoded json file
+def jsonDecode(jsonfile):
     try:
-        with open(json, 'r') as fd:
+        with open(jsonfile, 'r') as fd:
             configjson = json.load(fd)
-    except:
-        log.error("jsonSetAttribute: Can't read or decode " + json + ".")
+    except Exception as e:
+        log.error("jsonDecode: Can't read or decode " + jsonfile + ".")
+        log.error(str(e))
+        return None
+    return configjson
+
+def jsonAttributeExists(jsonfile, attribute):
+    # Decode json first
+    configjson = jsonDecode(jsonfile)
+    if not configjson:
         return False
 
     return attribute in configjson.keys()
 
-def jsonSetAttribute(json, attribute, value, onlyIfNotDefined=False):
-    # Load the decoded json file
-    try:
-        with open(json, 'r') as fd:
-            configjson = json.load(fd)
-    except:
-        log.error("jsonSetAttribute: Can't read or decode " + json + ".")
+def jsonGetAttribute(jsonfile, attribute):
+    # Decode json first
+    configjson = jsonDecode(jsonfile)
+    if not configjson:
+        return None
+
+    if attribute in configjson.keys():
+        return configjson[attribute]
+    else:
+        return None
+
+def jsonSetAttribute(jsonfile, attribute, value, onlyIfNotDefined=False):
+    # Decode json first
+    configjson = jsonDecode(jsonfile)
+    if not configjson:
         return False
 
     # Handle onlyIfNotDefined
@@ -410,20 +425,20 @@ def jsonSetAttribute(json, attribute, value, onlyIfNotDefined=False):
         else:
             log.warn("jsonSetAttribute: " + attribute + " will be overwritten.")
 
-    configjson[atttribute] = value # Set the required attribute
+    configjson[attribute] = value # Set the required attribute
 
     # Write new json to a tmp file
     try:
-        with open(json+'.hup.tmp', 'w') as fd:
+        with open(jsonfile + '.hup.tmp', 'w') as fd:
             configjson = json.dump(configjson, fd)
             os.fsync(fd)
     except:
-        log.error("jsonSetAttribute: Can't write or encode to " + json + ".")
+        log.error("jsonSetAttribute: Can't write or encode to " + jsonfile + ".")
         return False
 
-    os.rename(json+'.hup.tmp', json) # Atomic rename file
+    os.rename(jsonfile + '.hup.tmp', jsonfile) # Atomic rename file
 
-    log.debug("jsonSetAttribute: Successfully set " + attribute + " to " + value + " in " + json + ".")
+    log.debug("jsonSetAttribute: Successfully set " + attribute + " to " + value + " in " + jsonfile + ".")
     return True
 
 def safeCopy(src, dst):
