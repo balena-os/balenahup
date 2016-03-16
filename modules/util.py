@@ -482,8 +482,9 @@ def safeFileCopy(src, dst):
     with open(src, 'rb') as srcfd, open(dst + ".tmp", "wb") as dsttmpfd:
         try:
             shutil.copyfileobj(srcfd, dsttmpfd)
-        except:
-            log.error("safeFileCopy: Failed to copy " + src + ".")
+        except Exception as s:
+            log.error("safeFileCopy: Failed to copy " + src + " to " + dst + ".tmp .")
+            log.error(str(s))
             return False
         os.fsync(dsttmpfd)
 
