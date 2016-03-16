@@ -451,7 +451,6 @@ def safeDirCopy(src, dst):
             for name in files:
                 srcfullpath = os.path.join(root, name)
                 dstfullpath = os.path.join(dst, os.path.relpath(srcfullpath, src))
-                print(srcfullpath + " -> " + dstfullpath)
                 if not safeFileCopy(srcfullpath, dstfullpath):
                     return False
     return True
