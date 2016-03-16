@@ -246,6 +246,7 @@ def getConfigurationItem(conffile, section, option):
         log.error("Configuration file " + conffile + " not found.")
         return None
     config = configparser.ConfigParser()
+    config.optionxform=str
     try:
         config.read(conffile)
         return config.get(section, option)
@@ -258,6 +259,7 @@ def getSectionOptions(conffile, section):
         log.error("Configuration file " + conffile + " not found.")
         return None
     config = configparser.ConfigParser()
+    config.optionxform=str
     try:
         config.read(conffile)
     except:
@@ -270,6 +272,7 @@ def setConfigurationItem(conffile, section, option, value):
         log.error("Configuration file " + conffile + " not found.")
         return None
     config = configparser.ConfigParser()
+    config.optionxform=str
     try:
         config.read(conffile)
         config.set(section, option, value)
