@@ -140,17 +140,7 @@ class Updater:
             if not os.path.exists(src_full_path):
                 log.warn(src_full_path + " was not found in your current mounted rootfs. Can't overlay.")
                 continue
-            if os.path.isfile(src_full_path):
-                # Handle file
-                if not safeCopy(src_full_path, self.tempRootMountpoint + os.path.dirname(dst)):
-                    return False
-            elif os.path.isdir(src_full_path):
-                # Handle directory
-                if not safeCopy(src_full_path, self.tempRootMountpoint + dst):
-                    return False
-            else:
-                # Don't handle something else
-                log.warn (src_full_path + " is an unhandled path")
+            if not safeCopy(src_full_path, self.tempRootMountpoint + dst):
                 return False
             log.debug("Overlayed " + src_full_path + " in " + self.tempRootMountpoint)
         return True
