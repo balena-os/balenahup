@@ -243,11 +243,27 @@ class Updater:
             configPartition = getConfigPartition(self.conf)
             if not configPartition:
                 return False
+            # Make sure this partition is not mounted
+            if isMounted(configPartition):
+                if not unmount(configPartition):
+                    return False
+            # Format partition and copy config.json
             if not formatVFAT(configPartition, "resin-conf"):
                 return False
             if not mcopy(dev=configPartition, src=tmpconfig, dst="::/config.json"):
                 return False
             os.remove(tmpconfig)
+
+            # At this point configuration file is fixed and is in a filesystem. Make sure
+            # this fs is mounted in config default mountpoint so detections of config.json
+            # will return the updated one from now on.
+            default_config_mountpoint = os.path.normpath(root_mount + "/" + getConfigurationItem(self.conf, 'config.json', 'default_mountpoint'))
+            if not isMounted(default_config_mountpoint):
+                if not os.path.isdir(default_config_mountpoint):
+                    os.makedirs(default_config_mountpoint)
+                if not mount(what=configPartition, where=default_config_mountpoint):
+                    return False
+
             return True
 
         return False
