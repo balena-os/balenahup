@@ -214,7 +214,7 @@ class Updater:
                 'PUBNUB_SUBSCRIBE_KEY': 'pubnubSubscribeKey',
                 'PUBNUB_PUBLISH_KEY': 'pubnubPublishKey',
                 'MIXPANEL_TOKEN': 'mixpanelToken',
-                'LISTEN_PORT': 'vpnPort'
+                'LISTEN_PORT': 'listenPort'
             };
 
             config = os.path.join(root_mount, "mnt/data-disk/config.json")
