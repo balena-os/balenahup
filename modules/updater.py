@@ -166,7 +166,7 @@ class Updater:
             if not umount(self.tempBootMountpoint):
                 return False
 
-        # Make sure the boot partition dev is mounted
+        # Make sure the boot partition device is mounted
         if not isMounted(bootdevice):
             if not mount(what=bootdevice, where=self.tempBootMountpoint):
                 return False
