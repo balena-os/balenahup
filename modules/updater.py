@@ -313,8 +313,8 @@ class Updater:
             options = getSectionOptions(self.conf, ctype)
             configjsonpath = getConfJsonPath(self.conf)
             for option in options:
-                if not jsonAttributeExists(configjsonpath, option):
-                    value = getConfigurationItem(self.conf, ctype, option)
+                value = getConfigurationItem(self.conf, ctype, option)
+                if jsonGetAttribute(configjsonpath, option) != value:
                     log.debug("verifyConfigJson: Fixing config.json: " + option + "=" + value + ".")
                     jsonSetAttribute(configjsonpath, option, value)
         except:
