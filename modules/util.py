@@ -444,39 +444,61 @@ def jsonSetAttribute(jsonfile, attribute, value, onlyIfNotDefined=False):
     log.debug("jsonSetAttribute: Successfully set " + attribute + " to " + value + " in " + jsonfile + ".")
     return True
 
-def safeCopy(src, dst):
+def safeCopy(src, dst, sync=True):
     if os.path.isfile(src):
-        return safeFileCopy(src, dst)
+        return safeFileCopy(src, dst, sync)
     elif os.path.isdir(src):
-        return safeDirCopy(src, dst)
+        return safeDirCopy(src, dst, sync)
     else:
-        log.error("Unknown src target to copy " + src + ".")
+        log.error("safeCopy: Unknown src target to copy " + src + ".")
         return False
 
-def safeDirCopy(src, dst):
+def safeDirCopy(src, dst, sync=True):
     # src must be a dir
     if not os.path.isdir(src):
-        log.error("Can't copy source as " + src + " is not a directory.")
+        log.error("safeDirCopy: Can't copy source as " + src + " is not a directory.")
         return False
 
-    # dst must not exist
-    if os.path.isdir(dst):
-        log.error("Can't copy to an existent directory " + dst + " .")
+    # dst must not be the same as src
+    if os.path.abspath(src) == os.path.abspath(dst):
+        log.error("safeDirCopy: Can't copy to the same source directory " + src + " .")
         return False
 
     # Copy each file in the structure of src to dst
     for root, dirs, files in os.walk(src):
+
+            # Directories
+            for d in dirs:
+                try:
+                    srcfullpath = os.path.join(root, d)
+                    dstfullpath = os.path.join(dst, os.path.relpath(srcfullpath, src))
+                    os.makedirs(dstfullpath, exist_ok=True)
+                    try:
+                        shutil.copymode(srcfullpath, dstfullpath)
+                    except:
+                        return False
+                except Exception as e:
+                    log.error(str(e))
+                    return False
+
+            # Files
             for name in files:
                 srcfullpath = os.path.join(root, name)
                 dstfullpath = os.path.join(dst, os.path.relpath(srcfullpath, src))
-                if not safeFileCopy(srcfullpath, dstfullpath):
+                if stat.S_ISFIFO(os.stat(srcfullpath, follow_symlinks=False).st_mode): # FIXME Ignore pipe files
+                    continue
+                if not safeFileCopy(srcfullpath, dstfullpath, sync):
                     return False
+
+            # Stay on the same filesystem
+            dirs[:] = list(filter(lambda dir: not os.path.ismount(os.path.join(root, dir)), dirs))
+
     return True
 
-def safeFileCopy(src, dst):
+def safeFileCopy(src, dst, sync=True):
     # src must be a file
-    if not os.path.isfile(src):
-        log.error("safeFileCopy: Can't copy source as " + src + " is not a file.")
+    if (not os.path.isfile(src)) and (not os.path.islink(src)):
+        log.error("safeFileCopy: Can't copy source as " + src + " is not a handled file.")
         return False
 
     # Make sure dst is either non-existent or a file (which we overwrite)
@@ -497,18 +519,25 @@ def safeFileCopy(src, dst):
         except:
             log.error("safeFileCopy: Failed to create directories structure for destination " + dst + ".")
             return False
-    with open(src, 'rb') as srcfd, open(dst + ".tmp", "wb") as dsttmpfd:
-        try:
-            shutil.copyfileobj(srcfd, dsttmpfd)
-        except Exception as s:
-            log.error("safeFileCopy: Failed to copy " + src + " to " + dst + ".tmp .")
-            log.error(str(s))
-            return False
-        os.fsync(dsttmpfd)
+    if os.path.islink(src):
+        linkto = os.readlink(src)
+        os.symlink(linkto, dst + ".tmp")
+    else:
+        with open(src, 'rb') as srcfd, open(dst + ".tmp", "wb") as dsttmpfd:
+            try:
+                shutil.copyfileobj(srcfd, dsttmpfd)
+            except Exception as s:
+                log.error("safeFileCopy: Failed to copy " + src + " to " + dst + ".tmp .")
+                log.error(str(s))
+                return False
+            if sync:
+                os.fsync(dsttmpfd)
+            shutil.copymode(src, dst + ".tmp")
 
     # Rename and sync filesystem to disk
     os.rename(dst + ".tmp", dst)
-    os.sync()
+    if sync:
+        os.sync()
 
     return True
 
