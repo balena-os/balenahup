@@ -336,14 +336,9 @@ class Updater:
         if not self.verifyConfigJson():
             log.error("Could not verify config.json.")
             return False
-        # Configure bootloader to use the updated rootfs
-        if runningDevice(self.conf) == 'raspberry-pi' or runningDevice(self.conf) == 'raspberry-pi2':
-            b = BCMRasberryPiBootloader(self.conf)
-            if not b.configure(getRootPartition(self.conf), self.toUpdateRootDevice()[0]):
-                log.error("Could not configure bootloader.")
-                return False
-        else:
-            log.warn("No bootloader configuration support for this board.")
+        if not configureBootloader(getRootPartition(self.conf), self.toUpdateRootDevice()[0]):
+            log.error("Could not configure bootloader.")
+            return False
         log.info("Finished to upgrade system.")
         return True
 
