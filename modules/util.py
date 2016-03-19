@@ -385,6 +385,25 @@ def mcopy(dev, src, dst):
         return False
     return True
 
+def get_pids(name):
+    try:
+        pids = subprocess.check_output(["pidof",name])
+    except:
+        return None
+    return pids.split()
+
+def startUdevDaemon():
+    if get_pids('udevd'):
+        log.debug('startUdevDaemon: udevd already running.')
+        return True
+
+    child = subprocess.Popen("udevd --daemon" , stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    out, err = child.communicate()
+    if child.returncode != 0:
+        log.debug("Failed to start udev as daemon");
+        return False
+    return True
+
 def jsonDecode(jsonfile):
     try:
         with open(jsonfile, 'r') as fd:
