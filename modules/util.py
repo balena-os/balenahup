@@ -62,6 +62,22 @@ def getBootPartition(conffile):
         return bootdevice
     return None
 
+def getPartitionRelativeToBoot(conffile, label, relativeIndex):
+    ''' Returns the partition device path when index is relative to boot partition '''
+    # First search by label
+    partdevice = getDevice(label)
+    if not partdevice:
+        match = re.match(r"(.*?)(\d+$)", getBootPartition(conffile))
+        if match:
+            root = match.groups()[0]
+            idx = match.groups()[1]
+            partdevice = str(root) + str(int(idx) + int(relativeIndex))
+            log.debug("Couldn't find the %s partition by label. We guessed it as being %s." %(label, partdevice))
+            return partdevice
+    else:
+        return partdevice
+    return None
+
 def getPartitionLabel(device):
     child = subprocess.Popen("lsblk -n -o label " + device, stdout=subprocess.PIPE, shell=True)
     label = child.communicate()[0].decode().strip()
