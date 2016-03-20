@@ -27,7 +27,7 @@ class Repartitioner(object):
         self.device = parted.getDevice(getRootDevice(conf))
         self.disk = parted.newDisk(self.device)
 
-    def editPartition(self, targetPartition, deltaStart, deltaEnd, fstype, fslabel, unit='MiB'):
+    def editPartition(self, targetPartition, deltaStart, deltaEnd, fstype, fslabel, unit='MiB', formatPartition=True):
         log.info("editPartition: Editing partition " + targetPartition.path + ". Start = Start + (" + str(deltaStart) + "). End = End + (" + str(deltaEnd) + ").")
 
         # Make sure that partition is not mounted
@@ -51,19 +51,18 @@ class Repartitioner(object):
         self.disk.commit()
 
         # Format filesystem
-        if fstype == 'ext3':
-            if not formatEXT3(partition.path, fslabel):
-                log.error("movePartition: Could not format " + partition.path + " as ext3.")
+        if formatPartition:
+            if fstype == 'ext3':
+                if not formatEXT3(partition.path, fslabel):
+                    log.error("movePartition: Could not format " + partition.path + " as ext3.")
+                    return False
+            elif fstype == 'fat32':
+                if not formatVFAT(partition.path, fslabel):
+                    log.error("movePartition: Could not format " + partition.path + " as vfat.")
+                    return False
+            else:
+                log.error("movePartition: Format of " + fstype + " is not implemented.")
                 return False
-        elif fstype == 'vfat':
-            if not formatVFAT(partition.path, fslabel):
-                log.error("movePartition: Could not format " + partition.path + " as vfat.")
-                return False
-        elif not fstype:
-            log.debug("editPartition: No filesystem instructed to format.")
-        else:
-            log.error("movePartition: Format of " + fstype + " is not implemented.")
-            return False
 
         return True
 
@@ -126,7 +125,7 @@ class Repartitioner(object):
                 log.debug("Running transition from State A...")
 
                 # Edit resin-updt partition
-                if not self.editPartition(targetPartition=resinUpdtPart, deltaStart=(deltasize // 2), deltaEnd=0, fstype='ext3', fslabel='resin-updt', unit=unit):
+                if not self.editPartition(targetPartition=resinUpdtPart, deltaStart=(deltasize // 2), deltaEnd=0, fstype='ext3', fslabel='resin-updt', unit=unit, formatPartition=True):
                     log.error("increaseResinBootTo: Could not edit resin-updt partition.")
                     return False
 
@@ -190,12 +189,12 @@ class Repartitioner(object):
                 log.debug("Running transition from State C...")
 
                 # Edit resin-root partition
-                if not self.editPartition(targetPartition=resinRootPart, deltaStart=(deltasize), deltaEnd=(deltasize // 2), fstype='ext3', fslabel='resin-root', unit=unit):
+                if not self.editPartition(targetPartition=resinRootPart, deltaStart=(deltasize), deltaEnd=(deltasize // 2), fstype='ext3', fslabel='resin-root', unit=unit, formatPartition=True):
                     log.error("increaseResinBootTo: Could not edit resin-root partition.")
                     return False
 
                 # Expand resin-boot
-                if not self.editPartition(targetPartition=resinBootPart, deltaStart=0, deltaEnd=deltasize, fstype='', fslabel='resin-boot', unit=unit):
+                if not self.editPartition(targetPartition=resinBootPart, deltaStart=0, deltaEnd=deltasize, fstype='fat32', fslabel='resin-boot', unit=unit, formatPartition=False):
                     log.error("increaseResinBootTo: Could not edit resin-boot partition.")
                     return False
 
