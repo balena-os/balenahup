@@ -21,6 +21,7 @@ import hashlib
 import unittest
 import shutil
 import json
+from binaryornot.check import is_binary
 
 log = logging.getLogger(__name__)
 
@@ -233,29 +234,8 @@ def getMountpoint(dev):
     return None
 
 
-def isTextFile(filename, bs = 512):
-    if not os.path.exists(filename):
-        return False
-    with open(filename) as f:
-        block = f.read(bs)
-
-    txtChars = "".join(map(chr, range(32, 127)) + list("\n\r\t\b"))
-    _null_trans = string.maketrans("", "")
-
-    # If it includes null char we consider it not test
-    if "\0" in block:
-        return False
-
-    # Empty files are considered text
-    if not block:
-        return True
-
-    nonTxtChars = block.translate(_null_trans, txtChars)
-
-    if len(nonTxtChars)/len(block) > 0.20:
-        return False
-
-    return True
+def isTextFile(filename):
+    return (not is_binary(filename))
 
 def getConfigurationItem(conffile, section, option):
     if not os.path.isfile(conffile):
