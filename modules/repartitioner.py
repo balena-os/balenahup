@@ -8,6 +8,7 @@
 # Author: Andrei Gherzan <andrei@resin.io>
 #
 
+import sys
 import logging
 import parted
 import os
@@ -154,9 +155,9 @@ class Repartitioner(object):
                     log.error("increaseResinBootTo: Could not configure bootloader.")
                     return False
 
-                # We reboot cause this is an intermediate repartitioning step
+                # We exit cause this is an intermediate repartitioning step and reboot is needed
                 if not self.testMode:
-                    os.system('reboot')
+                    sys.exit(2)
             else:
                 #
                 # State E
@@ -204,9 +205,9 @@ class Repartitioner(object):
                     log.error("increaseResinBootTo: Could not configure bootloader.")
                     return False
 
-                # We reboot cause this is an intermediate repartitioning step
+                # We exit cause this is an intermediate repartitioning step and reboot is needed
                 if not self.testMode:
-                    os.system('reboot')
+                    sys.exit(2)
             else:
                 #
                 # State C
