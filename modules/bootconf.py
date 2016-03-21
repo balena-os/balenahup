@@ -9,6 +9,7 @@
 #
 
 import logging
+import tempfile
 from .util import *
 
 def configureBootloader(old, new, conffile):
@@ -28,16 +29,9 @@ class BootloaderConfigurator(object):
         self.conf = conf
 
     def applyTextTransformation(self, configurationFile, old, new):
-        root_mount = getConfigurationItem(self.conf, 'General', 'host_bind_mount')
-        if not root_mount:
-            root_mount = '/'
-        configurationFile = os.path.normpath(root_mount + "/" + configurationFile)
         if not os.path.isfile(configurationFile):
+            log.error("applyTextTransformation: configurationFile %s doesn't exist." % configurationFile)
             return False
-        mountPoint = getMountPoint(configurationFile)
-        if mountHasFlag(mountPoint, 'ro'):
-            if not mount(what='', where=mountPoint, mountoptions="remount,rw"):
-                return False
         lines = []
         with open(configurationFile) as infile:
             for line in infile:
@@ -54,9 +48,33 @@ class BootloaderConfigurator(object):
 class BCMRasberryPiBootloader(BootloaderConfigurator):
     def configure(self, old, new):
         super(BCMRasberryPiBootloader, self).configure()
-        if super(BCMRasberryPiBootloader, self).applyTextTransformation('/boot/cmdline.txt', old, new):
+
+        # Make sure the boot partition device is mounted
+        bootdevice = getBootPartition(self.conf)
+        if not isMounted(bootdevice):
+            try:
+                resinBootMountPoint = tempfile.mkdtemp(prefix='resinhup-', dir='/tmp')
+            except:
+                log.error("BCMRasberryPiBootloader: Failed to create temporary resin-boot mountpoint.")
+                return False
+            if not mount(what=bootdevice, where=resinBootMountPoint):
+                return False
+        else:
+            resinBootMountPoint = getMountpoint(bootdevice)
+
+        # We need to make sure the boot partition mountpoint is rw
+        if not os.access(resinBootMountPoint, os.W_OK | os.R_OK):
+            if not mount(what='', where=resinBootMountPoint, mounttype='', mountoptions='remount,rw'):
+                return False
+            # It *should* be fine now
+            if not os.access(resinBootMountPoint, os.W_OK | os.R_OK):
+                return False
+
+        # Do the actual configuration
+        if super(BCMRasberryPiBootloader, self).applyTextTransformation(resinBootMountPoint + '/cmdline.txt', old, new):
             log.info("BCM Raspberrypi Bootloader configured.")
         else:
-            log.info("Could not configure BCM Raspberrypi Bootloader.")
+            log.error("Could not configure BCM Raspberrypi Bootloader.")
             return False
+
         return True
