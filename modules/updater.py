@@ -336,7 +336,7 @@ class Updater:
         if not self.verifyConfigJson():
             log.error("Could not verify config.json.")
             return False
-        if not configureBootloader(getRootPartition(self.conf), self.toUpdateRootDevice()[0]):
+        if not configureBootloader(getRootPartition(self.conf), self.toUpdateRootDevice()[0], self.conf):
             log.error("Could not configure bootloader.")
             return False
         log.info("Finished to upgrade system.")
