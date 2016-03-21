@@ -14,6 +14,7 @@ import parted
 import os
 import tempfile
 import unittest
+import shutil
 from .util import *
 from .bootconf import *
 from .colorlogging import *
@@ -28,8 +29,32 @@ class Repartitioner(object):
         self.device = parted.getDevice(getRootDevice(conf))
         self.disk = parted.newDisk(self.device)
 
-    def editPartition(self, targetPartition, deltaStart, deltaEnd, fstype, fslabel, unit='MiB', formatPartition=True):
+    def editPartition(self, targetPartition, deltaStart, deltaEnd, fstype, fslabel, unit='MiB', formatPartition=True, safeDataThroughTmp=False):
         log.info("editPartition: Editing partition " + targetPartition.path + ". Start = Start + (" + str(deltaStart) + "). End = End + (" + str(deltaEnd) + ").")
+
+        # Backup data to a directory in tmp
+        if safeDataThroughTmp:
+            # Make sure targetPartition is mounted in mountpoint
+            if isMounted(targetPartition.path):
+                mountpoint = getMountpoint(targetPartition.path)
+            else:
+                try:
+                    mountpoint = tempfile.mkdtemp(prefix='resinhup-', dir='/tmp')
+                except:
+                    log.error("editPartition: Failed to create temporary mountpoint.")
+                    return False
+                if not mount(targetPartition.path, mountpoint):
+                    log.error("editPartition: Failed to mount %s in %s." %(targetPartition.path, mountpoint))
+                    return False
+
+            # Backup files to a directory in /tmp
+            try:
+                backupdir = tempfile.mkdtemp(prefix='resinhup-', dir='/tmp')
+            except:
+                log.error("editPartition: Failed to create temporary backup directory.")
+                return False
+            if not safeCopy(mountpoint, backupdir):
+                log.error("editPartition: Could not backup files from %s to %s." %(mountpoint, backupdir))
 
         # Make sure that partition is not mounted
         if isMounted(targetPartition.path):
@@ -64,6 +89,24 @@ class Repartitioner(object):
             else:
                 log.error("movePartition: Format of " + fstype + " is not implemented.")
                 return False
+
+        # Restore data in targetPartition
+        if safeDataThroughTmp:
+            # Make sure targetPartition is mounted in mountpoint
+            if isMounted(targetPartition.path):
+                log.error("editPartition: Something is wrong. %s should not be mounted." % targetPartition.path)
+                return False
+            else:
+                if not mount(targetPartition.path, mountpoint):
+                    log.error("editPartition: Failed to mount %s in %s." %(targetPartition.path, mountpoint))
+                    return False
+
+            # Copy back the data
+            if not safeCopy(backupdir, mountpoint, sync=True):
+                log.error("editPartition: Could not restore files from %s to %s." %(backupdir, mountpoint))
+
+            # Cleanup temporary backup files
+            shutil.rmtree(backupdir)
 
         return True
 
@@ -220,7 +263,7 @@ class Repartitioner(object):
                     return False
 
                 # Expand resin-boot
-                if not self.editPartition(targetPartition=resinBootPart, deltaStart=0, deltaEnd=deltasize, fstype='fat32', fslabel='resin-boot', unit=unit, formatPartition=False):
+                if not self.editPartition(targetPartition=resinBootPart, deltaStart=0, deltaEnd=deltasize, fstype='fat32', fslabel='resin-boot', unit=unit, formatPartition=True, safeDataThroughTmp=True):
                     log.error("increaseResinBootTo: Could not edit resin-boot partition.")
                     return False
 
