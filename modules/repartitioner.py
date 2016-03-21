@@ -87,9 +87,9 @@ class Repartitioner(object):
         #            +-----+----------------------------------+---+                                                            +------+---------------------------------+---+
         #                  ^                                                                                                          |
         #                  |                                                                                                          |
-        #                  |   b1 - configure bootloader to boot from resin-root                                                      | c1 - shrink and move resin-boot
-        #                  |   b2 - reboot system                                                                                     | c2 - expand resin-boot
-        #                  |                                                                                                          +
+        #                  |   b1 - copy resin-updt to resin-root                                                                     | c1 - shrink and move resin-boot
+        #                  |   b2 - configure bootloader to boot from resin-root                                                      | c2 - expand resin-boot
+        #                  |   b3 - reboot system                                                                                     +
         #                  |                                                                                                          V
         #            +-----+----------------------------------+---+                                                             +--------------------------+
         #            | Boot from resin-updt                   |   |                                                             |      Done                |
@@ -173,6 +173,31 @@ class Repartitioner(object):
                 # State B
                 #
                 log.debug("Running transition from State B...")
+
+                # Format resin-root
+                if not formatEXT3(resinRootPart.path, 'resin-root'):
+                    log.error("increaseResinBootTo: Could not format " + resinRootPart.path + " as ext3.")
+                    return False
+
+                # Copy resin-updt to resin-root
+                log.info("increaseResinBootTo: Copying resin-updt to resin-root. This will take a while...")
+                resinUpdtMountPoint = getConfigurationItem(self.conf, 'General', 'host_bind_mount')
+                if not resinUpdtMountPoint:
+                    resinUpdtMountPoint = '/'
+                try:
+                    resinRootMountPoint = tempfile.mkdtemp(prefix='resinhup-', dir='/tmp')
+                except:
+                    log.error("increaseResinBootTo: Failed to create temporary mountpoint.")
+                    return False
+                if not mount(resinRootPart.path, resinRootMountPoint):
+                    log.error("increaseResinBootTo: Failed to mount " + resinRootPart.path + " to " + resinRootMountPoint + ".")
+                if not safeCopy(resinUpdtMountPoint, resinRootMountPoint, sync=False):
+                    log.error("increaseResinBootTo: Failed to copy files from " + resinUpdtMountPoint + " to " + resinRootMountPoint + ".")
+                    umount(resinRootMountPoint) # We fail anyway so don't care out return value
+                    return False
+                if not umount(resinRootMountPoint):
+                    log.error("increaseResinBootTo: Failed to unmount " + resinRootMountPoint + ".")
+                    return False
 
                 # Configure bootloader
                 if not configureBootloader(self.currentResinRootPartPath, resinRootPart.path, self.conf):
