@@ -58,5 +58,5 @@ class BCMRasberryPiBootloader(BootloaderConfigurator):
             log.info("BCM Raspberrypi Bootloader configured.")
         else:
             log.info("Could not configure BCM Raspberrypi Bootloader.")
-            return Flase
+            return False
         return True
