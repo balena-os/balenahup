@@ -1,7 +1,7 @@
 FROM resin/rpi-raspbian:jessie
 
 # Install the dependencies
-RUN apt-get update && apt-get install btrfs-tools mtools dosfstools python3 python3-requests python3-sh jq -y && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install vim btrfs-tools mtools dosfstools python3 python3-requests python3-sh jq -y && rm -rf /var/lib/apt/lists/*
 
 # Add the current directoy in the container
 ADD . /app

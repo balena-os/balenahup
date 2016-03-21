@@ -29,7 +29,7 @@ This will stop all the running containers.
 Run the container manually using:
 ```sh
 [host     ]$ rce run -ti --privileged --rm --net=host --volume /:/host resinhup /bin/bash
-[container]$ python /app/resinhup.py --config /app/conf/resinhup.conf --debug
+[container]$ python3 /app/resinhup.py --config /app/conf/resinhup.conf --debug
 [container]$ exit
 [host     ]$ reboot
 ```

@@ -12,8 +12,8 @@ import unittest
 import os
 import logging
 import operator
-from util import *
-from colorlogging import *
+from .util import *
+from .colorlogging import *
 
 class FingerPrintScanner(object):
     def __init__(self, root, conf, images_fingerprint_path, skipMountPoints=True):
@@ -30,12 +30,12 @@ class FingerPrintScanner(object):
             if self.skipMountPoints:
                 if log.getEffectiveLevel() == logging.DEBUG:
                     # Filter out from dirs the mountpoints = stay on same filesystem
-                    temp_dirs = filter(lambda dir: not os.path.ismount(os.path.join(root, dir)), dirs)
+                    temp_dirs = list(filter(lambda dir: not os.path.ismount(os.path.join(root, dir)), dirs))
                     if set(dirs) != set(temp_dirs):
                         log.debug("FingerPrintScanner: Ignored these directories as they were mountpoint: " + ', '.join(set(dirs) - set(temp_dirs)))
                     dirs[:] = temp_dirs[:]
                     # Filter out whitelist
-                    temp_dirs = filter(lambda dir: not os.path.join(root, dir) in whitelist_fingerprints, dirs)
+                    temp_dirs = list(filter(lambda dir: not os.path.join(root, dir) in whitelist_fingerprints, dirs))
                     if set(dirs) != set(temp_dirs):
                         log.debug("FingerPrintScanner: Ignored these directories as they were whitelisted: " + ', '.join(set(dirs) - set(temp_dirs)))
                     dirs[:] = temp_dirs[:]
@@ -127,23 +127,23 @@ class MyTest(unittest.TestCase):
         log.addHandler(ch)
 
         # Test that it ignores mountpoints
-        mountpoint = "./fingerprint/tests/testRun/tree/dir1"
+        mountpoint = "./modules/fingerprint/tests/testRun/tree/dir1"
         mount(what="tmpfs", where=mountpoint, mounttype="tmpfs")
 
-        conf = "./fingerprint/tests/testRun/resinhup.conf"
-        scanner = FingerPrintScanner("./fingerprint/tests/testRun/tree", conf, "./fingerprint/tests/testRun")
+        conf = "./modules/fingerprint/tests/testRun/resinhup.conf"
+        scanner = FingerPrintScanner("./modules/fingerprint/tests/testRun/tree", conf, "./modules/fingerprint/tests/testRun")
         scanner.scan()
 
         # Cleanup mount
         umount(mountpoint)
 
-        print scanner.printFingerPrints()
+        print(scanner.printFingerPrints())
 
         whitelist_fingerprints = getConfigurationItem(conf, "FingerPrintScanner", "whitelist").split()
         fingerprints = scanner.getFingerPrints()
 
         # Check on known file
-        self.assertTrue(fingerprints['./fingerprint/tests/testRun/tree/dir4/file1'] == '68b329da9893e34099c7d8ad5cb9c940')
+        self.assertTrue(fingerprints['./modules/fingerprint/tests/testRun/tree/dir4/file1'] == '68b329da9893e34099c7d8ad5cb9c940')
 
         for filename,filemd5 in fingerprints.items():
             self.assertFalse(filename in whitelist_fingerprints)

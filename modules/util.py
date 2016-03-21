@@ -38,11 +38,12 @@ def getRootPartition(conffile):
     rootmajor=os.major(rootdev)
     rootminor=os.minor(rootdev)
     root="%d:%d" % (rootmajor, rootminor)
-    for f in glob("/sys/class/block/*/dev"):
-        if file(f).read().strip() == root:
-            dev = "/dev/" + os.path.basename(os.path.dirname(f))
-            log.debug("Found root partition: " + dev)
-            return dev
+    for filepath in glob("/sys/class/block/*/dev"):
+        with open(filepath) as fd:
+            if fd.read().strip() == root:
+                dev = "/dev/" + os.path.basename(os.path.dirname(filepath))
+                log.debug("Found root partition: " + dev + ".")
+                return dev
     return None
 
 def getBootPartition(conffile):
@@ -63,7 +64,7 @@ def getBootPartition(conffile):
 
 def getPartitionLabel(device):
     child = subprocess.Popen("lsblk -n -o label " + device, stdout=subprocess.PIPE, shell=True)
-    label = child.communicate()[0].strip()
+    label = child.communicate()[0].decode().strip()
     if child.returncode == 0 and label != "":
         log.debug("Found label " + label + " for device " + device)
         return label
@@ -72,7 +73,7 @@ def getPartitionLabel(device):
 
 def getDevice(label):
     child = subprocess.Popen("blkid -l -o device -t LABEL=\"" + label + "\"", stdout=subprocess.PIPE, shell=True)
-    device = child.communicate()[0].strip()
+    device = child.communicate()[0].decode().strip()
     if child.returncode == 0 and device != "":
         log.debug("Found device " + device + " for label " + label)
         return device
@@ -85,7 +86,7 @@ def setDeviceLabel(device, label):
     if not userConfirm("Setting label for " + device + " as " + label):
         return False
     child = subprocess.Popen("e2label " + device + " " + label, stdout=subprocess.PIPE, shell=True)
-    out = child.communicate()[0].strip()
+    out = child.communicate()[0].decode().strip()
     if child.returncode == 0:
         log.warning("Labeled " + device + " as " + label)
         return True
@@ -98,7 +99,7 @@ def setVFATDeviceLabel(device, label):
     if not userConfirm("Setting label for " + device + " as " + label):
         return False
     child = subprocess.Popen("dosfslabel " + device + " " + label, stdout=subprocess.PIPE, shell=True)
-    out = child.communicate()[0].strip()
+    out = child.communicate()[0].decode().strip()
     if child.returncode == 0:
         log.warning("Labeled " + device + " as " + label)
         return True
@@ -118,7 +119,7 @@ def setBTRFSDeviceLabel(device, label):
     if not userConfirm("Setting label for " + device + " as " + label):
         return False
     child = subprocess.Popen("btrfs filesystem label " + device + " " + label, stdout=subprocess.PIPE, shell=True)
-    out = child.communicate()[0].strip()
+    out = child.communicate()[0].decode().strip()
     if child.returncode == 0:
         log.warning("Labeled " + device + " as " + label)
         return True
@@ -131,7 +132,7 @@ def formatEXT3(path, label):
     if not userConfirm("Formatting " + path + " as EXT3 and set its label as " + label):
         return False
     child = subprocess.Popen("mkfs.ext3 -L " + label + " " + path, stdout=subprocess.PIPE, shell=True)
-    out = child.communicate()[0].strip()
+    out = child.communicate()[0].decode().strip()
     if child.returncode == 0:
         log.debug("Formatted " + path + " as EXT3")
         return True
@@ -144,7 +145,7 @@ def formatVFAT(path, label):
     if not userConfirm("Formatting " + path + " as VFAT and set its label as " + label):
         return False
     child = subprocess.Popen("mkfs.vfat -n " + label + " -S 512 " + path, stdout=subprocess.PIPE, shell=True)
-    out = child.communicate()[0].strip()
+    out = child.communicate()[0].decode().strip()
     if child.returncode == 0:
         log.debug("Formatted " + path + " as VFAT")
         return True
@@ -170,7 +171,7 @@ def userConfirm(name):
 def isMounted(dev):
     p = subprocess.Popen(['df', '-h'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     p1, err = p.communicate()
-    pattern = p1
+    pattern = p1.decode()
 
     if pattern.find(dev) == -1:
         log.debug(dev + " is not mounted")
@@ -244,19 +245,21 @@ def getConfigurationItem(conffile, section, option):
     if not os.path.isfile(conffile):
         log.error("Configuration file " + conffile + " not found.")
         return None
-    config = ConfigParser.ConfigParser()
+    config = configparser.ConfigParser()
+    config.optionxform=str
     try:
         config.read(conffile)
+        return config.get(section, option)
     except:
-        log.error("Cannot read configuration file " + conffile)
+        log.warning("Cannot get from configuration file " + conffile + ", section " + section + ", option " + option + ".")
         return None
-    return config.get(section, option)
 
 def getSectionOptions(conffile, section):
     if not os.path.isfile(conffile):
         log.error("Configuration file " + conffile + " not found.")
         return None
-    config = ConfigParser.ConfigParser()
+    config = configparser.ConfigParser()
+    config.optionxform=str
     try:
         config.read(conffile)
     except:
@@ -268,11 +271,12 @@ def setConfigurationItem(conffile, section, option, value):
     if not os.path.isfile(conffile):
         log.error("Configuration file " + conffile + " not found.")
         return None
-    config = ConfigParser.ConfigParser()
+    config = configparser.ConfigParser()
+    config.optionxform=str
     try:
         config.read(conffile)
         config.set(section, option, value)
-        with open(conffile, 'wb') as cf:
+        with open(conffile, 'w') as cf:
             config.write(cf)
     except:
         log.error("Cannot set required configuration value in " + conffile)
@@ -300,8 +304,8 @@ def runningDevice(conffile):
     child = subprocess.Popen("jq -r .deviceType " + conf, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     out, err = child.communicate()
     if out:
-        log.debug("Detected board: " + out.strip())
-        return out.strip()
+        log.debug("Detected board: " + out.decode().strip())
+        return out.decode().strip()
 
     log.warning("Failed to detect board")
     return None
@@ -349,8 +353,8 @@ def getExtendedPartition(conffile):
     child = subprocess.Popen("fdisk -l | grep \"Ext'd\" | awk '{print $1}' | grep " + rootdevice , stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     out, err = child.communicate()
     if out:
-        log.debug("Detected extended partition: " + out.strip())
-        return out.strip()
+        log.debug("Detected extended partition: " + out.decode().strip())
+        return out.decode().strip()
     return None
 
 def getConfigPartition(conffile):
@@ -381,24 +385,39 @@ def mcopy(dev, src, dst):
         return False
     return True
 
-def jsonAttributeExists(json, attribute):
-    # Load the decoded json file
+def jsonDecode(jsonfile):
     try:
-        with open(json, 'r') as fd:
+        with open(jsonfile, 'r') as fd:
             configjson = json.load(fd)
-    except:
-        log.error("jsonSetAttribute: Can't read or decode " + json + ".")
+    except Exception as e:
+        log.error("jsonDecode: Can't read or decode " + jsonfile + ".")
+        log.error(str(e))
+        return None
+    return configjson
+
+def jsonAttributeExists(jsonfile, attribute):
+    # Decode json first
+    configjson = jsonDecode(jsonfile)
+    if not configjson:
         return False
 
     return attribute in configjson.keys()
 
-def jsonSetAttribute(json, attribute, value, onlyIfNotDefined=False):
-    # Load the decoded json file
-    try:
-        with open(json, 'r') as fd:
-            configjson = json.load(fd)
-    except:
-        log.error("jsonSetAttribute: Can't read or decode " + json + ".")
+def jsonGetAttribute(jsonfile, attribute):
+    # Decode json first
+    configjson = jsonDecode(jsonfile)
+    if not configjson:
+        return None
+
+    if attribute in configjson.keys():
+        return configjson[attribute]
+    else:
+        return None
+
+def jsonSetAttribute(jsonfile, attribute, value, onlyIfNotDefined=False):
+    # Decode json first
+    configjson = jsonDecode(jsonfile)
+    if not configjson:
         return False
 
     # Handle onlyIfNotDefined
@@ -409,20 +428,20 @@ def jsonSetAttribute(json, attribute, value, onlyIfNotDefined=False):
         else:
             log.warn("jsonSetAttribute: " + attribute + " will be overwritten.")
 
-    configjson[atttribute] = value # Set the required attribute
+    configjson[attribute] = value # Set the required attribute
 
     # Write new json to a tmp file
     try:
-        with open(json+'.hup.tmp', 'w') as fd:
+        with open(jsonfile + '.hup.tmp', 'w') as fd:
             configjson = json.dump(configjson, fd)
             os.fsync(fd)
     except:
-        log.error("jsonSetAttribute: Can't write or encode to " + json + ".")
+        log.error("jsonSetAttribute: Can't write or encode to " + jsonfile + ".")
         return False
 
-    os.rename(json+'.hup.tmp', json) # Atomic rename file
+    os.rename(jsonfile + '.hup.tmp', jsonfile) # Atomic rename file
 
-    log.debug("jsonSetAttribute: Successfully set " + attribute + " to " + value + " in " + json + ".")
+    log.debug("jsonSetAttribute: Successfully set " + attribute + " to " + value + " in " + jsonfile + ".")
     return True
 
 def safeCopy(src, dst):
@@ -450,7 +469,6 @@ def safeDirCopy(src, dst):
             for name in files:
                 srcfullpath = os.path.join(root, name)
                 dstfullpath = os.path.join(dst, os.path.relpath(srcfullpath, src))
-                print(srcfullpath + " -> " + dstfullpath)
                 if not safeFileCopy(srcfullpath, dstfullpath):
                     return False
     return True
@@ -482,8 +500,9 @@ def safeFileCopy(src, dst):
     with open(src, 'rb') as srcfd, open(dst + ".tmp", "wb") as dsttmpfd:
         try:
             shutil.copyfileobj(srcfd, dsttmpfd)
-        except:
-            log.error("safeFileCopy: Failed to copy " + src + ".")
+        except Exception as s:
+            log.error("safeFileCopy: Failed to copy " + src + " to " + dst + ".tmp .")
+            log.error(str(s))
             return False
         os.fsync(dsttmpfd)
 
@@ -495,19 +514,19 @@ def safeFileCopy(src, dst):
 
 class TestSafeFileCopy(unittest.TestCase):
     def testSafeFileCopyNormal(self):
-        src = "./util/safefilecopy/file1"
-        dst = "./util/safefilecopy/file1.test"
+        src = "./modules/util/safefilecopy/file1"
+        dst = "./modules/util/safefilecopy/file1.test"
         self.assertTrue(safeFileCopy(src, dst))
         os.remove(dst) # cleanup
 
     def testSafeFileCopySrcInvalid(self):
-        src = "./util/safefilecopy/none"
-        dst = "./util/safefilecopy/file1.test"
+        src = "./modules/util/safefilecopy/none"
+        dst = "./modules/util/safefilecopy/file1.test"
         self.assertFalse(safeFileCopy(src, dst))
 
     def testSafeFileCopyOverwrite(self):
-        src = "./util/safefilecopy/file1"
-        dst = "./util/safefilecopy/file2"
+        src = "./modules/util/safefilecopy/file1"
+        dst = "./modules/util/safefilecopy/file2"
         with open(dst,'w') as f:
             f.write("file2")
         self.assertTrue(safeFileCopy(src, dst))
@@ -517,40 +536,40 @@ class TestSafeFileCopy(unittest.TestCase):
         os.remove(dst) # cleanup
 
     def testSafeFileCopySrcDir(self):
-        src = "./util/safefilecopy/dir1"
-        dst = "./util/safefilecopy/file2"
+        src = "./modules/util/safefilecopy/dir1"
+        dst = "./modules/util/safefilecopy/file2"
         self.assertFalse(safeFileCopy(src, dst))
 
     def testSafeFileCopyDstDir(self):
-        src = "./util/safefilecopy/file1"
-        dst = "./util/safefilecopy/dir1"
+        src = "./modules/util/safefilecopy/file1"
+        dst = "./modules/util/safefilecopy/dir1"
         self.assertFalse(safeFileCopy(src, dst))
 
     def testSafeFileCopyToDirStr(self):
-        src = "./util/safefilecopy/dir1/file2"
-        dst = "./util/safefilecopy/dir2/dir3/file4"
+        src = "./modules/util/safefilecopy/dir1/file2"
+        dst = "./modules/util/safefilecopy/dir2/dir3/file4"
         self.assertTrue(safeFileCopy(src, dst))
         self.assertTrue(os.path.isfile(dst))
         with open(dst,'r') as f:
             content = f.read()
         self.assertTrue(content == 'file2')
-        shutil.rmtree("./util/safefilecopy/dir2") # cleanup
+        shutil.rmtree("./modules/util/safefilecopy/dir2") # cleanup
 
 class TestSafeDirCopy(unittest.TestCase):
     def testSafeDirCopyNormal(self):
-        src = "./util/safedircopy/dir1"
-        dst = "./util/safedircopy/dir3"
+        src = "./modules/util/safedircopy/dir1"
+        dst = "./modules/util/safedircopy/dir3"
         self.assertTrue(safeDirCopy(src, dst))
         shutil.rmtree(dst) # cleanup
 
     def testSafeDirCopyDstExistent(self):
-        src = "./util/safedircopy/dir1"
-        dst = "./util/safedircopy/dir1"
+        src = "./modules/util/safedircopy/dir1"
+        dst = "./modules/util/safedircopy/dir1"
         self.assertFalse(safeDirCopy(src, dst))
 
     def testSafeDirCopyFile(self):
-        src = "./util/safedircopy/dir1/file2"
-        dst = "./util/safedircopy/dir3"
+        src = "./modules/util/safedircopy/dir1/file2"
+        dst = "./modules/util/safedircopy/dir3"
         self.assertFalse(safeDirCopy(src, dst))
 
 if __name__ == '__main__':

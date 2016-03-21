@@ -28,7 +28,8 @@ def main():
     Main
     '''
     # Parse arguments
-    parser = ArgumentParser(add_help=False, version = meta.version, description=meta.description)
+    parser = ArgumentParser(add_help=False, description=meta.description)
+    parser.add_argument('-v', '--version', action='version', version = meta.version)
     parser.add_argument('-h', '--help', action='help',
                       help = 'Print this message and exit')
     parser.add_argument('-d', '--debug', action="store_true", dest = 'debug', default = False,
@@ -102,10 +103,11 @@ def main():
         log.debug("Fingerprint scan avoided due to flag or env.")
 
     # Staging / production
+    log.info("Configure update as " + ("staging" if args.staging else "production") + ".")
     if args.staging:
         if not setConfigurationItem(args.conf, "config.json", "type", "staging"):
             return False
-    else
+    else:
         if not setConfigurationItem(args.conf, "config.json", "type", "production"):
             return False
 

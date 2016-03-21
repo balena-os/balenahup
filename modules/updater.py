@@ -9,8 +9,8 @@
 #
 
 import logging
-from util import *
-from bootconf import *
+from .util import *
+from .bootconf import *
 import re
 import os
 import shutil
@@ -140,17 +140,7 @@ class Updater:
             if not os.path.exists(src_full_path):
                 log.warn(src_full_path + " was not found in your current mounted rootfs. Can't overlay.")
                 continue
-            if os.path.isfile(src_full_path):
-                # Handle file
-                if not safeCopy(src_full_path, self.tempRootMountpoint + os.path.dirname(dst)):
-                    return False
-            elif os.path.isdir(src_full_path):
-                # Handle directory
-                if not safeCopy(src_full_path, self.tempRootMountpoint + dst)
-                    return False
-            else:
-                # Don't handle something else
-                log.warn (src_full_path + " is an unhandled path")
+            if not safeCopy(src_full_path, self.tempRootMountpoint + dst):
                 return False
             log.debug("Overlayed " + src_full_path + " in " + self.tempRootMountpoint)
         return True
@@ -176,7 +166,7 @@ class Updater:
             if not umount(self.tempBootMountpoint):
                 return False
 
-        # Make sure the boot partition dev is mounted
+        # Make sure the boot partition device is mounted
         if not isMounted(bootdevice):
             if not mount(what=bootdevice, where=self.tempBootMountpoint):
                 return False
@@ -224,7 +214,7 @@ class Updater:
                 'PUBNUB_SUBSCRIBE_KEY': 'pubnubSubscribeKey',
                 'PUBNUB_PUBLISH_KEY': 'pubnubPublishKey',
                 'MIXPANEL_TOKEN': 'mixpanelToken',
-                'LISTEN_PORT': 'vpnPort'
+                'LISTEN_PORT': 'listenPort'
             };
 
             config = os.path.join(root_mount, "mnt/data-disk/config.json")
@@ -241,30 +231,41 @@ class Updater:
                         continue
                     value = line.split('=')[1]
                     mappedvariable = variablesmap[variable]
-                    command = "jq '." + mappedvariable + "=\"" + value.strip() + "\"' " + tmpconfig + " > /tmp/tempconfig.json"
-                    child = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-                    out, err = child.communicate()
-                    safeCopy("/tmp/tempconfig.json", tmpconfig)
+                    jsonSetAttribute(tmpconfig, mappedvariable, value.strip(), onlyIfNotDefined=True)
 
             # Handle VPN address separately as we didn't have it in resin.conf
-            command = "jq --raw-output '.registryEndpoint' " + tmpconfig
-            child = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-            registryEndpoint, err = child.communicate()
-            vpnEndpoint = registryEndpoint.strip().replace('registry','vpn')
-            command = "cat " + tmpconfig + " | jq '.vpnEndpoint=\"" + vpnEndpoint + "\"' > /tmp/tempconfig.json"
-            child = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-            out, err = child.communicate()
-            safeCopy("/tmp/tempconfig.json", tmpconfig)
+            # Compute vpn endpoint based on registry endpoint and write it to json
+            registryEndpoint = jsonGetAttribute(tmpconfig, 'registryEndpoint')
+            vpnEndpoint = registryEndpoint.strip().replace('registry', 'vpn')
+            jsonSetAttribute(tmpconfig, 'vpnEndpoint', vpnEndpoint, onlyIfNotDefined=True)
 
+            # Handle config partition and write tmpconfig in it
             configPartition = getConfigPartition(self.conf)
             if not configPartition:
                 return False
+            # Make sure this partition is not mounted
+            if isMounted(configPartition):
+                if not unmount(configPartition):
+                    return False
+            # Format partition and copy config.json
             if not formatVFAT(configPartition, "resin-conf"):
                 return False
             if not mcopy(dev=configPartition, src=tmpconfig, dst="::/config.json"):
                 return False
             os.remove(tmpconfig)
+
+            # At this point configuration file is fixed and is in a filesystem. Make sure
+            # this fs is mounted in config default mountpoint so detections of config.json
+            # will return the updated one from now on.
+            default_config_mountpoint = os.path.normpath(root_mount + "/" + getConfigurationItem(self.conf, 'config.json', 'default_mountpoint'))
+            if not isMounted(default_config_mountpoint):
+                if not os.path.isdir(default_config_mountpoint):
+                    os.makedirs(default_config_mountpoint)
+                if not mount(what=configPartition, where=default_config_mountpoint):
+                    return False
+
             return True
+
         return False
 
     def fixFsLabels(self):
@@ -312,8 +313,8 @@ class Updater:
             options = getSectionOptions(self.conf, ctype)
             configjsonpath = getConfJsonPath(self.conf)
             for option in options:
-                if not jsonAttributeExists(configjsonpath, option):
-                    value = getConfigurationItem(self.conf, ctype, option)
+                value = getConfigurationItem(self.conf, ctype, option)
+                if jsonGetAttribute(configjsonpath, option) != value:
                     log.debug("verifyConfigJson: Fixing config.json: " + option + "=" + value + ".")
                     jsonSetAttribute(configjsonpath, option, value)
         except:
