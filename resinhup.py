@@ -16,6 +16,7 @@ import meta.resinhupmeta as meta
 from modules.colorlogging import *
 from modules.util import *
 from modules.fingerprint import *
+from modules.repartitioner import *
 from fetcher.tar import *
 from modules.updater import *
 from argparse import ArgumentParser
@@ -111,17 +112,26 @@ def main():
         if not setConfigurationItem(args.conf, "config.json", "type", "production"):
             return False
 
+    # Handle old boot partitions
+    r = Repartitioner(args.conf)
+    if not r.increaseResinBootTo(40):
+        log.error("resinhup: Failed to increase resin-boot to 40MiB.")
+        return False
+
+    # Get new update
     f = tarFetcher(args.conf)
     if not f.unpack(downloadFirst=True):
         log.error("Could not unpack update")
         return False
 
+    # Perform update
     u = Updater(f, args.conf)
     if not u.upgradeSystem():
         u.cleanup()
         log.error("Could not upgrade your system")
         return False
     u.cleanup()
+
     return True
 
 if __name__ == "__main__":
