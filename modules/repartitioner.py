@@ -52,7 +52,7 @@ class Repartitioner(object):
 
         # Format filesystem
         if formatPartition:
-            if fstype == 'ext3':
+            if (fstype == 'ext3') or (fstype == 'ext4'):
                 if not formatEXT3(partition.path, fslabel):
                     log.error("movePartition: Could not format " + partition.path + " as ext3.")
                     return False
@@ -125,7 +125,7 @@ class Repartitioner(object):
                 log.debug("Running transition from State A...")
 
                 # Edit resin-updt partition
-                if not self.editPartition(targetPartition=resinUpdtPart, deltaStart=(deltasize // 2), deltaEnd=0, fstype='ext3', fslabel='resin-updt', unit=unit, formatPartition=True):
+                if not self.editPartition(targetPartition=resinUpdtPart, deltaStart=(deltasize // 2), deltaEnd=0, fstype='ext4', fslabel='resin-updt', unit=unit, formatPartition=True):
                     log.error("increaseResinBootTo: Could not edit resin-updt partition.")
                     return False
 
@@ -214,7 +214,7 @@ class Repartitioner(object):
                 log.debug("Running transition from State C...")
 
                 # Edit resin-root partition
-                if not self.editPartition(targetPartition=resinRootPart, deltaStart=(deltasize), deltaEnd=(deltasize // 2), fstype='ext3', fslabel='resin-root', unit=unit, formatPartition=True):
+                if not self.editPartition(targetPartition=resinRootPart, deltaStart=(deltasize), deltaEnd=(deltasize // 2), fstype='ext4', fslabel='resin-root', unit=unit, formatPartition=True):
                     log.error("increaseResinBootTo: Could not edit resin-root partition.")
                     return False
 
