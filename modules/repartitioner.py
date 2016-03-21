@@ -129,7 +129,7 @@ class Repartitioner(object):
                     log.error("increaseResinBootTo: Could not edit resin-updt partition.")
                     return False
 
-                # Copy resin-root to resin-boot
+                # Copy resin-root to resin-updt
                 log.info("increaseResinBootTo: Copying resin-root to resin-updt. This will take a while...")
                 resinRootMountPoint = getConfigurationItem(self.conf, 'General', 'host_bind_mount')
                 if not resinRootMountPoint:
