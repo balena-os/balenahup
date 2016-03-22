@@ -21,6 +21,7 @@ import hashlib
 import unittest
 import shutil
 import json
+from binaryornot.check import is_binary
 
 log = logging.getLogger(__name__)
 
@@ -60,6 +61,22 @@ def getBootPartition(conffile):
             return bootdevice
     else:
         return bootdevice
+    return None
+
+def getPartitionRelativeToBoot(conffile, label, relativeIndex):
+    ''' Returns the partition device path when index is relative to boot partition '''
+    # First search by label
+    partdevice = getDevice(label)
+    if not partdevice:
+        match = re.match(r"(.*?)(\d+$)", getBootPartition(conffile))
+        if match:
+            root = match.groups()[0]
+            idx = match.groups()[1]
+            partdevice = str(root) + str(int(idx) + int(relativeIndex))
+            log.debug("Couldn't find the %s partition by label. We guessed it as being %s." %(label, partdevice))
+            return partdevice
+    else:
+        return partdevice
     return None
 
 def getPartitionLabel(device):
@@ -217,29 +234,8 @@ def getMountpoint(dev):
     return None
 
 
-def isTextFile(filename, bs = 512):
-    if not os.path.exists(filename):
-        return False
-    with open(filename) as f:
-        block = f.read(bs)
-
-    txtChars = "".join(map(chr, range(32, 127)) + list("\n\r\t\b"))
-    _null_trans = string.maketrans("", "")
-
-    # If it includes null char we consider it not test
-    if "\0" in block:
-        return False
-
-    # Empty files are considered text
-    if not block:
-        return True
-
-    nonTxtChars = block.translate(_null_trans, txtChars)
-
-    if len(nonTxtChars)/len(block) > 0.20:
-        return False
-
-    return True
+def isTextFile(filename):
+    return (not is_binary(filename))
 
 def getConfigurationItem(conffile, section, option):
     if not os.path.isfile(conffile):
@@ -385,6 +381,25 @@ def mcopy(dev, src, dst):
         return False
     return True
 
+def get_pids(name):
+    try:
+        pids = subprocess.check_output(["pidof",name])
+    except:
+        return None
+    return pids.split()
+
+def startUdevDaemon():
+    if get_pids('udevd'):
+        log.debug('startUdevDaemon: udevd already running.')
+        return True
+
+    child = subprocess.Popen("udevd --daemon" , stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    out, err = child.communicate()
+    if child.returncode != 0:
+        log.debug("Failed to start udev as daemon");
+        return False
+    return True
+
 def jsonDecode(jsonfile):
     try:
         with open(jsonfile, 'r') as fd:
@@ -444,39 +459,61 @@ def jsonSetAttribute(jsonfile, attribute, value, onlyIfNotDefined=False):
     log.debug("jsonSetAttribute: Successfully set " + attribute + " to " + value + " in " + jsonfile + ".")
     return True
 
-def safeCopy(src, dst):
+def safeCopy(src, dst, sync=True):
     if os.path.isfile(src):
-        return safeFileCopy(src, dst)
+        return safeFileCopy(src, dst, sync)
     elif os.path.isdir(src):
-        return safeDirCopy(src, dst)
+        return safeDirCopy(src, dst, sync)
     else:
-        log.error("Unknown src target to copy " + src + ".")
+        log.error("safeCopy: Unknown src target to copy " + src + ".")
         return False
 
-def safeDirCopy(src, dst):
+def safeDirCopy(src, dst, sync=True):
     # src must be a dir
     if not os.path.isdir(src):
-        log.error("Can't copy source as " + src + " is not a directory.")
+        log.error("safeDirCopy: Can't copy source as " + src + " is not a directory.")
         return False
 
-    # dst must not exist
-    if os.path.isdir(dst):
-        log.error("Can't copy to an existent directory " + dst + " .")
+    # dst must not be the same as src
+    if os.path.abspath(src) == os.path.abspath(dst):
+        log.error("safeDirCopy: Can't copy to the same source directory " + src + " .")
         return False
 
     # Copy each file in the structure of src to dst
     for root, dirs, files in os.walk(src):
+
+            # Directories
+            for d in dirs:
+                try:
+                    srcfullpath = os.path.join(root, d)
+                    dstfullpath = os.path.join(dst, os.path.relpath(srcfullpath, src))
+                    os.makedirs(dstfullpath, exist_ok=True)
+                    try:
+                        shutil.copymode(srcfullpath, dstfullpath)
+                    except:
+                        return False
+                except Exception as e:
+                    log.error(str(e))
+                    return False
+
+            # Files
             for name in files:
                 srcfullpath = os.path.join(root, name)
                 dstfullpath = os.path.join(dst, os.path.relpath(srcfullpath, src))
-                if not safeFileCopy(srcfullpath, dstfullpath):
+                if stat.S_ISFIFO(os.stat(srcfullpath, follow_symlinks=False).st_mode): # FIXME Ignore pipe files
+                    continue
+                if not safeFileCopy(srcfullpath, dstfullpath, sync):
                     return False
+
+            # Stay on the same filesystem
+            dirs[:] = list(filter(lambda dir: not os.path.ismount(os.path.join(root, dir)), dirs))
+
     return True
 
-def safeFileCopy(src, dst):
+def safeFileCopy(src, dst, sync=True):
     # src must be a file
-    if not os.path.isfile(src):
-        log.error("safeFileCopy: Can't copy source as " + src + " is not a file.")
+    if (not os.path.isfile(src)) and (not os.path.islink(src)):
+        log.error("safeFileCopy: Can't copy source as " + src + " is not a handled file.")
         return False
 
     # Make sure dst is either non-existent or a file (which we overwrite)
@@ -497,18 +534,25 @@ def safeFileCopy(src, dst):
         except:
             log.error("safeFileCopy: Failed to create directories structure for destination " + dst + ".")
             return False
-    with open(src, 'rb') as srcfd, open(dst + ".tmp", "wb") as dsttmpfd:
-        try:
-            shutil.copyfileobj(srcfd, dsttmpfd)
-        except Exception as s:
-            log.error("safeFileCopy: Failed to copy " + src + " to " + dst + ".tmp .")
-            log.error(str(s))
-            return False
-        os.fsync(dsttmpfd)
+    if os.path.islink(src):
+        linkto = os.readlink(src)
+        os.symlink(linkto, dst + ".tmp")
+    else:
+        with open(src, 'rb') as srcfd, open(dst + ".tmp", "wb") as dsttmpfd:
+            try:
+                shutil.copyfileobj(srcfd, dsttmpfd)
+            except Exception as s:
+                log.error("safeFileCopy: Failed to copy " + src + " to " + dst + ".tmp .")
+                log.error(str(s))
+                return False
+            if sync:
+                os.fsync(dsttmpfd)
+            shutil.copymode(src, dst + ".tmp")
 
     # Rename and sync filesystem to disk
     os.rename(dst + ".tmp", dst)
-    os.sync()
+    if sync:
+        os.sync()
 
     return True
 
