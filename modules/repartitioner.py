@@ -146,11 +146,6 @@ class Repartitioner(object):
         resinRootPart = self.disk.getPartitionByPath(getPartitionRelativeToBoot(self.conf, 'resin-root', 1))  # resin-root is the first partition after resin-boot
         resinUpdtPart = self.disk.getPartitionByPath(getPartitionRelativeToBoot(self.conf, 'resin-updt', 2))  # resin-updt is the second partition after resin-boot
 
-        # Make sure a greater size was requested
-        if (size <= resinBootPart.getLength(unit)):
-            log.error("increaseResinBootTo: Size needs to be greater than current size.")
-            return False
-
         # How much we need to increase resin-boot
         deltasize = int(size) - int(resinBootPart.getLength(unit))
 
