@@ -322,7 +322,7 @@ class Updater:
                 else:
                     if not jsonAttributeExists(configjsonpath, option):
                         if option == 'registered_at':
-                            value = int(time.time())
+                            value = str(int(time.time()))
                         else:
                             log.error("verifyConfigJson: Don't know the value of %s." % option)
                             return False
