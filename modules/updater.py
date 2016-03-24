@@ -15,6 +15,7 @@ import re
 import os
 import shutil
 import string
+import time
 
 class Updater:
     def __init__(self, fetcher, conf):
@@ -314,11 +315,22 @@ class Updater:
             configjsonpath = getConfJsonPath(self.conf)
             for option in options:
                 value = getConfigurationItem(self.conf, ctype, option)
-                if jsonGetAttribute(configjsonpath, option) != value:
-                    log.debug("verifyConfigJson: Fixing config.json: " + option + "=" + value + ".")
-                    jsonSetAttribute(configjsonpath, option, value)
-        except:
+                if value:
+                    if jsonGetAttribute(configjsonpath, option) != value:
+                        log.debug("verifyConfigJson: Fixing config.json: " + option + "=" + value + ".")
+                        jsonSetAttribute(configjsonpath, option, value)
+                else:
+                    if not jsonAttributeExists(configjsonpath, option):
+                        if option == 'registered_at':
+                            value = str(int(time.time()))
+                        else:
+                            log.error("verifyConfigJson: Don't know the value of %s." % option)
+                            return False
+                        log.debug("verifyConfigJson: Fixing config.json: " + option + "=" + value + ".")
+                        jsonSetAttribute(configjsonpath, option, value)
+        except Exception as e:
             log.error("verifyConfigJson: Error while verifying config.json.")
+            log.error(str(e))
             return False
         return True
 
