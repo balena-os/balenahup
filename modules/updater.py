@@ -160,6 +160,14 @@ class Updater:
         log.info("Started to upgrade boot files...")
         bootfiles = self.fetcher.getBootFiles()
 
+        # Read the list of 'to be ignored' files in boot partition and test that we have
+        # something to ignore
+        ignore_files = getConfigurationItem(self.conf, "boot", "ignore_files")
+        if not ignore_files:
+            log.warn("updateBoot: No files configured to be ignored.")
+            return True
+        ignore_files = ignore_files.split()
+
         bootdevice = getBootPartition(self.conf)
 
         # Make sure the temp boot directory is unmounted
@@ -182,6 +190,10 @@ class Updater:
                 return False
 
         for bootfile in bootfiles:
+            # Ignore?
+            if bootfile in ignore_files:
+                log.warn(bootfile + " was ignored due to ignore_files configuration.")
+                continue
             # All these files are relative to bootfilesdir
             src = os.path.join(self.fetcher.bootfilesdir, bootfile)
             dst = os.path.join(bootmountpoint, bootfile)
