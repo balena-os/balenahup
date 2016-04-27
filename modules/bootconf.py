@@ -14,7 +14,7 @@ from .util import *
 
 def configureBootloader(old, new, conffile):
     ''' Configure bootloader to use the updated rootfs '''
-    if runningDevice(conffile) == 'raspberry-pi' or runningDevice(conffile) == 'raspberry-pi2' or runningDevice(conffile) == 'raspberrypi3':
+    if runningDevice(conffile) in ['raspberry-pi', 'raspberry-pi2', 'raspberrypi3']:
         b = BCMRasberryPiBootloader(conffile)
         if not b.configure(old, new):
             log.error("Could not configure bootloader.")
