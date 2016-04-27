@@ -14,12 +14,13 @@ from .util import *
 
 def configureBootloader(old, new, conffile):
     ''' Configure bootloader to use the updated rootfs '''
-    if runningDevice(conffile) in ['raspberry-pi', 'raspberry-pi2', 'raspberrypi3']:
+    currentDevice = runningDevice(conffile)
+    if currentDevice in ['raspberry-pi', 'raspberry-pi2', 'raspberrypi3']:
         b = BCMRasberryPiBootloader(conffile)
         if not b.configure(old, new):
             log.error("Could not configure bootloader.")
             return False
-    elif runningDevice(conffile) == 'intel-nuc':
+    elif currentDevice == 'intel-nuc':
         b = GrubNucBootloader(conffile)
         if not b.configure(old, new):
             log.error("Could not configure bootloader.")
