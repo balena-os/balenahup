@@ -335,7 +335,7 @@ def getRootDevice(conffile):
     rootpartition = getRootPartition(conffile)
     if not rootpartition:
         return None
-    if rootpartition.startswith("sd"):
+    if rootpartition.startswith("/dev/sd"):
         rootdevice = rootpartition[:-1]
     else:
         rootdevice = rootpartition[:-2]
