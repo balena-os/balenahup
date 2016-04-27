@@ -296,6 +296,7 @@ class Updater:
         # resin-data
         if not getDevice("resin-data"):
             log.error("Can't label btrfs partition. You need to do it manually on host OS with: btrfs filesystem label <X> resin-data .")
+            return False
             #btrfspartition = getBTRFSPartition(self.conf)
             #if not btrfspartition:
             #    return False
