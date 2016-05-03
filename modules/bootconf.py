@@ -25,6 +25,11 @@ def configureBootloader(old, new, conffile):
         if not b.configure(old, new):
             log.error("Could not configure bootloader.")
             return False
+    elif currentDevice == 'beaglebone-black':
+        b = UBootBeagleboneBootloader(conffile)
+        if not b.configure(old, new):
+            log.error("Could not configure bootloader.")
+            return False
     else:
         log.error("No bootloader configuration support for this board.")
         return False
@@ -115,6 +120,40 @@ class GrubNucBootloader(BootloaderConfigurator):
             log.info("GrubNucBootloader: GRUB Intel NUC Bootloader configured.")
         else:
             log.error("GrubNucBootloader: Could not configure GRUB Intel NUC Bootloader.")
+            return False
+
+        return True
+
+class UBootBeagleboneBootloader(BootloaderConfigurator):
+    def configure(self, old, new):
+        super(UBootBeagleboneBootloader, self).configure()
+
+        # Make sure the boot partition device is mounted
+        bootdevice = getBootPartition(self.conf)
+        if not isMounted(bootdevice):
+            try:
+                resinBootMountPoint = tempfile.mkdtemp(prefix='resinhup-', dir='/tmp')
+            except:
+                log.error("UBootBeagleboneBootloader: Failed to create temporary resin-boot mountpoint.")
+                return False
+            if not mount(what=bootdevice, where=resinBootMountPoint):
+                return False
+        else:
+            resinBootMountPoint = getMountpoint(bootdevice)
+
+        # We need to make sure the boot partition mountpoint is rw
+        if not os.access(resinBootMountPoint, os.W_OK | os.R_OK):
+            if not mount(what='', where=resinBootMountPoint, mounttype='', mountoptions='remount,rw'):
+                return False
+            # It *should* be fine now
+            if not os.access(resinBootMountPoint, os.W_OK | os.R_OK):
+                return False
+
+        # Do the actual configuration
+        if super(UBootBeagleboneBootloader, self).applyTextTransformation(resinBootMountPoint + '/uEnv.txt', old, new):
+            log.info("UBootBeagleboneBootloader: UBoot Beaglebone Bootloader configured.")
+        else:
+            log.error("UBootBeagleboneBootloader: Could not configure UBoot Beaglebone Bootloader.")
             return False
 
         return True
