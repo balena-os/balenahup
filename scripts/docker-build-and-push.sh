@@ -4,6 +4,7 @@ set -e
 
 GREEN='\033[0;32m'
 NC='\033[0m'
+TAG=latest
 
 # Help function
 function help {
@@ -17,6 +18,10 @@ Options:
 
   -d, --dockerfile
         Build and push only this Dockerfile. Otherwise all found will be used.
+
+  -t, --tag
+        By default push will be done to latest tag. This can be tweaked with this flag.
+
 EOF
 }
 
@@ -38,6 +43,13 @@ while [[ $# > 0 ]]; do
                 log ERROR "\"$1\" argument needs a value."
             fi
             DOCKERFILES=$2
+            shift
+            ;;
+        -t|--tag)
+            if [ -z "$2" ]; then
+                log ERROR "\"$1\" argument needs a value."
+            fi
+            TAG=$2
             shift
             ;;
         *)
@@ -64,8 +76,8 @@ for dockerfile in $DOCKERFILES; do
         exit 1
     fi
     printf "${GREEN}Running build for $device using $dockerfile ...${NC}\n"
-    docker build -t resinhup-$device -f ../$dockerfile $SCRIPTPATH/..
+    docker build -t resinhup-$device:$TAG -f ../$dockerfile $SCRIPTPATH/..
     printf "${GREEN}Tag an push for $device ...${NC}\n"
-    docker tag -f resinhup-$device registry.resinstaging.io/resinhup/resinhup-$device
-    docker push registry.resinstaging.io/resinhup/resinhup-$device
+    docker tag -f resinhup-$device registry.resinstaging.io/resinhup/resinhup-$device:$TAG
+    docker push registry.resinstaging.io/resinhup/resinhup-$device:$TAG
 done
