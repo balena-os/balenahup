@@ -10,6 +10,7 @@
 
 import logging
 import tempfile
+import os
 from .util import *
 
 def configureBootloader(old, new, conffile):
@@ -40,6 +41,8 @@ class BootloaderConfigurator(object):
         self.conf = conf
 
     def applyTextTransformation(self, configurationFile, old, new):
+        log.debug("applyTextTransformation: Apply text replace from " + old + " to " + new + " .")
+
         if not os.path.isfile(configurationFile):
             log.error("applyTextTransformation: configurationFile %s doesn't exist." % configurationFile)
             return False
@@ -48,17 +51,25 @@ class BootloaderConfigurator(object):
             for line in infile:
                 line = line.replace(old, new)
                 lines.append(line)
-        with open(configurationFile, 'w') as outfile:
+        with open(configurationFile + ".tmp", 'w') as outfile:
             for line in lines:
                 outfile.write(line)
+            os.fsync(outfile)
+        os.rename(configurationFile + ".tmp", configurationFile)
+
+        # Make sure the write operation is durable - avoid data loss
+        dirfd = os.open(os.path.dirname(configurationFile), os.O_DIRECTORY)
+        os.fsync(dirfd)
+        os.close(dirfd)
+
         return True
 
-    def configure(self):
-        log.info("Configuring bootloader.")
+    def configure(self, old, new):
+        log.info("Configuring bootloader. From " + old + " to " + new + " .")
 
 class BCMRasberryPiBootloader(BootloaderConfigurator):
     def configure(self, old, new):
-        super(BCMRasberryPiBootloader, self).configure()
+        super(BCMRasberryPiBootloader, self).configure(old, new)
 
         # Make sure the boot partition device is mounted
         bootdevice = getBootPartition(self.conf)
@@ -92,7 +103,7 @@ class BCMRasberryPiBootloader(BootloaderConfigurator):
 
 class GrubNucBootloader(BootloaderConfigurator):
     def configure(self, old, new):
-        super(GrubNucBootloader, self).configure()
+        super(GrubNucBootloader, self).configure(old, new)
 
         # Make sure the boot partition device is mounted
         bootdevice = getBootPartition(self.conf)
@@ -125,8 +136,66 @@ class GrubNucBootloader(BootloaderConfigurator):
         return True
 
 class UBootBeagleboneBootloader(BootloaderConfigurator):
+
+    def switchUEnv(self, old, new, uEnvPath):
+        ''' Switch bootpart uboot variable using uEnv.txt - this variable points to the
+            rootfs partition where the kernel is installed as well it is used by finduuid
+            to get the root kernel parameter '''
+        oldidx = getPartitionIndex(old)
+        newidx = getPartitionIndex(new)
+        if not oldidx or not newidx:
+            return False
+
+        if not super(UBootBeagleboneBootloader, self).applyTextTransformation(uEnvPath, 'bootpart=1:' + oldidx, 'bootpart=1:' + newidx):
+            return False
+
+        return True
+
+    def tweakUEnv(self, bootmountpoint):
+        ''' Various tweaks and cleanups to uEnv.txt '''
+
+        log.info ("tweakUEnv: Tweaking and cleaning up uEnv.txt...")
+
+        if not isMounted(bootmountpoint):
+            log.error("transformUEnv: " + bootmountpoint + " is not a mountpoint.")
+            return False
+        uEnvPath = os.path.join(bootmountpoint, 'uEnv.txt')
+        if not os.path.isfile(uEnvPath):
+            log.error("transformUEnv: uEnv.txt seem not to exist in boot partition")
+            return False
+
+        lines=[]
+        fixFindUUID = True
+        finduuid = 'finduuid=part uuid mmc ${bootpart} uuid\n'
+        with open(uEnvPath) as f:
+            for line in f:
+                # Remove setemmcroot lines as current uboot is not using it anymore
+                if "setemmcroot" in line:
+                    continue
+                # Tweak finduuid to use a configurable partition
+                if line.startswith('finduuid='):
+                    line = finduuid
+                    fixFindUUID = False
+
+                lines.append(line)
+            # If no finduuid found append one
+            if fixFindUUID:
+                line.append('finduuid=part uuid mmc ${bootpart} uuid\n')
+        with open(uEnvPath + ".tmp", "w") as f:
+            for line in lines:
+                f.write(line)
+            os.fsync(f)
+        os.rename(uEnvPath + ".tmp", uEnvPath)
+
+        # Make sure the write operation is durable - avoid data loss
+        dirfd = os.open(os.path.dirname(uEnvPath), os.O_DIRECTORY)
+        os.fsync(dirfd)
+        os.close(dirfd)
+
+        return True
+
     def configure(self, old, new):
-        super(UBootBeagleboneBootloader, self).configure()
+        super(UBootBeagleboneBootloader, self).configure(old, new)
 
         # Make sure the boot partition device is mounted
         bootdevice = getBootPartition(self.conf)
@@ -149,8 +218,12 @@ class UBootBeagleboneBootloader(BootloaderConfigurator):
             if not os.access(resinBootMountPoint, os.W_OK | os.R_OK):
                 return False
 
+        if not self.tweakUEnv(resinBootMountPoint):
+            log.error("UBootBeagleboneBootloader: Can't tweak uEnv.txt .")
+            return False
+
         # Do the actual configuration
-        if super(UBootBeagleboneBootloader, self).applyTextTransformation(resinBootMountPoint + '/uEnv.txt', old, new):
+        if self.switchUEnv(old, new, resinBootMountPoint + "/uEnv.txt"):
             log.info("UBootBeagleboneBootloader: UBoot Beaglebone Bootloader configured.")
         else:
             log.error("UBootBeagleboneBootloader: Could not configure UBoot Beaglebone Bootloader.")
