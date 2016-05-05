@@ -63,6 +63,12 @@ def getBootPartition(conffile):
         return bootdevice
     return None
 
+def getPartitionIndex(device):
+    ''' Get the index number of a partition '''
+    match = re.match(r"(.*?)(\d+$)", device)
+    if match:
+        return match.groups()[1]
+
 def getPartitionRelativeToBoot(conffile, label, relativeIndex):
     ''' Returns the partition device path when index is relative to boot partition '''
     # First search by label
