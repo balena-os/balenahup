@@ -180,7 +180,7 @@ class UBootBeagleboneBootloader(BootloaderConfigurator):
                 lines.append(line)
             # If no finduuid found append one
             if fixFindUUID:
-                line.append('finduuid=part uuid mmc ${bootpart} uuid\n')
+                lines.append('finduuid=part uuid mmc ${bootpart} uuid\n')
         with open(uEnvPath + ".tmp", "w") as f:
             for line in lines:
                 f.write(line)
