@@ -545,13 +545,18 @@ def safeFileCopy(src, dst, sync=True):
                 log.error("safeFileCopy: Failed to copy " + src + " to " + dst + ".tmp .")
                 log.error(str(s))
                 return False
+            shutil.copymode(src, dst + ".tmp")
             if sync:
                 os.fsync(dsttmpfd)
-            shutil.copymode(src, dst + ".tmp")
 
     # Rename and sync filesystem to disk
     os.rename(dst + ".tmp", dst)
     if sync:
+        # # Make sure the write operation is durable - avoid data loss
+        dirfd = os.open(os.path.dirname(dst), os.O_DIRECTORY)
+        os.fsync(dirfd)
+        os.close(dirfd)
+
         os.sync()
 
     return True
