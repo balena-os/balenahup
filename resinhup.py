@@ -113,11 +113,16 @@ def main():
     # Is the requested version already there or greater?
     currentVersion = getCurrentHostOSVersion(args.conf)
     if currentVersion:
-        if StrictVersion(currentVersion) >= StrictVersion(args.version):
-            log.info("The device is (" + currentVersion + ") already at the requested or greater version than the one requested (" + args.version + ").")
-            sys.exit(3)
-        else:
-            log.info("Updating from " + currentVersion + " to " + args.version + ".")
+        try:
+            if StrictVersion(currentVersion) >= StrictVersion(args.version):
+                log.info("The device is (" + currentVersion + ") already at the requested or greater version than the one requested (" + args.version + ").")
+                sys.exit(3)
+            else:
+                log.info("Updating from " + currentVersion + " to " + args.version + ".")
+        except:
+            log.warning("Error while checking if device is already at the requested version. Continuing update...")
+    else:
+        log.info("Can't get current HostOS version. Continuing update...")
 
     # Check the image fingerprint
     if not args.force_fingerprint:
