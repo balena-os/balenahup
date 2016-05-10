@@ -406,6 +406,21 @@ def startUdevDaemon():
         return False
     return True
 
+def getCurrentHostOSVersion(conffile):
+    ''' Get current OS version from /etc/os-release '''
+    root_mount = getConfigurationItem(conffile, 'General', 'host_bind_mount')
+    if not root_mount:
+        root_mount = '/'
+    try:
+        with open(os.path.join(root_mount, "etc/os-release"), 'r') as f:
+            lines = f.readlines()
+            for line in lines:
+                (attribute, value) = line.split('=')
+                if attribute == 'VERSION':
+                    return value.strip()
+    except:
+        log.debug("getCurrentHostOSVersion: Can't get the current host OS version")
+
 def jsonDecode(jsonfile):
     try:
         with open(jsonfile, 'r') as fd:
