@@ -44,15 +44,15 @@ This is a wrapper which pulls the proper resinhup image and runs the updater:
 
 + takes care of all the prerequisites 
 + adds support for supervisor update
-+ pull resinhup image
-+ run resinhup container
++ pulls resinhup image
++ runs resinhup container
 + if updater is successful, reboots the board
 
 ### run-resinhup-ssh.sh 
 This is a tool which:
 
 + Uploads over ssh all the needed tools from meta-resin (update-resin-supervisor, run-resinhup.sh and resin-device-progress).
-+ Runs run-resinhup.sh over a set of devices and saves the log in a file called <uuid>.resinhup.log
++ Runs run-resinhup.sh over a set of devices and saves the log in a file called `<uuid>.resinhup.log`
 + Can run the updater over multiple devices in parallel.
 
 It requires SSH access over VPN to devices.
