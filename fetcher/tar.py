@@ -19,11 +19,14 @@ log = logging.getLogger(__name__)
 
 class tarFetcher:
 
-    def __init__ (self, conffile):
-        self.remote = getConfigurationItem(conffile, 'fetcher', 'remote')
+    def __init__ (self, conffile, version, remote):
+        if not remote:
+            self.remote = getConfigurationItem(conffile, 'fetcher', 'remote')
+        else:
+            self.remote = remote
         self.workspace = getConfigurationItem(conffile, 'fetcher', 'workspace')
         machine = runningDevice(conffile)
-        self.remotefile = os.path.join(self.remote, "resinos-" + machine, "resinhup.tar.gz")
+        self.remotefile = os.path.join(self.remote, "resinos-" + machine, "resinhup-" + version + ".tar.gz")
         self.workspacefile = os.path.join(self.workspace, "resinhup.tar.gz")
         self.workspaceunpack = os.path.join(self.workspace, "update")
         self.bootfilesdir = os.path.join(self.workspace, "update/resin-boot")

@@ -21,6 +21,7 @@ from fetcher.tar import *
 from modules.updater import *
 from argparse import ArgumentParser
 import logging
+from distutils.version import StrictVersion
 
 default_resinhup_conf_file = "/etc/resinhup.conf"
 
@@ -45,7 +46,22 @@ def main():
                       help = "Avoid fingerprint check and force update. Do it on your own risk.")
     parser.add_argument('-s', '--staging', action = 'store_true', dest = 'staging', default = False,
                       help = "Validate and configure config.json against staging values.")
+    parser.add_argument('-u', '--update-to-version', action = 'store', dest = 'version', default = False,
+                      help = "Use this version to update the device to.")
+    parser.add_argument('-r', '--remote', action = 'store', dest = 'remote', default = '',
+                      help = "Remote to be used when searching for update bundles. Overwrites the value in configuration file.")
+
     args = parser.parse_args()
+
+    # Allow things to be overwritten from environment
+    if os.getenv('REMOTE'):
+        args.remote = os.getenv('REMOTE')
+    if os.getenv('VERSION'):
+        args.version = os.getenv('VERSION')
+    if os.getenv('RESINHUP_STAGING'):
+        args.staging = True
+    if os.getenv('RESINHUP_FORCE'):
+        args.force_fingerprint = True
 
     # Logger
     log = logging.getLogger()
@@ -67,6 +83,13 @@ def main():
     # Debug message for configuration file
     log.debug("Using configuration file " + args.conf)
 
+    # Make sure version was provided
+    if not args.version:
+        log.error("HostOS version to update to was not provided. Check help..")
+        return False
+    else:
+        log.info("Update version " + args.version + " selected.")
+
     # Board identification
     if not args.device:
         device = runningDevice(args.conf)
@@ -87,8 +110,22 @@ def main():
         return False
     log.debug(device + " is a supported device for resinhup.")
 
+    # Is the requested version already there or greater?
+    currentVersion = getCurrentHostOSVersion(args.conf)
+    if currentVersion:
+        try:
+            if StrictVersion(currentVersion) >= StrictVersion(args.version):
+                log.info("The device is (" + currentVersion + ") already at the requested or greater version than the one requested (" + args.version + ").")
+                sys.exit(3)
+            else:
+                log.info("Updating from " + currentVersion + " to " + args.version + ".")
+        except:
+            log.warning("Error while checking if device is already at the requested version. Continuing update...")
+    else:
+        log.info("Can't get current HostOS version. Continuing update...")
+
     # Check the image fingerprint
-    if not args.force_fingerprint and not os.getenv('RESINHUP_FORCE'):
+    if not args.force_fingerprint:
         root_mount = getConfigurationItem(args.conf, 'General', 'host_bind_mount')
         if not root_mount:
             root_mount = '/'
@@ -101,11 +138,9 @@ def main():
         else:
             log.info("Fingerprint validation succeeded.")
     else:
-        log.debug("Fingerprint scan avoided due to flag or env.")
+        log.debug("Fingerprint scan avoided as instructed.")
 
     # Staging / production
-    if os.getenv('RESINHUP_STAGING'):
-        args.staging = True
     log.info("Configure update as " + ("staging" if args.staging else "production") + ".")
     if args.staging:
         if not setConfigurationItem(args.conf, "config.json", "type", "staging"):
@@ -121,7 +156,7 @@ def main():
         return False
 
     # Get new update
-    f = tarFetcher(args.conf)
+    f = tarFetcher(args.conf, version=args.version, remote=args.remote)
     if not f.unpack(downloadFirst=True):
         log.error("Could not unpack update")
         return False
