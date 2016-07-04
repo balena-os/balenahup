@@ -38,24 +38,24 @@ class FingerPrintScanner(object):
                         log.debug("FingerPrintScanner: Ignored these directories as they were mountpoint: " + ', '.join(set(dirs) - set(temp_dirs)))
                     dirs[:] = temp_dirs[:]
                     # Filter out whitelist
-                    temp_dirs = list(filter(lambda dir: not os.path.join(root, dir) in whitelist_fingerprints, dirs))
+                    temp_dirs = list(filter(lambda dir: not os.path.relpath(os.path.join(root, dir), mountpoint) in whitelist_fingerprints, dirs))
                     if set(dirs) != set(temp_dirs):
                         log.debug("FingerPrintScanner: Ignored these directories as they were whitelisted: " + ', '.join(set(dirs) - set(temp_dirs)))
                     dirs[:] = temp_dirs[:]
                 else:
                     # Same as above but without debug
                     dirs[:] = filter(lambda dir: not os.path.ismount(os.path.join(root, dir)), dirs)
-                    dirs[:] = filter(lambda dir: not os.path.join(root, dir) in whitelist_fingerprints, dirs)
+                    dirs[:] = filter(lambda dir: not + os.path.relpath(os.path.join(root, dir), mountpoint) in whitelist_fingerprints, dirs)
             for filename in files:
                 if os.path.islink(os.path.join(root,filename)):
                     continue
                 if not os.path.isfile(os.path.join(root,filename)):
                     continue
-                if os.path.join(root,filename) in whitelist_fingerprints:
+                if os.path.relpath(os.path.join(root,filename),mountpoint) in whitelist_fingerprints:
                     log.debug("FingerPrintScanner: Ignored " + os.path.join(root,filename) + " as it was found whitelisted.")
                     continue
 
-                fingerprints[os.path.join(root, filename)] = getmd5(os.path.join(root, filename))
+                fingerprints[os.path.relpath(os.path.join(root, filename), mountpoint)] = getmd5(os.path.join(root, filename))
         return fingerprints
 
     def scan(self):
@@ -93,7 +93,9 @@ class FingerPrintScanner(object):
                     default_filename = line.split()[1]
                     default_filemd5 = line.split()[0]
                     for filename,filemd5 in fingerprints.items():
-                        if filename == default_filename and filemd5 != default_filemd5:
+                        # The computed filename in fingerprints is relative while the one in fingerPrintFile
+                        # is absolute
+                        if ('/' + filename) == default_filename and filemd5 != default_filemd5:
                             log.warning("Fingerprint failed for: " + filename)
                             toReturn = False
         except Exception as e:
@@ -189,7 +191,7 @@ class MyTest(unittest.TestCase):
         root_fingerprints = scanner.getRootFingerPrints()
 
         # Check on known file
-        self.assertTrue(root_fingerprints['./modules/fingerprint/tests/testRun/root_tree/dir4/file1'] == '68b329da9893e34099c7d8ad5cb9c940')
+        self.assertTrue(root_fingerprints['file1'] == '68b329da9893e34099c7d8ad5cb9c940')
 
         for filename,filemd5 in root_fingerprints.items():
             self.assertFalse(filename in root_whitelist_fingerprints)
@@ -203,7 +205,7 @@ class MyTest(unittest.TestCase):
         boot_fingerprints = scanner.getBootFingerPrints()
 
         # Check on known file
-        self.assertTrue(boot_fingerprints['./modules/fingerprint/tests/testRun/boot_tree/file1'] == '68b329da9893e34099c7d8ad5cb9c940')
+        self.assertTrue(boot_fingerprints['file1'] == '68b329da9893e34099c7d8ad5cb9c940')
 
         for filename,filemd5 in boot_fingerprints.items():
             self.assertFalse(filename in root_whitelist_fingerprints)

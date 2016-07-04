@@ -1,2 +1,3 @@
-68b329da9893e34099c7d8ad5cb9c940    ./fingerprint/tests/testRun/boot_tree/file1
-d41d8cd98f00b204e9800998ecf8427e    ./fingerprint/tests/testRun/boot_tree/file2
+68b329da9893e34099c7d8ad5cb9c940    /file1
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX    /file2
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX    /dir1/file1
