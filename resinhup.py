@@ -130,13 +130,26 @@ def main():
         if not root_mount:
             root_mount = '/'
         images_fingerprint_path = os.path.join(os.path.dirname(sys.modules[__name__].__file__), "modules/fingerprint/known-images")
-        scanner = FingerPrintScanner(root_mount, args.conf, images_fingerprint_path)
-        scanner.scan()
+
+        # Make sure the boot partition device is mounted
+        bootdevice = getBootPartition(args.conf)
+        if not isMounted(bootdevice):
+            try:
+                boot_mount = tempfile.mkdtemp(prefix='resinhup-', dir='/tmp')
+            except:
+                log.error("Failed to create temporary resin-boot mountpoint.")
+                return False
+            if not mount(what=bootdevice, where=boot_mount):
+                return False
+        else:
+            boot_mount = getMountpoint(bootdevice)
+
+        scanner = FingerPrintScanner(root_mount, boot_mount, args.conf, images_fingerprint_path)
         if not scanner.validateFingerPrints():
-            log.error("Cannot validate current image fingerprint.")
+            log.error("Cannot validate current image fingerprint on rootfs/boot partition.")
             return False
         else:
-            log.info("Fingerprint validation succeeded.")
+            log.info("Fingerprint validation succeeded on rootfs/boot partition.")
     else:
         log.debug("Fingerprint scan avoided as instructed.")
 
