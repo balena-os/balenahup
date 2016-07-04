@@ -67,10 +67,11 @@ class FingerPrintScanner(object):
         self.boot_fingerprints = self.do_scan(self.boot, boot_whitelist_fingerprints)
 
     def printFingerPrints(self):
-        fingerprints = "# File MD5SUM\t\t\t\tFilepath\n"
+        fingerprints = "# File MD5SUM\t\t\t\tFilepath\n\nroot\n\n"
         sorted_root_fingerprints = sorted(self.root_fingerprints.items(), key=operator.itemgetter(0))
         for filename, filemd5 in sorted_root_fingerprints:
             fingerprints += filemd5 + "\t" + filename + "\n"
+        fingerprints += "\n\nboot\n\n"
         sorted_boot_fingerprints = sorted(self.boot_fingerprints.items(), key=operator.itemgetter(0))
         for filename, filemd5 in sorted_boot_fingerprints:
             fingerprints += filemd5 + "\t" + filename + "\n"
