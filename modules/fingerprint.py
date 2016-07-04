@@ -94,7 +94,7 @@ class FingerPrintScanner(object):
                     default_filemd5 = line.split()[0]
                     for filename,filemd5 in fingerprints.items():
                         if filename == default_filename and filemd5 != default_filemd5:
-                            log.warn("Fingerprint failed for: " + filename)
+                            log.warning("Fingerprint failed for: " + filename)
                             toReturn = False
         except Exception as e:
             print(e)
