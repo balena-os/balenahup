@@ -16,6 +16,7 @@ import meta.resinhupmeta as meta
 from modules.colorlogging import *
 from modules.util import *
 from modules.fingerprint import *
+from modules.resinkernel import *
 from modules.repartitioner import *
 from fetcher.tar import *
 from modules.updater import *
@@ -123,6 +124,14 @@ def main():
             log.warning("Error while checking if device is already at the requested version. Continuing update...")
     else:
         log.info("Can't get current HostOS version. Continuing update...")
+
+    # Check for kernel custom modules
+    if ResinKernel().customLoadedModules():
+        return False
+    else:
+        log.info("No custom loaded kernel modules detected.")
+
+    return False
 
     # Check the image fingerprint
     if not args.force_fingerprint:
