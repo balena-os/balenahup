@@ -162,7 +162,7 @@ class Updater:
 
         # Read the list of 'to be ignored' files in boot partition and test that we have
         # something to ignore
-        ignore_files = getConfigurationItem(self.conf, "boot", "ignore_files")
+        ignore_files = getConfigurationItem(self.conf, "FingerPrintScanner", "boot_whitelist")
         if not ignore_files:
             log.warn("updateBoot: No files configured to be ignored.")
             return True

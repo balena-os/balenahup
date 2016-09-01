@@ -3,6 +3,9 @@ FROM resin/nuc-debian:jessie
 # Install the dependencies
 RUN apt-get update && apt-get install vim btrfs-tools mtools dosfstools python3 python3-requests python3-sh python3-parted python3-binaryornot jq -y && rm -rf /var/lib/apt/lists/*
 
+# Use the host's kmod - this one supports compressed kernel modules
+RUN ln -sf /host/bin/kmod /bin/kmod
+
 # Add the current directoy in the container
 COPY . /app
 
