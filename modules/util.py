@@ -417,7 +417,7 @@ def getCurrentHostOSVersion(conffile):
             for line in lines:
                 (attribute, value) = line.split('=')
                 if attribute == 'VERSION':
-                    return value.strip()
+                    return value.strip(' "\n')
     except:
         log.debug("getCurrentHostOSVersion: Can't get the current host OS version")
 
