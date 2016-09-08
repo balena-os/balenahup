@@ -480,16 +480,16 @@ def jsonSetAttribute(jsonfile, attribute, value, onlyIfNotDefined=False):
     log.debug("jsonSetAttribute: Successfully set " + attribute + " to " + value + " in " + jsonfile + ".")
     return True
 
-def safeCopy(src, dst, sync=True):
+def safeCopy(src, dst, sync=True, ignore=[]):
     if os.path.isfile(src):
         return safeFileCopy(src, dst, sync)
     elif os.path.isdir(src):
-        return safeDirCopy(src, dst, sync)
+        return safeDirCopy(src, dst, sync, ignore)
     else:
         log.error("safeCopy: Unknown src target to copy " + src + ".")
         return False
 
-def safeDirCopy(src, dst, sync=True):
+def safeDirCopy(src, dst, sync=True, ignore=[]):
     # src must be a dir
     if not os.path.isdir(src):
         log.error("safeDirCopy: Can't copy source as " + src + " is not a directory.")
@@ -505,6 +505,10 @@ def safeDirCopy(src, dst, sync=True):
 
             # Directories
             for d in dirs:
+                if d in ignore:
+                    log.warning("safeDirCopy: Ignored directory " + d + ".")
+                    dirs.remove(d)
+                    continue
                 try:
                     srcfullpath = os.path.join(root, d)
                     dstfullpath = os.path.join(dst, os.path.relpath(srcfullpath, src))
@@ -519,6 +523,9 @@ def safeDirCopy(src, dst, sync=True):
 
             # Files
             for name in files:
+                if name in ignore:
+                    log.warning("safeDirCopy: Ignored file " + d + ".")
+                    continue
                 srcfullpath = os.path.join(root, name)
                 dstfullpath = os.path.join(dst, os.path.relpath(srcfullpath, src))
                 if stat.S_ISFIFO(os.stat(srcfullpath, follow_symlinks=False).st_mode): # FIXME Ignore pipe files
@@ -641,6 +648,20 @@ class TestSafeDirCopy(unittest.TestCase):
         src = "./modules/util/safedircopy/dir1/file2"
         dst = "./modules/util/safedircopy/dir3"
         self.assertFalse(safeDirCopy(src, dst))
+
+    def testSafeDirCopyIgnoreDir(self):
+        src = "./modules/util/safedircopy/dir1"
+        dst = "./modules/util/safedircopy/dir3"
+        self.assertTrue(safeCopy(src, dst, ignore=['ignore-dir']))
+        self.assertFalse(os.path.isdir(os.path.join(dst, "ignore-dir")))
+        shutil.rmtree(dst) # cleanup
+
+    def testSafeDirCopyIgnoreFile(self):
+        src = "./modules/util/safedircopy/dir1"
+        dst = "./modules/util/safedircopy/dir3"
+        self.assertTrue(safeCopy(src, dst, ignore=['ignore-file']))
+        self.assertFalse(os.path.isdir(os.path.join(dst, "ignore-dir/ignore-file")))
+        shutil.rmtree(dst) # cleanup
 
 if __name__ == '__main__':
     unittest.main()
