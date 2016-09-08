@@ -86,7 +86,9 @@ class tarFetcher:
 
     def unpack(self, downloadFirst=False):
         if downloadFirst:
-            self.download()
+            if not self.download():
+                log.error("Could not download update package.")
+                return False
 
         self.cleanunpack()
 
