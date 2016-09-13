@@ -101,18 +101,13 @@ class tarFetcher:
         update = tarfile.open(name=self.workspacefile, mode='r:*')
         update.extractall(self.workspaceunpack)
 
-        # Save the rootfs filename of easy access
-        rootfsfiles = os.listdir(self.workspace + "/update/resin-root")
-        self.rootfsarchive = self.workspace + "/update/resin-root/" + os.listdir(self.workspace + "/update/resin-root")[0]
-
         log.debug("Unpacked " + self.workspacefile + " in " + self.workspaceunpack)
         return True
 
     def unpackRootfs(self, location):
         log.info("Unpack rootfs started... this can take a couple of seconds or even minutes...")
-        update = tarfile.open(self.rootfsarchive)
-        update.extractall(location)
-        log.debug("Unpacked rootfs " + self.rootfsarchive + " in " + location)
+        safeCopy(self.workspaceunpack, location, sync=False, ignore=['resin-boot'])
+        log.debug("Unpacked rootfs " + self.workspaceunpack + " in " + location)
         return True
 
     def getBootFiles(self):
