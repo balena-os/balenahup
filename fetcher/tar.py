@@ -104,9 +104,22 @@ class tarFetcher:
         log.debug("Unpacked " + self.workspacefile + " in " + self.workspaceunpack)
         return True
 
+    def unpackQuirks(self, location):
+        '''Copies the content of <quirks> directory from an update to <location>.'''
+        quirks_path = os.path.join(self.workspaceunpack, 'quirks')
+        log.info("Unpacking rootfs quirks from " + quirks_path + " to " + location + ".")
+        if not os.path.isdir(quirks_path):
+            log.debug("No quirks found. Skipping.")
+            return True
+        if not safeCopy(quirks_path, location, sync=False):
+            log.error("Failed to unpack quirks.")
+            return False
+        log.info("Unpack rootfs quirks done.")
+        return True
+
     def unpackRootfs(self, location):
         log.info("Unpack rootfs started... this can take a couple of seconds or even minutes...")
-        safeCopy(self.workspaceunpack, location, sync=False, ignore=['resin-boot'])
+        safeCopy(self.workspaceunpack, location, sync=False, ignore=['resin-boot', 'quirks'])
         log.debug("Unpacked rootfs " + self.workspaceunpack + " in " + location)
         return True
 
