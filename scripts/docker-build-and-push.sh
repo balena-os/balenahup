@@ -77,7 +77,7 @@ for dockerfile in $DOCKERFILES; do
     fi
     printf "${GREEN}Running build for $device using $dockerfile ...${NC}\n"
     docker build -t resinhup-$device:$TAG -f ../$dockerfile $SCRIPTPATH/..
-    printf "${GREEN}Tag an push for $device ...${NC}\n"
+    printf "${GREEN}Tag and push for $device ...${NC}\n"
     docker tag -f resinhup-$device registry.resinstaging.io/resinhup/resinhup-$device:$TAG
     docker push registry.resinstaging.io/resinhup/resinhup-$device:$TAG
 done
