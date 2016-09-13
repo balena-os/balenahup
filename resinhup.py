@@ -18,7 +18,7 @@ from modules.util import *
 from modules.fingerprint import *
 from modules.resinkernel import *
 from modules.repartitioner import *
-from fetcher.tar import *
+from fetcher.fetcher import *
 from modules.updater import *
 from argparse import ArgumentParser
 import logging
@@ -185,7 +185,13 @@ def main():
         return False
 
     # Get new update
-    f = tarFetcher(args.conf, version=args.version, remote=args.remote)
+    fetcher_type = getConfigurationItem(args.conf, 'fetcher', 'type')
+    if (not fetcher_type):
+        fetcher_type = 'dockerhub'
+    f = Fetcher(fetcher_type, args.conf, version=args.version, remote=args.remote)
+    if not f:
+        log.error("Fetcher error. Do you have a valid fetcher type?!")
+        return False
     if not f.unpack(downloadFirst=True):
         log.error("Could not unpack update")
         return False
