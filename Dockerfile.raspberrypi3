@@ -9,4 +9,4 @@ RUN ln -sf /host/bin/kmod /bin/kmod
 # Add the current directoy in the container
 COPY . /app
 
-CMD python3 /app/resinhup.py --config /app/conf/resinhup.conf --debug
+CMD /app/run.sh
