@@ -105,9 +105,14 @@ class Updater:
         if not mount(what=updateDevice, where=self.tempRootMountpoint):
             return False
 
-        # Unpack the rootfs archive
+        # Unpack the rootfs
         if not self.fetcher.unpackRootfs(self.tempRootMountpoint):
             return False
+
+        # Unpack the rootfs quirks
+        if not self.fetcher.unpackQuirks(self.tempRootMountpoint):
+            return False
+
         return True
 
     def rootfsOverlay(self):
