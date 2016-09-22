@@ -22,7 +22,6 @@ class dockerhubFetcher(tarFetcher):
         super().__init__(conffile, version, remote)
         machine = runningDevice(conffile)
         self.remotefile = os.path.join(self.remote + ":" + version + "-" + machine)
-        self.workspacefile = os.path.join(self.workspace, "resinhup.tar")
 
     def download(self):
         self.cleanworkspace()
@@ -64,8 +63,6 @@ class dockerhubFetcher(tarFetcher):
         except:
             log.error("Can't export tar archive update file.")
             return False
-        with open(self.workspacefile, 'wb') as fd:
-            for chunk in strm.stream(1000000):
-                fd.write(chunk)
+        self.updatefilestream = strm
 
         return True

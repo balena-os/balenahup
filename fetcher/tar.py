@@ -13,6 +13,7 @@ import os
 import tarfile
 import logging
 import shutil
+from io import StringIO
 from modules.util import *
 
 log = logging.getLogger(__name__)
@@ -27,7 +28,7 @@ class tarFetcher:
         self.workspace = getConfigurationItem(conffile, 'fetcher', 'workspace')
         machine = runningDevice(conffile)
         self.remotefile = os.path.join(self.remote, "resinos-" + machine, "resinhup-" + version + ".tar.gz")
-        self.workspacefile = os.path.join(self.workspace, "resinhup.tar.gz")
+        self.updatefilestream = None
         self.workspaceunpack = os.path.join(self.workspace, "update")
         self.bootfilesdir = os.path.join(self.workspace, "update/resin-boot")
         self.update_file_fingerprints = getConfigurationItem(conffile, 'fetcher', 'update_file_fingerprints').split()
@@ -48,8 +49,7 @@ class tarFetcher:
         self.cleanworkspace()
 
         try:
-            log.info("Download started... this can take a couple of minutes...")
-            log.debug("Downloading " + self.remotefile + " ...")
+            log.info("Downloading " + self.remotefile + " ...")
             r = requests.get(self.remotefile, stream=True)
         except:
             log.error("Can't download update file.")
@@ -59,28 +59,16 @@ class tarFetcher:
             log.error("HTTP status code: " + str(r.status_code))
             return False
 
-        with open(self.workspacefile, 'wb') as fd:
-            for chunk in r.iter_content(1000000):
-                fd.write(chunk)
+        self.updatefilestream = StringIO(r.content)
 
         return True
 
     def testUpdate(self):
-        if not os.path.exists(self.workspacefile):
-            log.error("No such file: " + self.workspacefile)
-            return False
-        if not tarfile.is_tarfile(self.workspacefile):
-            log.error(self.workspacefile + " doesn't seem to be a tar archive.")
-            return False
-
-        update = tarfile.open(self.workspacefile)
-        namelist = update.getnames()
         for entry in self.update_file_fingerprints:
-            if not entry in namelist:
+            if not os.path.exists(os.path.join(self.workspaceunpack, entry)):
                 update.close()
                 log.warning("Check update file failed: " + entry)
                 return False
-        update.close()
 
         return True
 
@@ -92,16 +80,18 @@ class tarFetcher:
 
         self.cleanunpack()
 
-        if not self.testUpdate():
-            log.error(self.workspacefile + " not an update file.")
-            return False
-
         log.info("Unpack started... this can take a couple of seconds...")
 
-        update = tarfile.open(name=self.workspacefile, mode='r:*')
+        update = tarfile.open(mode='r|*', fileobj=self.updatefilestream)
         update.extractall(self.workspaceunpack)
+        update.close()
 
-        log.debug("Unpacked " + self.workspacefile + " in " + self.workspaceunpack)
+        log.debug("Unpacked stream update file in " + self.workspaceunpack)
+
+        if not self.testUpdate():
+            log.error("Unpacked update is not a resinhup update package.")
+            return False
+
         return True
 
     def unpackQuirks(self, location):
