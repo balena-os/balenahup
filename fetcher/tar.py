@@ -8,7 +8,7 @@
 # Author: Andrei Gherzan <andrei@resin.io>
 #
 
-import requests
+import urllib3
 import os
 import tarfile
 import logging
@@ -50,16 +50,17 @@ class tarFetcher:
 
         try:
             log.info("Downloading " + self.remotefile + " ...")
-            r = requests.get(self.remotefile, stream=True)
+            http = urllib3.PoolManager()
+            r = http.request('GET', self.remotefile, preload_content=False)
         except:
             log.error("Can't download update file.")
             return False
 
-        if r.status_code != 200:
-            log.error("HTTP status code: " + str(r.status_code))
+        if r.status != 200:
+            log.error("HTTP status code: " + str(r.status))
             return False
 
-        self.updatefilestream = StringIO(r.content)
+        self.updatefilestream = r
 
         return True
 
