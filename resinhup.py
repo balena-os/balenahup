@@ -111,6 +111,12 @@ def main():
         return False
     log.debug(device + " is a supported device for resinhup.")
 
+    # Minimum resinOS version
+    min_version = "1.12.0"
+    if StrictVersion(args.version) < StrictVersion(min_version):
+        log.error("Resinhup is not supported for the resinOS version requested.")
+        return False
+
     # Is the requested version already there or greater?
     if not args.force:
         currentVersion = getCurrentHostOSVersion(args.conf)
