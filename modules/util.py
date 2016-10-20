@@ -63,6 +63,25 @@ def getBootPartition(conffile):
         return bootdevice
     return None
 
+def getBootPartitionRwMount(conffile, where):
+    'Returns the mount location of the boot partition while making sure it is mounted rw'
+    bootdevice = getBootPartition(conffile)
+    if not isMounted(bootdevice):
+        if isMounted(where):
+            if not umount(where):
+                return None
+        if not mount(what=bootdevice, where=where):
+            return None
+
+    bootmountpoint = getMountpoint(bootdevice)
+    if not os.access(bootmountpoint, os.W_OK | os.R_OK):
+        if not mount(what='', where=bootmountpoint, mounttype='', mountoptions='remount,rw'):
+            return None
+        # It *should* be fine now
+        if not os.access(bootmountpoint, os.W_OK | os.R_OK):
+            return None
+    return bootmountpoint
+
 def getPartitionIndex(device):
     ''' Get the index number of a partition '''
     match = re.match(r"(.*?)(\d+$)", device)
@@ -293,6 +312,13 @@ def getConfJsonPath(conffile):
     if not possible_locations:
         return None
     possible_locations = possible_locations.split()
+
+    # config.json should be in boot partition so let's prepend the temporary mountpoint
+    # for this partition
+    fetcher_workspace = getConfigurationItem(conffile, 'fetcher', 'workspace')
+    tempbootmountpoint = os.path.join(fetcher_workspace, 'boot-tempmountpoint')
+    possible_locations.insert(0, tempbootmountpoint)
+
     for location in possible_locations:
         if os.path.isfile(os.path.normpath(root_mount + "/" + location + '/config.json')):
             log.debug("Detected config.json in " + location)

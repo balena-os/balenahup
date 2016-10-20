@@ -173,26 +173,10 @@ class Updater:
             return True
         ignore_files = ignore_files.split()
 
-        bootdevice = getBootPartition(self.conf)
-
-        # Make sure the temp boot directory is unmounted
-        if isMounted(self.tempBootMountpoint):
-            if not umount(self.tempBootMountpoint):
-                return False
-
-        # Make sure the boot partition device is mounted
-        if not isMounted(bootdevice):
-            if not mount(what=bootdevice, where=self.tempBootMountpoint):
-                return False
-
-        # We need to make sure the boot partition mountpoint is rw
-        bootmountpoint = getMountpoint(bootdevice)
-        if not os.access(bootmountpoint, os.W_OK | os.R_OK):
-            if not mount(what='', where=bootmountpoint, mounttype='', mountoptions='remount,rw'):
-                return False
-            # It *should* be fine now
-            if not os.access(bootmountpoint, os.W_OK | os.R_OK):
-                return False
+        # Make sure boot is mounted and RW
+        bootmountpoint = getBootPartitionRwMount(self.conf, self.tempBootMountpoint)
+        if not bootmountpoint:
+            return False
 
         for bootfile in bootfiles:
             # Ignore?
@@ -219,72 +203,70 @@ class Updater:
         return True
 
     def fixOldConfigJson(self):
+        # Get host OS root mountpoint
         root_mount = getConfigurationItem(self.conf, 'General', 'host_bind_mount')
         if not root_mount:
             root_mount = '/'
+        # Make sure boot is mounted and RW
+        bootmountpoint = getBootPartitionRwMount(self.conf, self.tempBootMountpoint)
+        if not bootmountpoint:
+            return False
 
-        if os.path.isfile(os.path.join(root_mount, "mnt/data-disk/config.json")) and os.path.isfile(os.path.join(root_mount, "etc/resin.conf")):
-            # We are in the case were we used to have config.json in btrfs partition
+        # Config should be in on boot partition
+        if not os.path.isfile(os.path.join(bootmountpoint, 'config.json')):
+            if os.path.isfile(os.path.join(root_mount, "mnt/data-disk/config.json")) and os.path.isfile(os.path.join(root_mount, "etc/resin.conf")):
+                # We are in the case were we used to have config.json in data partition
+                # We need to translate resin.conf into a config.json and put the final one
+                # in boot partition
+                log.info("Migrate/fix config.json from data partition...")
 
-            variablesmap = {
-                'API_ENDPOINT': 'apiEndpoint',
-                'REGISTRY_ENDPOINT': 'registryEndpoint',
-                'PUBNUB_SUBSCRIBE_KEY': 'pubnubSubscribeKey',
-                'PUBNUB_PUBLISH_KEY': 'pubnubPublishKey',
-                'MIXPANEL_TOKEN': 'mixpanelToken',
-                'LISTEN_PORT': 'listenPort'
-            };
+                variablesmap = {
+                    'API_ENDPOINT': 'apiEndpoint',
+                    'REGISTRY_ENDPOINT': 'registryEndpoint',
+                    'PUBNUB_SUBSCRIBE_KEY': 'pubnubSubscribeKey',
+                    'PUBNUB_PUBLISH_KEY': 'pubnubPublishKey',
+                    'MIXPANEL_TOKEN': 'mixpanelToken',
+                    'LISTEN_PORT': 'listenPort'
+                };
 
-            config = os.path.join(root_mount, "mnt/data-disk/config.json")
-            tmpconfig = "/tmp/config.json"
-            resinconf = os.path.join(root_mount, "etc/resin.conf")
+                config = os.path.join(root_mount, "mnt/data-disk/config.json")
+                tmpconfig = "/tmp/config.json"
+                resinconf = os.path.join(root_mount, "etc/resin.conf")
 
-            safeCopy(config, tmpconfig) # Work on a copy
+                safeCopy(config, tmpconfig) # Work on a copy
 
-            # Make sure everything in resin.conf is in json
-            with open(resinconf) as resinconffile:
-                for line in resinconffile:
-                    variable = line.split('=')[0]
-                    if not variable in variablesmap:
-                        continue
-                    value = line.split('=')[1]
-                    mappedvariable = variablesmap[variable]
-                    jsonSetAttribute(tmpconfig, mappedvariable, value.strip(), onlyIfNotDefined=True)
+                # Make sure everything in resin.conf is in json
+                with open(resinconf) as resinconffile:
+                    for line in resinconffile:
+                        variable = line.split('=')[0]
+                        if not variable in variablesmap:
+                            continue
+                        value = line.split('=')[1]
+                        mappedvariable = variablesmap[variable]
+                        jsonSetAttribute(tmpconfig, mappedvariable, value.strip(), onlyIfNotDefined=True)
 
-            # Handle VPN address separately as we didn't have it in resin.conf
-            # Compute vpn endpoint based on registry endpoint and write it to json
-            registryEndpoint = jsonGetAttribute(tmpconfig, 'registryEndpoint')
-            vpnEndpoint = registryEndpoint.strip().replace('registry', 'vpn')
-            jsonSetAttribute(tmpconfig, 'vpnEndpoint', vpnEndpoint, onlyIfNotDefined=True)
+                # Handle VPN address separately as we didn't have it in resin.conf
+                # Compute vpn endpoint based on registry endpoint and write it to json
+                registryEndpoint = jsonGetAttribute(tmpconfig, 'registryEndpoint')
+                vpnEndpoint = registryEndpoint.strip().replace('registry', 'vpn')
+                jsonSetAttribute(tmpconfig, 'vpnEndpoint', vpnEndpoint, onlyIfNotDefined=True)
 
-            # Handle config partition and write tmpconfig in it
-            configPartition = getConfigPartition(self.conf)
-            if not configPartition:
-                return False
-            # Make sure this partition is not mounted
-            if isMounted(configPartition):
-                if not unmount(configPartition):
+                # Copy the temp config.json to resin-boot
+                if not safeCopy(tmpconfig, bootmountpoint):
                     return False
-            # Format partition and copy config.json
-            if not formatVFAT(configPartition, "resin-conf"):
-                return False
-            if not mcopy(dev=configPartition, src=tmpconfig, dst="::/config.json"):
-                return False
-            os.remove(tmpconfig)
-
-            # At this point configuration file is fixed and is in a filesystem. Make sure
-            # this fs is mounted in config default mountpoint so detections of config.json
-            # will return the updated one from now on.
-            default_config_mountpoint = os.path.normpath(root_mount + "/" + getConfigurationItem(self.conf, 'config.json', 'default_mountpoint'))
-            if not isMounted(default_config_mountpoint):
-                if not os.path.isdir(default_config_mountpoint):
-                    os.makedirs(default_config_mountpoint)
-                if not mount(what=configPartition, where=default_config_mountpoint):
+                os.remove(tmpconfig)
+            elif os.path.isfile(os.path.join(root_mount, "mnt/conf/config.json")):
+                # We are in the case where the config.json was in conf partition
+                log.info("Migrate config.json from conf partition...")
+                if not safeCopy(getConfJsonPath(self.conf), os.path.join(bootmountpoint, 'config.json')):
                     return False
+            else:
+                log.warn("Can't detect old config.json.")
+                return False
+        else:
+            log.info("No need to migrate/fix config.json...")
 
-            return True
-
-        return False
+        return True
 
     def fixFsLabels(self):
         log.info("Fixing the labels of all the filesystems...")
@@ -306,9 +288,8 @@ class Updater:
             return False
 
         # resin-conf
-        if not getDevice("resin-conf"):
-            if not self.fixOldConfigJson():
-                return False
+        if not self.fixOldConfigJson():
+            return False
 
         # resin-data
         if not getDevice("resin-data"):
