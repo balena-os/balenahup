@@ -40,20 +40,23 @@ while [[ $# > 0 ]]; do
             ;;
         -d|--dockerfile)
             if [ -z "$2" ]; then
-                log ERROR "\"$1\" argument needs a value."
+                echo "[ERROR] \"$1\" argument needs a value."
+                exit 1
             fi
             DOCKERFILES=$2
             shift
             ;;
         -t|--tag)
             if [ -z "$2" ]; then
-                log ERROR "\"$1\" argument needs a value."
+                echo "[ERROR] \"$1\" argument needs a value."
+                exit 1
             fi
             TAG=$2
             shift
             ;;
         *)
-            log ERROR "Unrecognized option $1."
+            echo "[ERROR] Unrecognized option $1."
+            exit 1
             ;;
     esac
     shift
