@@ -8,8 +8,8 @@
 # Author: Andrei Gherzan <andrei@resin.io>
 #
 
-import os
 import logging
+import os
 from docker import Client
 from fetcher.tar import tarFetcher
 from modules.util import *
