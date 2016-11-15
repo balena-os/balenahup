@@ -9,8 +9,8 @@
 #
 
 import logging
-from fetcher.tar import tarFetcher
 from fetcher.dockerhub import dockerhubFetcher
+from fetcher.tar import tarFetcher
 
 log = logging.getLogger(__name__)
 
