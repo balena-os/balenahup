@@ -11,20 +11,20 @@ REGISTRY=registry.resinstaging.io/resinhup
 function help {
     cat << EOF
 Run docker build and push for the supported images.
-$0 <OPTION>
+$0 [OPTION ...]
 
 Options:
   -h, --help
         Display this help and exit.
 
-  -d, --dockerfile
+  -d <PATH>, --dockerfile <PATH>
         Build and push only this Dockerfile. Otherwise all found will be used.
 
-  -r, --registry
+  -r <URL>, --registry <URL>
         The Docker registry to push to, without the trailing slash.
         Remember to change the corresponding value in conf/resinhup.conf as well.
 
-  -t, --tag
+  -t <TAG>, --tag <TAG>
         By default push will be done to latest tag. This can be tweaked with this flag.
 
 EOF
