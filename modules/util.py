@@ -538,11 +538,12 @@ def safeDirCopy(src, dst, sync=True, ignore=[]):
                 try:
                     srcfullpath = os.path.join(root, d)
                     dstfullpath = os.path.join(dst, os.path.relpath(srcfullpath, src))
-                    os.makedirs(dstfullpath, exist_ok=True)
-                    try:
+                    if os.path.islink(srcfullpath):
+                        if not safeFileCopy(srcfullpath, dstfullpath, sync):
+                            return False
+                    else:
+                        os.makedirs(dstfullpath, exist_ok=True)
                         shutil.copymode(srcfullpath, dstfullpath)
-                    except:
-                        return False
                 except Exception as e:
                     log.error(str(e))
                     return False
