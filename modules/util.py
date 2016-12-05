@@ -507,7 +507,7 @@ def jsonSetAttribute(jsonfile, attribute, value, onlyIfNotDefined=False):
     return True
 
 def safeCopy(src, dst, sync=True, ignore=[]):
-    if os.path.isfile(src):
+    if os.path.isfile(src) or os.path.islink(src):
         return safeFileCopy(src, dst, sync)
     elif os.path.isdir(src):
         return safeDirCopy(src, dst, sync, ignore)
