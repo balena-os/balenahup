@@ -18,7 +18,7 @@ from modules.util import *
 from modules.fingerprint import *
 from modules.resinkernel import *
 from modules.repartitioner import *
-from fetcher.tar import *
+from fetcher.fetcher import *
 from modules.updater import *
 from argparse import ArgumentParser
 import logging
@@ -43,8 +43,8 @@ def main():
                       help = "Force the device name and skip device detection")
     parser.add_argument('-c', '--configuration-file', action = 'store', dest = 'conf', default = default_resinhup_conf_file,
                       help = "Configuration file to be used. Default: " + default_resinhup_conf_file)
-    parser.add_argument('-f', '--force-fingerprint', action = 'store_true', dest = 'force_fingerprint', default = False,
-                      help = "Avoid fingerprint check and force update. Do it on your own risk.")
+    parser.add_argument('-f', '--force', action = 'store_true', dest = 'force', default = False,
+                      help = "Force update while avoiding fingerprint checks, current version, etc. Do it on your own risk.")
     parser.add_argument('-s', '--staging', action = 'store_true', dest = 'staging', default = False,
                       help = "Validate and configure config.json against staging values.")
     parser.add_argument('-u', '--update-to-version', action = 'store', dest = 'version', default = False,
@@ -62,7 +62,7 @@ def main():
     if os.getenv('RESINHUP_STAGING'):
         args.staging = True
     if os.getenv('RESINHUP_FORCE'):
-        args.force_fingerprint = True
+        args.force = True
 
     # Logger
     log = logging.getLogger()
@@ -111,19 +111,34 @@ def main():
         return False
     log.debug(device + " is a supported device for resinhup.")
 
+    # Minimum resinOS version
+    min_version = "1.12.0"
+    if StrictVersion(args.version) < StrictVersion(min_version):
+        log.error("Resinhup is not supported for the resinOS version requested.")
+        return False
+
     # Is the requested version already there or greater?
-    currentVersion = getCurrentHostOSVersion(args.conf)
-    if currentVersion:
-        try:
-            if StrictVersion(currentVersion) >= StrictVersion(args.version):
+    if not args.force:
+        currentVersion = getCurrentHostOSVersion(args.conf)
+        log.debug("Current detected version: " + currentVersion + ". Requested version = " + args.version + ".")
+        if currentVersion:
+            try:
+                if StrictVersion(currentVersion) >= StrictVersion(args.version):
+                    updated=True
+                else:
+                    updated=False
+            except:
+                log.warning("Error while checking if device is already at the requested version. Continuing update...")
+
+            if updated:
                 log.info("The device is (" + currentVersion + ") already at the requested or greater version than the one requested (" + args.version + ").")
                 sys.exit(3)
             else:
                 log.info("Updating from " + currentVersion + " to " + args.version + ".")
-        except:
-            log.warning("Error while checking if device is already at the requested version. Continuing update...")
+        else:
+            log.info("Can't get current HostOS version. Continuing update...")
     else:
-        log.info("Can't get current HostOS version. Continuing update...")
+        log.debug("Version check avoided as instructed.")
 
     # Check for kernel custom modules
     if ResinKernel().customLoadedModules():
@@ -131,10 +146,8 @@ def main():
     else:
         log.info("No custom loaded kernel modules detected.")
 
-    return False
-
     # Check the image fingerprint
-    if not args.force_fingerprint:
+    if not args.force:
         root_mount = getConfigurationItem(args.conf, 'General', 'host_bind_mount')
         if not root_mount:
             root_mount = '/'
@@ -178,7 +191,13 @@ def main():
         return False
 
     # Get new update
-    f = tarFetcher(args.conf, version=args.version, remote=args.remote)
+    fetcher_type = getConfigurationItem(args.conf, 'fetcher', 'type')
+    if (not fetcher_type):
+        fetcher_type = 'dockerhub'
+    f = Fetcher(fetcher_type, args.conf, version=args.version, remote=args.remote)
+    if not f:
+        log.error("Fetcher error. Do you have a valid fetcher type?!")
+        return False
     if not f.unpack(downloadFirst=True):
         log.error("Could not unpack update")
         return False

@@ -5,6 +5,7 @@ set -e
 GREEN='\033[0;32m'
 NC='\033[0m'
 TAG=latest
+REGISTRY=registry.resinstaging.io/resinhup
 
 # Help function
 function help {
@@ -18,6 +19,10 @@ Options:
 
   -d, --dockerfile
         Build and push only this Dockerfile. Otherwise all found will be used.
+
+  -r, --registry
+        The Docker registry to push to, without the trailing slash.
+        Remember to change the corresponding value in conf/resinhup.conf as well.
 
   -t, --tag
         By default push will be done to latest tag. This can be tweaked with this flag.
@@ -40,20 +45,31 @@ while [[ $# > 0 ]]; do
             ;;
         -d|--dockerfile)
             if [ -z "$2" ]; then
-                log ERROR "\"$1\" argument needs a value."
+                echo "[ERROR] \"$1\" argument needs a value."
+                exit 1
             fi
             DOCKERFILES=$2
             shift
             ;;
+        -r|--registry)
+            if [ -z "$2" ]; then
+                echo "[ERROR] \"$1\" argument needs a value."
+                exit 1
+            fi
+            REGISTRY=$2
+            shift
+            ;;
         -t|--tag)
             if [ -z "$2" ]; then
-                log ERROR "\"$1\" argument needs a value."
+                echo "[ERROR] \"$1\" argument needs a value."
+                exit 1
             fi
             TAG=$2
             shift
             ;;
         *)
-            log ERROR "Unrecognized option $1."
+            echo "[ERROR] Unrecognized option $1."
+            exit 1
             ;;
     esac
     shift
@@ -77,7 +93,7 @@ for dockerfile in $DOCKERFILES; do
     fi
     printf "${GREEN}Running build for $device using $dockerfile ...${NC}\n"
     docker build -t resinhup-$device:$TAG -f ../$dockerfile $SCRIPTPATH/..
-    printf "${GREEN}Tag an push for $device ...${NC}\n"
-    docker tag -f resinhup-$device registry.resinstaging.io/resinhup/resinhup-$device:$TAG
-    docker push registry.resinstaging.io/resinhup/resinhup-$device:$TAG
+    printf "${GREEN}Tag and push for $device ...${NC}\n"
+    docker tag -f resinhup-$device:$TAG $REGISTRY/resinhup-$device:$TAG
+    docker push $REGISTRY/resinhup-$device:$TAG
 done

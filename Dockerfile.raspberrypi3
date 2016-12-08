@@ -1,7 +1,8 @@
 FROM resin/raspberrypi3-debian:jessie
 
-# Install the dependencies
-RUN apt-get update && apt-get install vim btrfs-tools mtools dosfstools python3 python3-requests python3-sh python3-parted python3-binaryornot jq -y && rm -rf /var/lib/apt/lists/*
+# Install the resinhup dependencies
+RUN apt-get update && apt-get install vim btrfs-tools mtools dosfstools python3 python3-pip python3-urllib3 python3-sh python3-parted python3-binaryornot jq -y && rm -rf /var/lib/apt/lists/*
+RUN pip3 install docker-py
 
 # Use the host's kmod - this one supports compressed kernel modules
 RUN ln -sf /host/bin/kmod /bin/kmod
@@ -9,4 +10,4 @@ RUN ln -sf /host/bin/kmod /bin/kmod
 # Add the current directoy in the container
 COPY . /app
 
-CMD python3 /app/resinhup.py --config /app/conf/resinhup.conf --debug
+CMD /app/run.sh

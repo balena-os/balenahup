@@ -63,6 +63,25 @@ def getBootPartition(conffile):
         return bootdevice
     return None
 
+def getBootPartitionRwMount(conffile, where):
+    'Returns the mount location of the boot partition while making sure it is mounted rw'
+    bootdevice = getBootPartition(conffile)
+    if not isMounted(bootdevice):
+        if isMounted(where):
+            if not umount(where):
+                return None
+        if not mount(what=bootdevice, where=where):
+            return None
+
+    bootmountpoint = getMountpoint(bootdevice)
+    if not os.access(bootmountpoint, os.W_OK | os.R_OK):
+        if not mount(what='', where=bootmountpoint, mounttype='', mountoptions='remount,rw'):
+            return None
+        # It *should* be fine now
+        if not os.access(bootmountpoint, os.W_OK | os.R_OK):
+            return None
+    return bootmountpoint
+
 def getPartitionIndex(device):
     ''' Get the index number of a partition '''
     match = re.match(r"(.*?)(\d+$)", device)
@@ -293,6 +312,13 @@ def getConfJsonPath(conffile):
     if not possible_locations:
         return None
     possible_locations = possible_locations.split()
+
+    # config.json should be in boot partition so let's prepend the temporary mountpoint
+    # for this partition
+    fetcher_workspace = getConfigurationItem(conffile, 'fetcher', 'workspace')
+    tempbootmountpoint = os.path.join(fetcher_workspace, 'boot-tempmountpoint')
+    possible_locations.insert(0, tempbootmountpoint)
+
     for location in possible_locations:
         if os.path.isfile(os.path.normpath(root_mount + "/" + location + '/config.json')):
             log.debug("Detected config.json in " + location)
@@ -417,7 +443,7 @@ def getCurrentHostOSVersion(conffile):
             for line in lines:
                 (attribute, value) = line.split('=')
                 if attribute == 'VERSION':
-                    return value.strip()
+                    return value.strip(' "\n')
     except:
         log.debug("getCurrentHostOSVersion: Can't get the current host OS version")
 
@@ -480,16 +506,16 @@ def jsonSetAttribute(jsonfile, attribute, value, onlyIfNotDefined=False):
     log.debug("jsonSetAttribute: Successfully set " + attribute + " to " + value + " in " + jsonfile + ".")
     return True
 
-def safeCopy(src, dst, sync=True):
-    if os.path.isfile(src):
+def safeCopy(src, dst, sync=True, ignore=[]):
+    if os.path.isfile(src) or os.path.islink(src):
         return safeFileCopy(src, dst, sync)
     elif os.path.isdir(src):
-        return safeDirCopy(src, dst, sync)
+        return safeDirCopy(src, dst, sync, ignore)
     else:
         log.error("safeCopy: Unknown src target to copy " + src + ".")
         return False
 
-def safeDirCopy(src, dst, sync=True):
+def safeDirCopy(src, dst, sync=True, ignore=[]):
     # src must be a dir
     if not os.path.isdir(src):
         log.error("safeDirCopy: Can't copy source as " + src + " is not a directory.")
@@ -505,20 +531,28 @@ def safeDirCopy(src, dst, sync=True):
 
             # Directories
             for d in dirs:
+                if d in ignore:
+                    log.warning("safeDirCopy: Ignored directory " + d + ".")
+                    dirs.remove(d)
+                    continue
                 try:
                     srcfullpath = os.path.join(root, d)
                     dstfullpath = os.path.join(dst, os.path.relpath(srcfullpath, src))
-                    os.makedirs(dstfullpath, exist_ok=True)
-                    try:
+                    if os.path.islink(srcfullpath):
+                        if not safeFileCopy(srcfullpath, dstfullpath, sync):
+                            return False
+                    else:
+                        os.makedirs(dstfullpath, exist_ok=True)
                         shutil.copymode(srcfullpath, dstfullpath)
-                    except:
-                        return False
                 except Exception as e:
                     log.error(str(e))
                     return False
 
             # Files
             for name in files:
+                if name in ignore:
+                    log.warning("safeDirCopy: Ignored file " + d + ".")
+                    continue
                 srcfullpath = os.path.join(root, name)
                 dstfullpath = os.path.join(dst, os.path.relpath(srcfullpath, src))
                 if stat.S_ISFIFO(os.stat(srcfullpath, follow_symlinks=False).st_mode): # FIXME Ignore pipe files
@@ -641,6 +675,20 @@ class TestSafeDirCopy(unittest.TestCase):
         src = "./modules/util/safedircopy/dir1/file2"
         dst = "./modules/util/safedircopy/dir3"
         self.assertFalse(safeDirCopy(src, dst))
+
+    def testSafeDirCopyIgnoreDir(self):
+        src = "./modules/util/safedircopy/dir1"
+        dst = "./modules/util/safedircopy/dir3"
+        self.assertTrue(safeCopy(src, dst, ignore=['ignore-dir']))
+        self.assertFalse(os.path.isdir(os.path.join(dst, "ignore-dir")))
+        shutil.rmtree(dst) # cleanup
+
+    def testSafeDirCopyIgnoreFile(self):
+        src = "./modules/util/safedircopy/dir1"
+        dst = "./modules/util/safedircopy/dir3"
+        self.assertTrue(safeCopy(src, dst, ignore=['ignore-file']))
+        self.assertFalse(os.path.isdir(os.path.join(dst, "ignore-dir/ignore-file")))
+        shutil.rmtree(dst) # cleanup
 
 if __name__ == '__main__':
     unittest.main()
