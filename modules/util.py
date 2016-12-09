@@ -22,6 +22,7 @@ import unittest
 import shutil
 import json
 from binaryornot.check import is_binary
+from distutils.version import StrictVersion
 
 log = logging.getLogger(__name__)
 
@@ -443,9 +444,11 @@ def getCurrentHostOSVersion(conffile):
             for line in lines:
                 (attribute, value) = line.split('=')
                 if attribute == 'VERSION':
+                    version = StrictVersion(value.strip(' "\n'))
                     return value.strip(' "\n')
     except:
-        log.debug("getCurrentHostOSVersion: Can't get the current host OS version")
+        log.warn("getCurrentHostOSVersion: Can't get the current host OS version so assume 1.0.0 .")
+    return "1.0.0"
 
 def jsonDecode(jsonfile):
     try:
