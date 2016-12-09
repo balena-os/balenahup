@@ -1,7 +1,12 @@
 FROM resin/rpi-raspbian:jessie
 
 # Install the resinhup dependencies
-RUN apt-get update && apt-get install vim btrfs-tools mtools dosfstools python3 python3-pip python3-urllib3 python3-sh python3-parted python3-binaryornot jq -y && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install wget vim btrfs-tools mtools dosfstools python3 python3-urllib3 python3-sh python3-parted python3-binaryornot jq -y && rm -rf /var/lib/apt/lists/*
+
+# Install pip manually otherwise we will get a broken dependency of docker-py: requests-2.12.2
+# https://github.com/docker/docker-py/issues/1321
+RUN wget https://bootstrap.pypa.io/get-pip.py
+RUN python3 get-pip.py
 RUN pip3 install docker-py
 
 # Use the host's kmod - this one supports compressed kernel modules
