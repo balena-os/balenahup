@@ -121,22 +121,19 @@ def main():
     if not args.force:
         currentVersion = getCurrentHostOSVersion(args.conf)
         log.debug("Current detected version: " + currentVersion + ". Requested version = " + args.version + ".")
-        if currentVersion:
-            try:
-                if StrictVersion(currentVersion) >= StrictVersion(args.version):
-                    updated=True
-                else:
-                    updated=False
-            except:
-                log.warning("Error while checking if device is already at the requested version. Continuing update...")
-
-            if updated:
-                log.info("The device is (" + currentVersion + ") already at the requested or greater version than the one requested (" + args.version + ").")
-                sys.exit(3)
+        try:
+            if StrictVersion(currentVersion) >= StrictVersion(args.version):
+                updated=True
             else:
-                log.info("Updating from " + currentVersion + " to " + args.version + ".")
+                updated=False
+        except:
+            log.warning("Error while checking if device is already at the requested version. Continuing update...")
+
+        if updated:
+            log.info("The device is (" + currentVersion + ") already at the requested or greater version than the one requested (" + args.version + ").")
+            sys.exit(3)
         else:
-            log.info("Can't get current HostOS version. Continuing update...")
+            log.info("Updating from " + currentVersion + " to " + args.version + ".")
     else:
         log.debug("Version check avoided as instructed.")
 
