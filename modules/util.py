@@ -686,6 +686,14 @@ class TestSafeDirCopy(unittest.TestCase):
         self.assertFalse(os.path.isdir(os.path.join(dst, "ignore-dir")))
         shutil.rmtree(dst) # cleanup
 
+    def testSafeDirCopyIgnoreMultipleDirs(self):
+        src = "./modules/util/safedircopy/dir1"
+        dst = "./modules/util/safedircopy/dir3"
+        self.assertTrue(safeCopy(src, dst, ignore=['ignore-dir', 'ignore-dir-2']))
+        self.assertFalse(os.path.isdir(os.path.join(dst, "ignore-dir")))
+        self.assertFalse(os.path.isdir(os.path.join(dst, "ignore-dir-2")))
+        shutil.rmtree(dst) # cleanup
+
     def testSafeDirCopyIgnoreFile(self):
         src = "./modules/util/safedircopy/dir1"
         dst = "./modules/util/safedircopy/dir3"
