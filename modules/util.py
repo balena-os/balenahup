@@ -531,13 +531,9 @@ def safeDirCopy(src, dst, sync=True, ignore=[]):
 
     # Copy each file in the structure of src to dst
     for root, dirs, files in os.walk(src):
-
             # Directories
+            dirs[:] = [d for d in dirs if not d in ignore]
             for d in dirs:
-                if d in ignore:
-                    log.warning("safeDirCopy: Ignored directory " + d + ".")
-                    dirs.remove(d)
-                    continue
                 try:
                     srcfullpath = os.path.join(root, d)
                     dstfullpath = os.path.join(dst, os.path.relpath(srcfullpath, src))
@@ -684,6 +680,14 @@ class TestSafeDirCopy(unittest.TestCase):
         dst = "./modules/util/safedircopy/dir3"
         self.assertTrue(safeCopy(src, dst, ignore=['ignore-dir']))
         self.assertFalse(os.path.isdir(os.path.join(dst, "ignore-dir")))
+        shutil.rmtree(dst) # cleanup
+
+    def testSafeDirCopyIgnoreMultipleDirs(self):
+        src = "./modules/util/safedircopy/dir1"
+        dst = "./modules/util/safedircopy/dir3"
+        self.assertTrue(safeCopy(src, dst, ignore=['ignore-dir', 'ignore-dir-2']))
+        self.assertFalse(os.path.isdir(os.path.join(dst, "ignore-dir")))
+        self.assertFalse(os.path.isdir(os.path.join(dst, "ignore-dir-2")))
         shutil.rmtree(dst) # cleanup
 
     def testSafeDirCopyIgnoreFile(self):
