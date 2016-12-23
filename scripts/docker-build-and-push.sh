@@ -5,7 +5,7 @@ set -e
 GREEN='\033[0;32m'
 NC='\033[0m'
 TAG=latest
-REGISTRY=registry.resinstaging.io/resinhup
+REGISTRY="registry.resinstaging.io/resin/resinhup resin/resinhup-test"
 
 # Help function
 function help {
@@ -92,8 +92,9 @@ for dockerfile in $DOCKERFILES; do
         exit 1
     fi
     printf "${GREEN}Running build for $device using $dockerfile ...${NC}\n"
-    docker build -t resinhup-$device:$TAG -f ../$dockerfile $SCRIPTPATH/..
-    printf "${GREEN}Tag and push for $device ...${NC}\n"
-    docker tag -f resinhup-$device:$TAG $REGISTRY/resinhup-$device:$TAG
-    docker push $REGISTRY/resinhup-$device:$TAG
+    for registry in $REGISTRY; do
+        printf "${GREEN}Tag and push for $device ...${NC}\n"
+        docker build -t $registry:$TAG-$device -f ../$dockerfile $SCRIPTPATH/..
+        docker push $registry:$TAG-$device
+    done
 done
