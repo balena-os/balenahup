@@ -2,10 +2,12 @@
 
 set -e
 
+readonly _registry_default="registry.resinstaging.io/resin/resinhup resin/resinhup-test"
+
 GREEN='\033[0;32m'
 NC='\033[0m'
 TAG=latest
-REGISTRY="registry.resinstaging.io/resin/resinhup resin/resinhup-test"
+REGISTRY=$_registry_default
 
 # Help function
 function help {
@@ -21,8 +23,9 @@ Options:
         Build and push only this Dockerfile. Otherwise all found will be used.
 
   -r, --registry
-        The Docker registry to push to, without the trailing slash.
+        List of one or more Docker registries to push to, without the trailing slash.
         Remember to change the corresponding value in conf/resinhup.conf as well.
+        Default: "$_registry_default".
 
   -t, --tag
         By default push will be done to latest tag. This can be tweaked with this flag.
