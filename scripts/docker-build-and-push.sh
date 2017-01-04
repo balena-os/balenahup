@@ -2,12 +2,13 @@
 
 set -e
 
-readonly _registry_default="registry.resinstaging.io/resin/resinhup resin/resinhup-test"
+readonly _registry_paths_default="registry.resinstaging.io/resin/resinhup resin/resinhup-test"
+readonly _release_default=latest
 
 GREEN='\033[0;32m'
 NC='\033[0m'
-TAG=latest
-REGISTRY=$_registry_default
+RELEASE=$_release_default
+REGISTRY_PATHS=$_registry_paths_default
 
 # Help function
 function help {
@@ -19,16 +20,18 @@ Options:
   -h, --help
         Display this help and exit.
 
-  -d, --dockerfile
+  -d <PATH>, --dockerfile <PATH>
         Build and push only this Dockerfile. Otherwise all found will be used.
 
-  -r, --registry
-        List of one or more Docker registries to push to, without the trailing slash.
-        Remember to change the corresponding value in conf/resinhup.conf as well.
-        Default: "$_registry_default".
+  -p <PATHS>, --paths <PATHS>
+        List of one or more Docker registry paths to push to, quoted, separated
+        with spaces. The paths must end with the image name.
+        Default: "$_registry_paths_default".
 
-  -t, --tag
-        By default push will be done to latest tag. This can be tweaked with this flag.
+  -r <RELEASE>, --release <RELEASE>
+        Release name of the build. This will form the first part of the
+        image tag.
+        Default: "$_release_default".
 
 EOF
 }
@@ -54,20 +57,20 @@ while [[ $# > 0 ]]; do
             DOCKERFILES=$2
             shift
             ;;
-        -r|--registry)
+        -p|--paths)
             if [ -z "$2" ]; then
                 echo "[ERROR] \"$1\" argument needs a value."
                 exit 1
             fi
-            REGISTRY=$2
+            REGISTRY_PATHS=$2
             shift
             ;;
-        -t|--tag)
+        -r|--release)
             if [ -z "$2" ]; then
                 echo "[ERROR] \"$1\" argument needs a value."
                 exit 1
             fi
-            TAG=$2
+            RELEASE=$2
             shift
             ;;
         *)
@@ -95,9 +98,9 @@ for dockerfile in $DOCKERFILES; do
         exit 1
     fi
     printf "${GREEN}Running build for $device using $dockerfile ...${NC}\n"
-    for registry in $REGISTRY; do
+    for path in $REGISTRY_PATHS; do
         printf "${GREEN}Tag and push for $device ...${NC}\n"
-        docker build -t $registry:$TAG-$device -f ../$dockerfile $SCRIPTPATH/..
-        docker push $registry:$TAG-$device
+        docker build -t $path:$RELEASE-$device -f ../$dockerfile $SCRIPTPATH/..
+        docker push $path:$RELEASE-$device
     done
 done
