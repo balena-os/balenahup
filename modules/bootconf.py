@@ -31,6 +31,11 @@ def configureBootloader(old, new, conffile):
         if not b.configure(old, new):
             log.error("Could not configure bootloader.")
             return False
+    elif currentDevice == 'artik5':
+        b = UBootResin(conffile)
+        if not b.configure(old, new):
+            log.error("Could not configure bootloader.")
+            return False
     else:
         log.error("No bootloader configuration support for this board.")
         return False
@@ -63,6 +68,67 @@ class BootloaderConfigurator(object):
         os.close(dirfd)
 
         return True
+
+    def applyResinUbootConfiguration(self, old, new):
+        ''' Overwrite resin_root_part uboot variable using uEnv.txt - this
+            variable points to the next rootfs partition to boot from'''
+
+        # Make sure the boot partition device is mounted
+        bootdevice = getBootPartition(self.conf)
+        if not isMounted(bootdevice):
+            try:
+                resinBootMountPoint = tempfile.mkdtemp(prefix='resinhup-', dir='/tmp')
+            except:
+                log.error("UBootResin: Failed to create temporary resin-boot mountpoint.")
+                return False
+            if not mount(what=bootdevice, where=resinBootMountPoint):
+                return False
+        else:
+            resinBootMountPoint = getMountpoint(bootdevice)
+
+        # We need to make sure the boot partition mountpoint is rw
+        if not os.access(resinBootMountPoint, os.W_OK | os.R_OK):
+            if not mount(what='', where=resinBootMountPoint, mounttype='', mountoptions='remount,rw'):
+                return False
+            # It *should* be fine now
+            if not os.access(resinBootMountPoint, os.W_OK | os.R_OK):
+                return False
+
+        # u-boot configuration is based on partition index
+        oldidx = getPartitionIndex(old)
+        newidx = getPartitionIndex(new)
+        if not oldidx or not newidx:
+            return False
+
+        # Current name and location of the resin u-boot configuration file
+        resinUbootConfigPath = os.path.join(resinBootMountPoint, 'uEnv.txt')
+
+        entries = {}
+        if os.path.isfile(resinUbootConfigPath):
+            with open(resinUbootConfigPath) as infile:
+                for line in infile:
+                    if not line.strip() or line.startswith('#'):
+                        continue
+                    (variable, value) = line.split('=')
+                    if not value:
+                        log.error("Unparsable line in resin uboot configuration: " + line + " .")
+                        return False
+                    entries[variable] = value
+        entries['resin_root_part'] = newidx
+
+        with open(resinUbootConfigPath + ".tmp", 'w') as outfile:
+            for variable in entries.keys():
+                outfile.write(variable + "=" + entries[variable] + "\n")
+            os.fsync(outfile)
+        os.rename(resinUbootConfigPath + ".tmp", resinUbootConfigPath)
+
+        # Make sure the write operation is durable - avoid data loss
+        dirfd = os.open(os.path.dirname(resinUbootConfigPath), os.O_DIRECTORY)
+        os.fsync(dirfd)
+        os.close(dirfd)
+
+        return True
+
 
     def configure(self, old, new):
         log.info("Configuring bootloader. From " + old + " to " + new + " .")
@@ -227,6 +293,18 @@ class UBootBeagleboneBootloader(BootloaderConfigurator):
             log.info("UBootBeagleboneBootloader: UBoot Beaglebone Bootloader configured.")
         else:
             log.error("UBootBeagleboneBootloader: Could not configure UBoot Beaglebone Bootloader.")
+            return False
+
+        return True
+
+class UBootResin(BootloaderConfigurator):
+    def configure(self, old, new):
+        super(UBootResin, self).configure(old, new)
+
+        if super(UBootResin, self).applyResinUbootConfiguration(old, new):
+            log.info("UBootResin: Resin u-boot configured.")
+        else:
+            log.error("UBootResin: Could not configure resin u-boot.")
             return False
 
         return True
