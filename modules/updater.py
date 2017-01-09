@@ -151,6 +151,55 @@ class Updater:
             log.debug("Overlayed " + src_full_path + " in " + self.tempRootMountpoint)
         return True
 
+    def adjustSupervisorConf(self):
+        log.info("Started to adjust supervisor configuration...")
+
+        # Load resinhup configuration variables
+        registry = getConfigurationItem(self.conf, 'supervisor', 'registry')
+        if not registry:
+            log.debug("adjustSupervisorConf: No registry provided in resinhup configuration file.")
+            return True
+        root_mount = getConfigurationItem(self.conf, 'General', 'host_bind_mount')
+        if not root_mount:
+            root_mount = '/'
+        confpath = getConfigurationItem(self.conf, 'supervisor', 'confpath')
+        if not confpath:
+           confpath = '/etc/supervisor.conf'
+
+        # Compute full path of supervisor configuration file on both current root and next root
+        currentConfFullPath = os.path.normpath(root_mount + confpath)
+        if not os.path.isfile(currentConfFullPath):
+            log.error("adjustSupervisorConf: Can't find supervisor conf in %s ." % currentConfFullPath)
+            return False
+        nextConfFullPath = os.path.normpath(self.tempRootMountpoint + confpath)
+        if not os.path.isfile(nextConfFullPath):
+            log.error("adjustSupervisorConf: Can't find supervisor conf in %s ." % nextConfFullPath)
+            return False
+
+        # Adjust SUPERVISOR_IMAGE value
+        with open(nextConfFullPath, 'r') as f, open(nextConfFullPath + '.hup.tmp', "w") as tempf:
+            line = f.readline().strip()
+            while line:
+                match = re.match(r"SUPERVISOR_IMAGE=(.+\/)?(.+\/)(.+)", line)
+                if match:
+                    if match.groups()[0]:
+                        mregistry = match.groups()[0].replace('/','')
+                    else:
+                        mregistry = 'dockerhub'
+                    muser = match.groups()[1].replace('/','')
+                    mimage = match.groups()[2].replace('/','')
+                    if mregistry != registry:
+                        log.warn("adjustSupervisorConf: Set registry from %s to %s ." % (mregistry, registry))
+                        line = 'SUPERVISOR_IMAGE=' + registry + '/' + muser + '/' + mimage
+                tempf.write(line + '\n')
+                line = f.readline().strip()
+        os.rename(nextConfFullPath + '.hup.tmp', nextConfFullPath)
+
+        # Save back to current root the modfied supervisor configuration so we can update supervisor in one go
+        safeCopy(nextConfFullPath, currentConfFullPath)
+
+        return True
+
     def updateRootfs(self):
         log.info("Started to update rootfs...")
         if not self.unpackNewRootfs():
@@ -158,6 +207,9 @@ class Updater:
             return False
         if not self.rootfsOverlay():
             log.error("Could not overlay new rootfs.")
+            return False
+        if not self.adjustSupervisorConf():
+            log.error("Could not adjust supervisor configuration file.")
             return False
         return True
 
