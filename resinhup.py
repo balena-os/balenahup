@@ -23,6 +23,8 @@ from modules.updater import *
 from argparse import ArgumentParser
 import logging
 from distutils.version import StrictVersion
+from time import sleep
+from random import randrange
 
 default_resinhup_conf_file = "/etc/resinhup.conf"
 
@@ -195,8 +197,16 @@ def main():
     if not f:
         log.error("Fetcher error. Do you have a valid fetcher type?!")
         return False
-    if not f.unpack(downloadFirst=True):
-        log.error("Could not unpack update")
+
+    for i in range(3):
+        if i > 0:
+            log.error("Could not unpack update, retrying after %d seconds" % sl)
+            sleep(sl)
+        if f.unpack(downloadFirst=True):
+            break
+        sl = randrange(30, 120)
+    else:
+        log.error("Could not unpack update, exiting")
         return False
 
     # Perform update
