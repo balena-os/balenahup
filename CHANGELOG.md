@@ -2,6 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
+ - Implement retry mechanism in pulling resinos image [Michal]
  - Artik 5 support [Andrei]
 
 ## v1.0.0 - 2016-12-23
