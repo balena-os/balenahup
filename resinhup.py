@@ -47,6 +47,8 @@ def main():
                       help = "Configuration file to be used. Default: " + default_resinhup_conf_file)
     parser.add_argument('-f', '--force', action = 'store_true', dest = 'force', default = False,
                       help = "Force update while avoiding fingerprint checks, current version, etc. Do it on your own risk.")
+    parser.add_argument('--allow-downgrades', action = 'store_true', dest = 'allow_downgrades', default = False,
+                      help = "Allow downgrading to an older version.")
     parser.add_argument('-s', '--staging', action = 'store_true', dest = 'staging', default = False,
                       help = "Validate and configure config.json against staging values.")
     parser.add_argument('-u', '--update-to-version', action = 'store', dest = 'version', default = False,
@@ -65,6 +67,8 @@ def main():
         args.staging = True
     if os.getenv('RESINHUP_FORCE'):
         args.force = True
+    if os.getenv('ALLOW_DOWNGRADES'):
+        args.allow_downgrades = True
 
     # Logger
     log = logging.getLogger()
@@ -120,14 +124,13 @@ def main():
         return False
 
     # Is the requested version already there or greater?
-    if not args.force:
+    if not args.allow_downgrades:
         currentVersion = getCurrentHostOSVersion(args.conf)
         log.debug("Current detected version: " + currentVersion + ". Requested version = " + args.version + ".")
+        updated = False
         try:
             if StrictVersion(currentVersion) >= StrictVersion(args.version):
                 updated=True
-            else:
-                updated=False
         except:
             log.warning("Error while checking if device is already at the requested version. Continuing update...")
 
@@ -137,7 +140,7 @@ def main():
         else:
             log.info("Updating from " + currentVersion + " to " + args.version + ".")
     else:
-        log.debug("Version check avoided as instructed.")
+        log.debug("Force version update as downgrades were allowed..")
 
     # Check for kernel custom modules
     if ResinKernel().customLoadedModules():
