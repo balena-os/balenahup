@@ -34,7 +34,7 @@ class dockerhubFetcher(tarFetcher):
     def download(self):
         self.cleanworkspace()
 
-        container_name='resinhup'
+        container_name='resinos'
 
         try:
             cli = Client(base_url='unix://var/run/docker.sock', version='auto')
