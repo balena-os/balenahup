@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented in this file.
 
+ - Implement ability to downgrade through argument and environment variable [Andrei]
+
 ## v1.1.0 - 2017-01-19
 
  - Whitelist splash logo [Michal]
