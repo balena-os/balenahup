@@ -67,7 +67,6 @@ class tarFetcher:
     def testUpdate(self):
         for entry in self.update_file_fingerprints:
             if not os.path.exists(os.path.join(self.workspaceunpack, entry)):
-                update.close()
                 log.warning("Check update file failed: " + entry)
                 return False
 
