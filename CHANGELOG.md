@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.1.2 - 2017-05-16
+
  - Whitelist etc/openvpn/resin.conf to allow resinhup on staging [Will]
 
 ## v1.1.1 - 2017-01-23
