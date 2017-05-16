@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented in this file.
 
+ - Whitelist etc/openvpn/resin.conf to allow resinhup on staging [Will]
+
 ## v1.1.1 - 2017-01-23
 
  - Implement ability to downgrade through argument and environment variable [Andrei]
