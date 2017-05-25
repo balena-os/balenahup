@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.1.3 - 2017-05-25
+
  - Whitelist etc/hostname [Gergely]
 
 ## v1.1.2 - 2017-05-16
