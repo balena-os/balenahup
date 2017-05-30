@@ -1,18 +1,40 @@
-FROM resin/nuc-debian:jessie
+#############
+# Build image
+#############
+FROM resin/intel-nuc-alpine:3.6 AS build
 
-# Install the resinhup dependencies
-RUN apt-get update && apt-get install wget vim btrfs-tools mtools dosfstools python3 python3-urllib3 python3-sh python3-parted python3-binaryornot jq -y && rm -rf /var/lib/apt/lists/*
+# Install build requirements
+RUN apk add --no-cache \
+      python3 gcc libc-dev parted-dev python3-dev
 
-# Install pip manually otherwise we will get a broken dependency of docker-py: requests-2.12.2
-# https://github.com/docker/docker-py/issues/1321
-RUN wget https://bootstrap.pypa.io/get-pip.py
-RUN python3 get-pip.py
-RUN pip3 install docker-py
+# Add python requirements
+COPY requirements.txt ./
+RUN pip3 install -r requirements.txt
 
-# Use the host's kmod - this one supports compressed kernel modules
-RUN ln -sf /host/bin/kmod /bin/kmod
+# Remove cached builds to shrink image
+RUN find /usr/lib/ | grep -E "(__pycache__|\.pyc|\.pyo$)" | xargs rm -rf
+
+###############
+# Shipped image
+###############
+FROM resin/intel-nuc-alpine:3.6
+
+WORKDIR /app
+
+# Required packages
+# blkid: blkid
+# dosfstools: dosfslabel
+# e2fsprogs-extra: e2label
+# kmod: lsmod, rmmod
+# util-linux: lsblk
+RUN apk add --no-cache \
+      blkid btrfs-progs btrfs-progs-extra dosfstools e2fsprogs-extra jq kmod mtools parted python3 util-linux wget \
+    && find /usr/lib/ | grep -E "(__pycache__|\.pyc|\.pyo$)" | xargs rm -rf
+
+# Copy previously installed requirements
+COPY --from=build /usr/lib/python3.6/site-packages /usr/lib/python3.6/site-packages
 
 # Add the current directoy in the container
-COPY . /app
+COPY app/ /app
 
 CMD /app/run.sh
