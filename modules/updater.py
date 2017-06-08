@@ -252,7 +252,7 @@ class Updater:
                 jsonSetAttribute(tmpconfig, 'vpnEndpoint', vpnEndpoint, onlyIfNotDefined=True)
 
                 # Copy the temp config.json to resin-boot
-                if not safeCopy(tmpconfig, bootmountpoint):
+                if not safeCopy(tmpconfig, os.path.join(bootmountpoint, 'config.json')):
                     return False
                 os.remove(tmpconfig)
             elif os.path.isfile(os.path.join(root_mount, "mnt/conf/config.json")):
