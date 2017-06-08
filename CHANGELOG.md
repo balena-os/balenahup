@@ -2,7 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
- - legacy-config: fix copy bug when migrating config.json
+## v1.1.4 - 2017-06-08
+
+ - legacy-config: fix copy bug when migrating config.json [Gergely]
 
 ## v1.1.3 - 2017-05-25
 
