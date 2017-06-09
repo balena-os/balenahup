@@ -123,6 +123,13 @@ def main():
         log.error("Resinhup is not supported for the resinOS version requested.")
         return False
 
+    # Maximum resinOS version
+    # XXX 2.0.0 not supported yet
+    major = args.version.split(".")[0]
+    if major != "1":
+        log.error("Resinhup is not yet supported for the resinOS version requested.")
+        return False
+
     # Is the requested version already there or greater?
     if not args.allow_downgrades:
         currentVersion = getCurrentHostOSVersion(args.conf)
