@@ -55,6 +55,10 @@ def main():
                       help = "Use this version to update the device to.")
     parser.add_argument('-r', '--remote', action = 'store', dest = 'remote', default = '',
                       help = "Remote to be used when searching for update bundles. Overwrites the value in configuration file.")
+    parser.add_argument('--supevisor-image', action = 'store', dest = 'supervisor_image', default = '',
+                      help = "Supervisor image to be used when updating the supervisor configuration upon if the rest of the update was successful.")
+    parser.add_argument('--supevisor-tag', action = 'store', dest = 'supervisor_tag', default = '',
+                      help = "Supervisor tag to be used when updating the supervisor configuration upon if the rest of the update was successful.")
 
     args = parser.parse_args()
 
@@ -69,6 +73,9 @@ def main():
         args.force = True
     if os.getenv('ALLOW_DOWNGRADES'):
         args.allow_downgrades = True
+    if os.getenv('SUPERVISOR_IMAGE') and os.getenv('SUPERVISOR_TAG'):
+        args.supervisor_image = os.getenv('SUPERVISOR_IMAGE')
+        args.supervisor_tag = os.getenv('SUPERVISOR_TAG')
 
     # Logger
     log = logging.getLogger()
@@ -184,6 +191,14 @@ def main():
             return False
     else:
         if not setConfigurationItem(args.conf, "config.json", "type", "production"):
+            return False
+
+    # Supervisor config: save the values to be updated to
+    if args.supervisor_image == '' or args.supervisor_tag == '':
+        log.debug("No supervisor image and/or tag requested, the configuration won't be updated during hup")
+    else:
+        if not (setConfigurationItem(args.conf, "Supervisor", "supervisor_image", args.supervisor_image) and
+                setConfigurationItem(args.conf, "Supervisor", "supervisor_tag", args.supervisor_tag)):
             return False
 
     # Handle old boot partitions

@@ -202,6 +202,43 @@ class Updater:
             log.debug("Copied " + src + " to " + dst)
         return True
 
+    def updateSupervisorConf(self):
+        """Updating the supervisor.conf on the target rootfs, so after reboot it
+        will have the correct values. The relevant variables are pulled in from
+        the configuration.
+        """
+        log.info("Started to upgrade supervisor conf...")
+        supervisor_image = getConfigurationItem(self.conf, 'Supervisor', 'supervisor_image')
+        supervisor_tag = getConfigurationItem(self.conf, 'Supervisor', 'supervisor_tag')
+        if (not supervisor_image) or (not supervisor_tag):
+            log.debug('No supervisor conf is performed as no supervisor info is passed.')
+        else:
+            supervisorConf = os.path.join(self.tempRootMountpoint, 'etc/supervisor.conf')
+            tmpSupervisorConf = "/tmp/supervisor.conf"
+            try:
+                with open(tmpSupervisorConf, "w") as tmpfile:
+                    with open(supervisorConf, "r") as supervisorconffile:
+                        for line in supervisorconffile:
+                            # Write out the lines if not one of those that
+                            # we want to replace
+                            if not (re.match("^SUPERVISOR_IMAGE=.*$", line) or
+                                    re.match("^SUPERVISOR_TAG=.*$", line)):
+                                print(line, end='', file=tmpfile)
+                    # Add new values into the config file
+                    log.debug("Adding: SUPERVISOR_IMAGE=" + supervisor_image)
+                    print("SUPERVISOR_IMAGE={}".format(supervisor_image), file=tmpfile)
+                    log.debug("Adding: SUPERVISOR_TAG=" + supervisor_tag)
+                    print("SUPERVISOR_TAG={}".format(supervisor_tag), file=tmpfile)
+                if  not safeCopy(tmpSupervisorConf, supervisorConf):
+                    return False
+                log.debug("Copied " + supervisorConf)
+                os.remove(tmpSupervisorConf)
+            except Exception as s:
+                log.warning("Can't update " + supervisorConf)
+                log.warning(str(s))
+                return False
+        return True
+
     def fixOldConfigJson(self):
         # Get host OS root mountpoint
         root_mount = getConfigurationItem(self.conf, 'General', 'host_bind_mount')
@@ -349,6 +386,9 @@ class Updater:
             return False
         if not configureBootloader(getRootPartition(self.conf), self.toUpdateRootDevice()[0], self.conf):
             log.error("Could not configure bootloader.")
+            return False
+        if not self.updateSupervisorConf():
+            log.error("Could not update supervisor config.")
             return False
         log.info("Finished to upgrade system.")
         return True
