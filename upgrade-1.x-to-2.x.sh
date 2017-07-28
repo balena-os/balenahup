@@ -5,9 +5,19 @@ set -o pipefail
 
 . /etc/os-release
 
-MIN_HOSTOS_VERSION=1.16.0
+MIN_HOSTOS_VERSION=1.8.0
 PREFERRED_HOSTOS_VERSION=1.27
+SUPERVISOR_NEW_TAG=v6.1.2
 DOCKER=docker
+
+# Dashboard progress helper
+function progress {
+    percentage=$1
+    message=$2
+    # Progress bar is "nice to have", but might fail on systems
+    # where we move the config.json from it's default location during the update
+    /usr/bin/resin-device-progress --percentage ${percentage} --state "${message}" > /dev/null || true
+}
 
 # Log function helper
 function log {
@@ -32,7 +42,7 @@ function log {
         printf "[%09d%s%s\n" "$(($ENDTIME - $STARTTIME))" "][$loglevel]" "$1"
     fi
     if [ "$loglevel" == "ERROR" ]; then
-        /usr/bin/resin-device-progress --percentage 100 --state "ResinOS: Update failed."
+        progress 100 "ResinOS: Update failed."
         exit 1
     fi
 }
@@ -44,6 +54,8 @@ function version_gt() {
 
 # Log timer
 STARTTIME=$(date +%s)
+
+progress 5 "ResinOS: update prearation..."
 
 # Check board support
 case $SLUG in
@@ -76,6 +88,14 @@ else
     esac
 fi
 
+# Find boot path
+boot_path=$(findmnt -n --raw --evaluate --output=target LABEL=resin-boot)
+if [ -z "${boot_path}" ]; then
+    log ERROR "Cannot find where is 'resin-boot' mounted"
+else
+    log "Boot partition is mounted at ${boot_path}."
+fi
+
 # Check we are using the first root filesystem
 root_part=$(findmnt -n --raw --evaluate --output=source /)
 case $root_part in
@@ -84,18 +104,20 @@ case $root_part in
 	;;
     *p3)
 	log "Current root partition $root_part is the second root partition. Copying existing OS to first partition..."
+    progress 10 "ResinOS: partition switching..."
 	root_dev=${root_part%p3}
 	dd if=${root_dev}p3 of=${root_dev}p2 bs=4M
 	log "Updating bootloader to point to first partition..."
 	case $SLUG in
 	    beaglebone*)
-		sed -i -e 's/bootpart=1:3/bootpart=1:2/' /mnt/boot/uEnv.txt
+		sed -i -e 's/bootpart=1:3/bootpart=1:2/' "${boot_path}/uEnv.txt"
 		;;
 	    raspberry*)
-		sed -i -e 's/mmcblk0p3/mmcblk0p2/' /mnt/boot/cmdline.txt
+		sed -i -e 's/mmcblk0p3/mmcblk0p2/' "${boot_path}/cmdline.txt"
 		;;
 	esac
 	log "Rebooting..."
+    progress 15 "ResinOS: rebooting to continue..."
 	sync
 	reboot
 	;;
@@ -104,6 +126,8 @@ case $root_part in
 	;;
 esac
 root_dev=${root_part%p2}
+
+progress 25 "ResinOS: system preparation..."
 
 # Check if we need to install some more extra tools
 if ! version_gt $VERSION $PREFERRED_HOSTOS_VERSION && ! [ "$VERSION" == $PREFERRED_HOSTOS_VERSION ]; then
@@ -114,10 +138,10 @@ if ! version_gt $VERSION $PREFERRED_HOSTOS_VERSION && ! [ "$VERSION" == $PREFERR
     export PATH=$tools_path:$PATH
     case $BINARY_TYPE in
 	arm)
-	    download_uri=https://github.com/resin-os/resinhup/raw/onetotwo/upgrade-binaries/$BINARY_TYPE
+	    download_uri=https://github.com/resin-os/resinhup/raw/master/upgrade-binaries/$BINARY_TYPE
 	    for binary in $tools_binaries; do
 		log "Installing $binary..."
-		curl -s -L -o $tools_path/$binary $download_uri/$binary
+		curl -f -s -L -o $tools_path/$binary $download_uri/$binary || log ERROR "Couldn't download tool from $download_uri/$binary, aborting."
 		chmod 755 $tools_path/$binary
 	    done
 	    ;;
@@ -143,6 +167,8 @@ cp -a /var/lib/connman/* /tmp/connman/
 # Versions before 1.20 need this to prevent dropping VPN
 sed -i -e 's/NetworkInterfaceBlacklist=docker,veth,tun,p2p/NetworkInterfaceBlacklist=docker,veth,tun,p2p,resin-vpn/' /etc/connman/main.conf
 mount -o bind /tmp/connman /var/lib/connman
+# some systems require daemon-reload to correctly restart connman later
+systemctl daemon-reload
 systemctl restart connman
 
 # Save /resin-data to rootB
@@ -160,7 +186,11 @@ umount /var/lib/docker
 umount /resin-data
 
 # Save conf contents to /boot
-# XXX
+if [ -f "/mnt/conf/config.json" ]; then
+    # the boot partition might be mounted ro on some systems, remount
+    mount -o remount,rw "${boot_path}"
+    cp "/mnt/conf/config.json" "${boot_path}/config.json"
+fi
 
 # Unmount p5 if mounted
 if mount | grep /mnt/conf; then
@@ -168,7 +198,7 @@ if mount | grep /mnt/conf; then
 fi
 
 # Unmount p1
-umount /mnt/boot
+umount "${boot_path}"
 
 log "Creating new partition table stage 1..."
 # Delete partitions 4-6
@@ -275,8 +305,19 @@ ln -s /lib/systemd/system/update-resin-supervisor.timer $wants_dir
 # Copy resin-supervisor config
 cp -a /etc/supervisor.conf /mnt/state/root-overlay/etc/resin-supervisor
 
+supervisor_conf_path="/mnt/state/root-overlay/etc/resin-supervisor/supervisor.conf"
 # resinOS 1.22 and 1.23 can have bad supervisor tags
 sed -i -e 's/@TARGET_TAG@/v2.8.3/' /mnt/state/root-overlay/etc/resin-supervisor/supervisor.conf
+# Add or replace the supervisor tag in the configuration
+if grep -q "SUPERVISOR_TAG" "${supervisor_conf_path}"; then
+    # Update supervisor tag
+    sed -i -e 's/SUPERVISOR_TAG=.*/SUPERVISOR_TAG='"${SUPERVISOR_NEW_TAG}"'/' "${supervisor_conf_path}"
+else
+    # Insert supervisor tag
+    echo "SUPERVISOR_TAG=${SUPERVISOR_NEW_TAG}" >> "${supervisor_conf_path}"
+fi
+# Remove staging registry from the config
+sed -i -e 's/SUPERVISOR_IMAGE=registry.resinstaging.io\//SUPERVISOR_IMAGE=/' "${supervisor_conf_path}"
 
 # Copy docker config
 mkdir -p /mnt/state/root-overlay/etc/docker
@@ -293,14 +334,14 @@ mkdir -p /mnt/state/root-overlay/var/volatile/lib/systemd
 # Copy systemd var files
 cp -a /var/lib/systemd/* /mnt/state/root-overlay/var/lib/systemd
 
-# Ensure /mnt/boot is mounted
-mount ${root_dev}p1 /mnt/boot
+# Ensure that the boot partition is mounted
+mount ${root_dev}p1 "${boot_path}"
 
 # Migrate wifi config to NetworkManager
-if grep service_home_wifi /mnt/boot/config.json >/dev/null; then
+if grep service_home_wifi "${boot_path}/config.json" >/dev/null; then
     # Get wifi credentials
-    ssid=$(jq </mnt/boot/config.json '.["files"]."network/network.config"' | sed -e 's/.*Name = \([^\\"]*\).*/\1/')
-    psk=$(jq </mnt/boot/config.json '.["files"]."network/network.config"' | sed -e 's/.*Passphrase = \([^\\"]*\).*/\1/')
+    ssid=$(jq <${boot_path}/config.json '.["files"]."network/network.config"' | sed -e 's/.*Name = \([^\\"]*\).*/\1/')
+    psk=$(jq <${boot_path}/config.json '.["files"]."network/network.config"' | sed -e 's/.*Passphrase = \([^\\"]*\).*/\1/')
 
     # Write NetworkManager setup
     cat >/mnt/state/root-overlay/etc/NetworkManager/system-connections/resin-wifi <<EOF
@@ -345,8 +386,11 @@ BACKUPARCHIVE=/tmp/backup/newos.tar.gz
 FSARCHIVE=/mnt/data/newos.tar.gz
 
 log "Getting new OS image..."
+progress 50 "ResinOS: downloading OS update..."
 # Create container for new version
 CONTAINER=$(docker create ${IMAGE} echo export)
+
+progress 60 "ResinOS: processig update package..."
 
 # Export container
 docker export ${CONTAINER} | gzip > ${BACKUPARCHIVE}
@@ -363,6 +407,8 @@ systemctl stop docker
 # Unmount data partition
 umount /mnt/data
 umount /var/lib/docker
+
+progress 75 "ResinOS: running updater..."
 
 # Make ext4 data partition
 log "Creating new ext4 resin-data filesystem..."
@@ -414,7 +460,7 @@ echo resin-boot/EFI/BOOT/grub.cfg >>/tmp/boot-exclude
 # 2.x adds a default config.json, we should avoid clobbering the existing one
 echo resin-boot/config.json >>/tmp/boot-exclude
 tar -x -X /tmp/boot-exclude -C /tmp -f ${FSARCHIVE} resin-boot
-cp -av /tmp/resin-boot/* /mnt/boot/
+cp -av /tmp/resin-boot/* "${boot_path}"
 
 # Remove OS image
 rm ${FSARCHIVE}
@@ -423,16 +469,17 @@ rm ${FSARCHIVE}
 log "Switching root partition..."
 case $SLUG in
     beaglebone*)
-	echo 'resin_root_part=3' >/mnt/boot/resinOS_uEnv.txt
-	sed -i -e '/mmcdev=.*/d' -e '/bootpart=.*/d' /mnt/boot/uEnv.txt
+	echo 'resin_root_part=3' >"${boot_path}/resinOS_uEnv.txt"
+	sed -i -e '/mmcdev=.*/d' -e '/bootpart=.*/d' "${boot_path}/uEnv.txt"
 	;;
     raspberry*)
-	sed -i -e 's/mmcblk0p2/mmcblk0p3/' /mnt/boot/cmdline.txt
+	sed -i -e 's/mmcblk0p2/mmcblk0p3/' "${boot_path}/cmdline.txt"
 	;;
 esac
 
 # Reboot into new OS
 sync
 log "Rebooting into new OS after 5 seconds ..."
+progress 100 "ResinOS: Done. Rebooting..."
 sleep 5
 reboot
