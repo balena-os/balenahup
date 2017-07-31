@@ -99,10 +99,10 @@ if ! version_gt "$VERSION" "$preferred_hostos_version" &&
     export PATH=$tools_path:$PATH
     case $binary_type in
         arm)
-            download_uri=https://github.com/resin-os/resinhup/raw/onetotwo/upgrade-binaries/$binary_type
+            download_uri=https://github.com/resin-os/resinhup/raw/master/upgrade-binaries/$binary_type
             for binary in $tools_binaries; do
                 log "Installing $binary..."
-                curl -s -L -o $tools_path/$binary $download_uri/$binary
+                curl -f -s -L -o $tools_path/$binary $download_uri/$binary || log ERROR "Couldn't download tool from $download_uri/$binary, aborting."
                 chmod 755 $tools_path/$binary
             done
             ;;
