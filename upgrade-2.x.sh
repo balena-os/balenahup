@@ -138,18 +138,10 @@ systemctl stop resin-supervisor > /dev/null 2>&1
 docker stop $(docker ps -a -q) > /dev/null 2>&1 || true
 
 image=resin/resinos:${target_version}-${SLUG}
-fsarchive=/mnt/data/newos.tar.gz
 
 log "Getting new OS image..."
 # Create container for new version
 container=$(docker create "$image" echo export)
-
-log "Exporting new OS image..."
-# Export container
-docker export "$container" | gzip > "$fsarchive"
-
-# Remove container
-docker rm "$container"
 
 log "Making new OS filesystem..."
 # Format alternate root partition
@@ -165,10 +157,10 @@ cat >/tmp/root-exclude <<EOF
 quirks
 resin-boot
 EOF
-tar -x -X /tmp/root-exclude -C /tmp/updateroot -f $fsarchive
+docker export "$container" | tar -x -X /tmp/root-exclude -C /tmp/updateroot
 
 # Extract quirks
-tar -x -C /tmp -f $fsarchive quirks
+docker export "$container" | tar -x -C /tmp quirks
 cp -a /tmp/quirks/* /tmp/updateroot/
 rm -rf /tmp/quirks
 
@@ -185,11 +177,11 @@ resin-boot/uEnv.txt
 resin-boot/EFI/BOOT/grub.cfg
 resin-boot/config.json
 EOF
-tar -x -X /tmp/boot-exclude -C /tmp -f $fsarchive resin-boot
+docker export "$container" | tar -x -X /tmp/boot-exclude -C /tmp resin-boot
 cp -a /tmp/resin-boot/* /mnt/boot/
 
-# Remove OS image
-rm $fsarchive
+# Clearing up
+docker rm "$container"
 
 # Switch root partition
 log "Switching root partition..."
