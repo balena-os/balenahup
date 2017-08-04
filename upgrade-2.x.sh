@@ -239,6 +239,7 @@ progress 75 "ResinOS: running updater..."
 
 log "Making new OS filesystem..."
 # Format alternate root partition
+log "Update partition: ${update_part}"
 mkfs.ext4 -F -L "$update_label" "$update_part"
 
 # Mount alternate root partition
