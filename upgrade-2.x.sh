@@ -226,10 +226,10 @@ if [ ! -b "$update_part" ]; then
 fi
 
 # Stop docker containers
-log "Stopping all containers..."
+log "Stopping supervisor and related services..."
 systemctl stop update-resin-supervisor.timer > /dev/null 2>&1
 systemctl stop resin-supervisor > /dev/null 2>&1
-docker stop $(docker ps -a -q) > /dev/null 2>&1 || true
+docker stop resin_supervisor > /dev/null 2>&1 || true
 
 image=resin/resinos:${target_version}-${SLUG}
 
