@@ -221,6 +221,9 @@ case $root_part in
     *)
         log ERROR "Unknown root partition \"$root_part\"."
 esac
+if [ ! -b "$update_part" ]; then
+    log ERROR "Update partition detected as ${update_part} but it's not a block device."
+fi
 
 # Stop docker containers
 log "Stopping all containers..."
