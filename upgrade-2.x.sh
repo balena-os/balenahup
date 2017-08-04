@@ -10,6 +10,13 @@ minimum_target_version=2.0.7
 # This will set VERSION and SLUG
 . /etc/os-release
 
+# Dashboard progress helper
+function progress {
+    percentage=$1
+    message=$2
+    /usr/bin/resin-device-progress --percentage ${percentage} --state "${message}" > /dev/null || true
+}
+
 # Log function helper
 function log {
     # Address log levels
@@ -33,7 +40,7 @@ function log {
         printf "[%09d%s%s\n" "$((endtime - starttime))" "][$loglevel]" "$1"
     fi
     if [ "$loglevel" == "ERROR" ]; then
-        /usr/bin/resin-device-progress --percentage 100 --state "ResinOS: Update failed."
+        progress 100 "ResinOS: Update failed."
         exit 1
     fi
 }
@@ -45,6 +52,8 @@ function version_gt() {
 
 # Log timer
 starttime=$(date +%s)
+
+progress 25 "ResinOS: preparing update.."
 
 # Check board support
 case $SLUG in
@@ -140,8 +149,11 @@ docker stop $(docker ps -a -q) > /dev/null 2>&1 || true
 image=resin/resinos:${target_version}-${SLUG}
 
 log "Getting new OS image..."
+progress 50 "ResinOS: downloading update package..."
 # Create container for new version
 container=$(docker create "$image" echo export)
+
+progress 75 "ResinOS: running updater..."
 
 log "Making new OS filesystem..."
 # Format alternate root partition
@@ -199,4 +211,5 @@ esac
 # Reboot into new OS
 sync
 log "Rebooting into new OS..."
+progress 100 "ResinOS: update successful, rebooting..."
 reboot
