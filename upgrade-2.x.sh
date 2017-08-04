@@ -3,18 +3,39 @@
 set -o errexit
 set -o pipefail
 
-target_version=$1
 preferred_hostos_version=2.0.7
 minimum_target_version=2.0.7
 
 # This will set VERSION and SLUG
 . /etc/os-release
 
+###
+# Helper functions
+###
+
 # Dashboard progress helper
 function progress {
     percentage=$1
     message=$2
     /usr/bin/resin-device-progress --percentage ${percentage} --state "${message}" > /dev/null || true
+}
+
+function help {
+    cat << EOF
+Helper to run hostOS updates on resinOS 2.x devices
+
+Options:
+  -h, --help
+        Display this help and exit.
+
+  --hostos-version <HOSTOS_VERSION>
+        Run the updater for this specific HostOS version as semver.
+        Omit the 'v' in front of the version. e.g.: 2.2.0+rev1 and not v2.2.0+rev1.
+        This is a mandatory argument.
+
+  --no-reboot
+        Do not reboot if update is successful. This is useful when debugging.
+EOF
 }
 
 # Log function helper
@@ -49,6 +70,41 @@ function log {
 function version_gt() {
     test "$(echo "$@" | tr " " "\n" | sort -V | head -n 1)" != "$1"
 }
+
+###
+# Script start
+###
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    arg="$1"
+
+    case $arg in
+        -h|--help)
+            help
+            exit 0
+            ;;
+        --hostos-version)
+            if [ -z "$2" ]; then
+                log ERROR "\"$1\" argument needs a value."
+            fi
+            target_version=$2
+            shift
+            ;;
+        --no-reboot)
+            NOREBOOT=yes
+            ;;
+
+        *)
+            log ERROR "Unrecognized option $1."
+            ;;
+    esac
+    shift
+done
+
+if [ -z "$target_version" ]; then
+    log ERROR "--hostos-version is required."
+fi
 
 # Log timer
 starttime=$(date +%s)
@@ -210,6 +266,12 @@ esac
 
 # Reboot into new OS
 sync
-log "Rebooting into new OS..."
-progress 100 "ResinOS: update successful, rebooting..."
-reboot
+if [ -z "$NOREBOOT" ]; then
+    log "Rebooting into new OS..."
+    progress 100 "ResinOS: update successful, rebooting..."
+    reboot
+else
+    log "Finished update, not rebooting as requested."
+    log "NOTE: Supervisor and stopped services kept stopped!"
+    progress 100 "ResinOS: update successful."
+fi
