@@ -119,6 +119,9 @@ case $SLUG in
     raspberry*)
         binary_type=arm
         ;;
+    up-board)
+        binary_type=x86
+        ;;
     *)
         log ERROR "Unsupported board type $SLUG."
 esac
@@ -171,6 +174,17 @@ if ! version_gt "$VERSION" "$preferred_hostos_version" &&
                 chmod 755 $tools_path/$binary
             done
             ;;
+        x86)
+            download_uri=https://github.com/imrehg/resinhup/raw/twototwo-fixes/upgrade-binaries/$binary_type
+            for binary in $tools_binaries; do
+                log "Installing $binary..."
+                curl -f -s -L -o $tools_path/$binary $download_uri/$binary || log ERROR "Couldn't download tool from $download_uri/$binary, aborting."
+                chmod 755 $tools_path/$binary
+            done
+            ;;
+        "")
+            log "No extra tooling fetched..."
+            ;;
         *)
             log ERROR "Binary type $binary_type not supported."
             ;;
@@ -191,6 +205,18 @@ case $root_part in
         update_part=${root_dev}p2
         update_part_no=2
         update_label=resin-rootA
+        ;;
+    *rootA)
+        old_label=resin-rootA
+        update_label=resin-rootB
+        root_part_dev=$(blkid | grep "${old_label}" | awk '{print $1}' | sed 's/://')
+        update_part=${root_part_dev%p2}p3
+        ;;
+    *rootB)
+        old_label=resin-rootB
+        update_label=resin-rootA
+        root_part_dev=$(blkid | grep "${old_label}" | awk '{print $1}' | sed 's/://')
+        update_part=${root_part_dev%p2}p3
         ;;
     *)
         log ERROR "Unknown root partition \"$root_part\"."
@@ -255,13 +281,16 @@ docker rm "$container"
 log "Switching root partition..."
 case $SLUG in
     beaglebone*)
-	echo "resin_root_part=$update_part_no" >/mnt/boot/resinOS_uEnv.txt
-	;;
+        echo "resin_root_part=$update_part_no" >/mnt/boot/resinOS_uEnv.txt
+        ;;
     raspberry*)
-	old_root=${root_part#/dev/}
-	new_root=${update_part#/dev/}
-	sed -i -e "s/$old_root/$new_root/" /mnt/boot/cmdline.txt
-	;;
+        old_root=${root_part#/dev/}
+        new_root=${update_part#/dev/}
+        sed -i -e "s/$old_root/$new_root/" /mnt/boot/cmdline.txt
+        ;;
+    up-board)
+        sed -i -e "s/${old_label}/${update_label}/" /mnt/boot/EFI/BOOT/grub.cfg
+        ;;
 esac
 
 # Reboot into new OS
