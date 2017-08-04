@@ -119,7 +119,7 @@ case $SLUG in
     raspberry*)
         binary_type=arm
         ;;
-    up-board)
+    intel-nuc|up-board)
         binary_type=x86
         ;;
     *)
@@ -210,13 +210,13 @@ case $root_part in
         old_label=resin-rootA
         update_label=resin-rootB
         root_part_dev=$(blkid | grep "${old_label}" | awk '{print $1}' | sed 's/://')
-        update_part=${root_part_dev%p2}p3
+        update_part=${root_part_dev%2}3
         ;;
     *rootB)
         old_label=resin-rootB
         update_label=resin-rootA
         root_part_dev=$(blkid | grep "${old_label}" | awk '{print $1}' | sed 's/://')
-        update_part=${root_part_dev%p2}p3
+        update_part=${root_part_dev%2}3
         ;;
     *)
         log ERROR "Unknown root partition \"$root_part\"."
@@ -288,7 +288,7 @@ case $SLUG in
         new_root=${update_part#/dev/}
         sed -i -e "s/$old_root/$new_root/" /mnt/boot/cmdline.txt
         ;;
-    up-board)
+    intel-nuc|up-board)
         sed -i -e "s/${old_label}/${update_label}/" /mnt/boot/EFI/BOOT/grub.cfg
         ;;
 esac
