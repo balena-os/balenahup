@@ -1,6 +1,7 @@
 #!/bin/bash
 
 NOREBOOT=no
+STAGING=no
 
 set -o errexit
 set -o pipefail
@@ -37,6 +38,9 @@ Options:
 
   --no-reboot
         Do not reboot if update is successful. This is useful when debugging.
+
+  --staging
+        Get information from the resin staging environment as opposed to production.
 EOF
 }
 
@@ -73,6 +77,60 @@ function version_gt() {
     test "$(echo "$@" | tr " " "\n" | sort -V | head -n 1)" != "$1"
 }
 
+function stop_services() {
+    # Stopping supervisor and related services
+    log "Stopping supervisor and related services..."
+    systemctl stop update-resin-supervisor.timer > /dev/null 2>&1
+    systemctl stop resin-supervisor > /dev/null 2>&1
+    docker stop resin_supervisor > /dev/null 2>&1 || true
+}
+
+function upgradeToReleaseSupervisor() {
+    # Fetch what supervisor version the target hostOS was originally released with
+    # and if it's newer than the supervisor running on the device, then fetch the
+    # information that is required for supervisor update, then do the update with
+    # the tools shipped with the hostOS.
+    if [ "$STAGING" == "yes" ]; then
+        DEFAULT_SUPERVISOR_VERSION_URL_BASE="https://s3.amazonaws.com/resin-staging-img/"
+    else
+        DEFAULT_SUPERVISOR_VERSION_URL_BASE="https://s3.amazonaws.com/resin-production-img-cloudformation/"
+    fi
+    # Convert the hostOS vesrsion into the format used for the resinOS storage buckets on S3
+    # The '+' in the original version might have already been turnd into a '_', take that into account.
+    HOSTOS_SLUG=$(echo "${target_version}" | sed -e 's/[_+]/%2B/' -e 's/$/.prod/')
+    DEFAULT_SUPERVISOR_VERSION_URL="${DEFAULT_SUPERVISOR_VERSION_URL_BASE}images/${SLUG}/${HOSTOS_SLUG}/VERSION"
+
+    # Get supervisor version for target resinOS release, it is in format of "va.b.c-shortsha", e.g. "v6.1.2"
+    # and tag new version for the device if it's newer than the current version, from the API
+    DEFAULT_SUPERVISOR_VERSION=$(curl -s "$DEFAULT_SUPERVISOR_VERSION_URL" | sed -e 's/v//')
+    if [ -z "$DEFAULT_SUPERVISOR_VERSION" ] || [ -z "${DEFAULT_SUPERVISOR_VERSION##*xml*}" ]; then
+        log ERROR "Could not get the default supervisor version for this resinOS release, bailing out."
+    else
+        CURRENT_SUPERVISOR_VERSION=$(curl -s "${API_ENDPOINT}/v2/device(${DEVICEID})?\$select=supervisor_version&apikey=${APIKEY}" | jq -r '.d[0].supervisor_version')
+        if [ -z "$CURRENT_SUPERVISOR_VERSION" ]; then
+            log ERROR "Could not get current supervisor version from the API, bailing out."
+        else
+            if version_gt "$DEFAULT_SUPERVISOR_VERSION" "$CURRENT_SUPERVISOR_VERSION" ; then
+                log "Supervisor update: will be upgrading from v${CURRENT_SUPERVISOR_VERSION} to ${DEFAULT_SUPERVISOR_VERSION}"
+                UPDATER_SUPERVISOR_TAG="v${DEFAULT_SUPERVISOR_VERSION}"
+                # Get the supervisor id
+                if UPDATER_SUPERVISOR_ID=$(curl -s "${API_ENDPOINT}/v2/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'$UPDATER_SUPERVISOR_TAG'))&apikey=${APIKEY}" | jq -e -r '.d[0].id'); then
+                    log "Extracted supervisor vars: ID: $UPDATER_SUPERVISOR_ID"
+                    log "Setting supervisor version in the API..."
+                    curl -s "${API_ENDPOINT}/v2/device($DEVICEID)?apikey=$APIKEY" -X PATCH -H 'Content-Type: application/json;charset=UTF-8' --data-binary "{\"supervisor_release\": \"$UPDATER_SUPERVISOR_ID\"}" > /dev/null 2>&1
+                    log "Running supervisor updater..."
+                    update-resin-supervisor
+                    stop_services
+                else
+                    log WARN "Couldn't extract supervisor vars..."
+                fi
+            else
+                log "Supervisor update: no update needed."
+            fi
+        fi
+    fi
+}
+
 ###
 # Script start
 ###
@@ -95,6 +153,9 @@ while [[ $# -gt 0 ]]; do
             ;;
         --no-reboot)
             NOREBOOT="yes"
+            ;;
+        --staging)
+            STAGING="yes"
             ;;
         *)
             log ERROR "Unrecognized option $1."
@@ -197,6 +258,20 @@ if ! version_gt "$VERSION" "$preferred_hostos_version" &&
     esac
 fi
 
+log "Loading info from config.json"
+if [ -f /mnt/boot/config.json ]; then
+    CONFIGJSON=/mnt/boot/config.json
+else
+    log ERROR "Don't know where config.json is."
+fi
+APIKEY=$(jq -r '.deviceApiKey' $CONFIGJSON)
+if [ "$APIKEY" == 'null' ]; then
+    log WARN "Using apiKey as device does not have deviceApiKey yet..."
+    APIKEY=$(jq -r '.apiKey' $CONFIGJSON)
+fi
+DEVICEID=$(jq -r '.deviceId' $CONFIGJSON)
+API_ENDPOINT=$(jq -r '.apiEndpoint' $CONFIGJSON)
+
 # Find which partition is / and which we should write the update to
 root_part=$(findmnt -n --raw --evaluate --output=source /)
 case $root_part in
@@ -232,10 +307,7 @@ if [ ! -b "$update_part" ]; then
 fi
 
 # Stop docker containers
-log "Stopping supervisor and related services..."
-systemctl stop update-resin-supervisor.timer > /dev/null 2>&1
-systemctl stop resin-supervisor > /dev/null 2>&1
-docker stop resin_supervisor > /dev/null 2>&1 || true
+stop_services
 
 image=resin/resinos:${target_version}-${SLUG}
 
@@ -302,6 +374,9 @@ case $SLUG in
         sed -i -e "s/${old_label}/${update_label}/" /mnt/boot/EFI/BOOT/grub.cfg
         ;;
 esac
+
+# Updating supervisor
+upgradeToReleaseSupervisor
 
 # Reboot into new OS
 sync
