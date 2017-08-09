@@ -8,7 +8,7 @@ set -o pipefail
 preferred_hostos_version=2.0.7
 minimum_target_version=2.0.7
 
-# This will set VERSION and SLUG
+# This will set VERSION, SLUG, and VARIANT_ID
 . /etc/os-release
 
 ###
@@ -143,6 +143,11 @@ if [ -n "$target_version" ]; then
     esac
 else
     log ERROR "No target OS version specified."
+fi
+
+# Check OS variant and filter update availability based on that.
+if [ ! "$VARIANT_ID" == "prod" ]; then
+    log ERROR "Only updating production devices..."
 fi
 
 # Translate version to one docker will accept as part of an image name
