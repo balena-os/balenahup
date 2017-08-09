@@ -1,5 +1,7 @@
 #!/bin/bash
 
+NOREBOOT=no
+
 set -o errexit
 set -o pipefail
 
@@ -92,9 +94,8 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --no-reboot)
-            NOREBOOT=yes
+            NOREBOOT="yes"
             ;;
-
         *)
             log ERROR "Unrecognized option $1."
             ;;
@@ -299,7 +300,7 @@ esac
 
 # Reboot into new OS
 sync
-if [ -z "$NOREBOOT" ]; then
+if [ "$NOREBOOT" == "no" ]; then
     log "Rebooting into new OS..."
     progress 100 "ResinOS: update successful, rebooting..."
     reboot
