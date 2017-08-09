@@ -100,13 +100,13 @@ progress 5 "ResinOS: update prearation..."
 # Check board support
 case $SLUG in
     beaglebone*)
-	TARGET_VERSION=2.0.6_rev2
+	TARGET_VERSION=2.2.0_rev1
 	# In 2.x there is only a single device type
 	DEVICE=beaglebone-black
 	BINARY_TYPE=arm
 	;;
     raspberry*)
-	TARGET_VERSION=2.0.8_rev1
+	TARGET_VERSION=2.2.0_rev1
 	DEVICE=$SLUG
 	BINARY_TYPE=arm
 	;;
@@ -468,9 +468,6 @@ tar -x -X /tmp/root-exclude -C /tmp/rootB -f ${FSARCHIVE}
 tar -x -C /tmp -f ${FSARCHIVE} quirks
 cp -a /tmp/quirks/* /tmp/rootB/
 rm -rf /tmp/quirks
-
-# XXX hack required until 2.0.7 when a quirk is added for this
-(cd /tmp/rootB/etc; rm mtab; ln -s ../proc/self/mounts mtab)
 
 # Unmount rootB partition
 umount /tmp/rootB
