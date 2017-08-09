@@ -10,6 +10,10 @@ PREFERRED_HOSTOS_VERSION=1.27
 SUPERVISOR_NEW_TAG=v6.1.2
 DOCKER=docker
 
+##
+# Helper functions
+##
+
 # Dashboard progress helper
 function progress {
     percentage=$1
@@ -51,6 +55,42 @@ function log {
 function version_gt() {
     test "$(echo "$@" | tr " " "\n" | sort -V | head -n 1)" != "$1"
 }
+
+function wifi_migrate() {
+    # Function to create simple NetworkManager configuration files
+    # from the given SSID and password values
+    wifi_config_name=$1
+    ssid=$2
+    psk=$3
+
+    # Write NetworkManager setup
+    cat >"/mnt/state/root-overlay/etc/NetworkManager/system-connections/$wifi_config_name" <<EOF
+[connection]
+id=resin-wifi
+type=wifi
+
+[wifi]
+hidden=true
+mode=infrastructure
+ssid=$ssid
+
+[wifi-security]
+auth-alg=open
+key-mgmt=wpa-psk
+psk=$psk
+
+[ipv4]
+method=auto
+
+[ipv6]
+addr-gen-mode=stable-privacy
+method=auto
+EOF
+}
+
+##
+# Script start
+##
 
 # Log timer
 STARTTIME=$(date +%s)
@@ -150,6 +190,22 @@ if ! version_gt $VERSION $PREFERRED_HOSTOS_VERSION && ! [ "$VERSION" == $PREFERR
 	    ;;
     esac
 fi
+
+# Loading useful variables
+if [ -f /mnt/boot/config.json ]; then
+    CONFIGJSON=/mnt/boot/config.json
+elif [ -f /mnt/conf/config.json ]; then
+    CONFIGJSON=/mnt/conf/config.json
+elif [ -f /mnt/data-disk/config.json ]; then
+    CONFIGJSON=/mnt/data-disk/config.json
+else
+    log ERROR "Don't know where config.json is."
+fi
+APIKEY=$(jq -r .apiKey $CONFIGJSON)
+DEVICEID=$(jq -r .deviceId $CONFIGJSON)
+API_ENDPOINT=$(jq -r .apiEndpoint $CONFIGJSON)
+# Get App ID from the API to get the current value, since the device might have been moved from the originally provisioned application
+APP_ID=$(curl -s "${API_ENDPOINT}/v2/application?\$filter=device/id%20eq%20${DEVICEID}&apikey=${APIKEY}" -H "Content-Type: application/json" | jq .d[0].id)
 
 # Stop docker containers
 log "Stopping all containers..."
@@ -337,37 +393,6 @@ cp -a /var/lib/systemd/* /mnt/state/root-overlay/var/lib/systemd
 # Ensure that the boot partition is mounted
 mount ${root_dev}p1 "${boot_path}"
 
-# Migrate wifi config to NetworkManager
-if grep service_home_wifi "${boot_path}/config.json" >/dev/null; then
-    # Get wifi credentials
-    ssid=$(jq <${boot_path}/config.json '.["files"]."network/network.config"' | sed -e 's/.*Name = \([^\\"]*\).*/\1/')
-    psk=$(jq <${boot_path}/config.json '.["files"]."network/network.config"' | sed -e 's/.*Passphrase = \([^\\"]*\).*/\1/')
-
-    # Write NetworkManager setup
-    cat >/mnt/state/root-overlay/etc/NetworkManager/system-connections/resin-wifi <<EOF
-[connection]
-id=resin-wifi
-type=wifi
-
-[wifi]
-hidden=true
-mode=infrastructure
-ssid=$ssid
-
-[wifi-security]
-auth-alg=open
-key-mgmt=wpa-psk
-psk=$psk
-
-[ipv4]
-method=auto
-
-[ipv6]
-addr-gen-mode=stable-privacy
-method=auto
-EOF
-fi
-
 # Make /root/.docker
 mkdir -p /mnt/state/root-overlay/home/root/.docker
 
@@ -464,6 +489,29 @@ cp -av /tmp/resin-boot/* "${boot_path}"
 
 # Remove OS image
 rm ${FSARCHIVE}
+
+# Migrate wifi config to NetworkManager
+if grep service_home_wifi "${boot_path}/config.json" >/dev/null; then
+    # Get wifi credentials
+    ssid=$(jq <${boot_path}/config.json '.["files"]."network/network.config"' | sed -e 's/.*Name = \([^\\"]*\).*/\1/')
+    psk=$(jq <${boot_path}/config.json '.["files"]."network/network.config"' | sed -e 's/.*Passphrase = \([^\\"]*\).*/\1/')
+
+    # Write NetworkManager setup
+    wifi_migrate "resin-wifi" "$ssid" "$psk"
+fi
+# Migrate resin-wifi-connect settings if found
+if [ -n "$APP_ID" ] && [ -f "/mnt/data/resin-data/${APP_ID}/network.config" ]; then
+    wifi_connect_config_file="/mnt/data/resin-data/${APP_ID}/network.config"
+    log "Found likely resin-wifi-connect network config at ${wifi_connect_config_file}, migrating..."
+    ssid=$(cat "${wifi_connect_config_file}" |grep "service_home_wifi" -A 5 | sed -n -e 's/.*Name = \([^\\"]*\).*/\1/p')
+    psk=$(cat "${wifi_connect_config_file}" |grep "service_home_wifi" -A 5 | sed -n -e 's/.*Passphrase = \([^\\"]*\).*/\1/p')
+
+    if [ -z "$ssid" ]; then
+        log "No SSID setting found, not migrating settings..."
+    else
+        wifi_migrate "resin-wifi-connect" "$ssid" "$psk"
+    fi
+fi
 
 # Switch root partition
 log "Switching root partition..."
