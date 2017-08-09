@@ -19,7 +19,7 @@ minimum_target_version=2.0.7
 function progress {
     percentage=$1
     message=$2
-    /usr/bin/resin-device-progress --percentage ${percentage} --state "${message}" > /dev/null || true
+    /usr/bin/resin-device-progress --percentage "${percentage}" --state "${message}" > /dev/null || true
 }
 
 function help {
