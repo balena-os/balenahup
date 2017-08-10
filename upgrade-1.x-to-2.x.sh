@@ -417,17 +417,20 @@ progress 50 "ResinOS: downloading OS update..."
 CONTAINER=$(docker create ${IMAGE} echo export)
 
 progress 60 "ResinOS: processig update package..."
-
 # Export container
+log "Starting docker export"
 docker export ${CONTAINER} | gzip > ${BACKUPARCHIVE}
 
 # Remove container
+log "Removing container"
 docker rm ${CONTAINER}
 
 # Copy resin-data to backup partition before we wipe data
+log "Copy resin-data to backup partition"
 cp /mnt/data/resin-data.tar.gz /tmp/backup/
 
 # Stop docker
+log "Stopping docker"
 systemctl stop docker
 
 # Unmount data partition
