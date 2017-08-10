@@ -59,14 +59,15 @@ function version_gt() {
 function wifi_migrate() {
     # Function to create simple NetworkManager configuration files
     # from the given SSID and password values
-    wifi_config_name=$1
-    ssid=$2
-    psk=$3
+    local path=$1
+    local wifi_config_name=$2
+    local ssid=$3
+    local psk=$4
 
     # Write NetworkManager setup
-    cat >"/mnt/state/root-overlay/etc/NetworkManager/system-connections/$wifi_config_name" <<EOF
+    cat >"${path}/system-connections/${wifi_config_name}" <<EOF
 [connection]
-id=resin-wifi
+id=$wifi_config_name
 type=wifi
 
 [wifi]
@@ -494,7 +495,7 @@ if grep service_home_wifi "${boot_path}/config.json" >/dev/null; then
     psk=$(jq <${boot_path}/config.json '.["files"]."network/network.config"' | sed -e 's/.*Passphrase = \([^\\"]*\).*/\1/')
 
     # Write NetworkManager setup
-    wifi_migrate "resin-wifi" "$ssid" "$psk"
+    wifi_migrate "$boot_path" "resin-wifi" "$ssid" "$psk"
 fi
 # Migrate resin-wifi-connect settings if found
 if [ -n "$APP_ID" ] && [ -f "/mnt/data/resin-data/${APP_ID}/network.config" ]; then
@@ -506,7 +507,7 @@ if [ -n "$APP_ID" ] && [ -f "/mnt/data/resin-data/${APP_ID}/network.config" ]; t
     if [ -z "$ssid" ]; then
         log "No SSID setting found, not migrating settings..."
     else
-        wifi_migrate "resin-wifi-connect" "$ssid" "$psk"
+        wifi_migrate "$boot_path" "resin-wifi-connect" "$ssid" "$psk"
     fi
 fi
 
