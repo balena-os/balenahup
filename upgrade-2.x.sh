@@ -122,6 +122,7 @@ function upgradeToReleaseSupervisor() {
                     log "Setting supervisor version in the API..."
                     curl -s "${API_ENDPOINT}/v2/device($DEVICEID)?apikey=$APIKEY" -X PATCH -H 'Content-Type: application/json;charset=UTF-8' --data-binary "{\"supervisor_release\": \"$UPDATER_SUPERVISOR_ID\"}" > /dev/null 2>&1
                     log "Running supervisor updater..."
+                    progress 90 "ResinOS: running supervisor update..."
                     update-resin-supervisor
                     stop_services
                 else
