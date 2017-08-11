@@ -12,6 +12,9 @@ minimum_target_version=2.0.7
 # This will set VERSION, SLUG, and VARIANT_ID
 . /etc/os-release
 
+# Don't run anything before this source as it sets PATH here
+source /etc/profile
+
 ###
 # Helper functions
 ###
@@ -20,7 +23,7 @@ minimum_target_version=2.0.7
 function progress {
     percentage=$1
     message=$2
-    /usr/bin/resin-device-progress --percentage "${percentage}" --state "${message}" > /dev/null || true
+    resin-device-progress --percentage "${percentage}" --state "${message}" > /dev/null || true
 }
 
 function help {
@@ -381,9 +384,9 @@ upgradeToReleaseSupervisor
 # Reboot into new OS
 sync
 if [ "$NOREBOOT" == "no" ]; then
-    log "Rebooting into new OS..."
+    log "Rebooting into new OS in 5 seconds..."
     progress 100 "ResinOS: update successful, rebooting..."
-    reboot
+    nohup bash -c " /bin/sleep 5 ; /sbin/reboot " > /dev/null 2>&1 &
 else
     log "Finished update, not rebooting as requested."
     log "NOTE: Supervisor and stopped services kept stopped!"
