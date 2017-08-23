@@ -530,5 +530,4 @@ esac
 sync
 log "Rebooting into new OS after 5 seconds ..."
 progress 100 "ResinOS: Done. Rebooting..."
-sleep 5
-reboot
+nohup bash -c " /bin/sleep 5 ; /sbin/reboot " > /dev/null 2>&1 &
