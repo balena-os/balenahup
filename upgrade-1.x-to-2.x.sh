@@ -89,6 +89,18 @@ method=auto
 EOF
 }
 
+function stop_all() {
+    # Stop supervisor and docker
+    log "Stopping all containers..."
+    systemctl stop update-resin-supervisor.timer > /dev/null 2>&1
+    systemctl stop resin-supervisor > /dev/null 2>&1
+    $DOCKER stop $($DOCKER ps -a -q) > /dev/null 2>&1 || true
+    log "Removing all containers..."
+    $DOCKER rm $($DOCKER ps -a -q) > /dev/null 2>&1 || true
+    log "Stopping $DOCKER"
+    systemctl stop docker
+}
+
 ##
 # Script start
 ##
@@ -146,8 +158,15 @@ case $root_part in
     *p3)
 	log "Current root partition $root_part is the second root partition. Copying existing OS to first partition..."
     progress 10 "ResinOS: partition switching..."
-	root_dev=${root_part%p3}
+    stop_all
+    sync
+    log "Forcing remount of file systems in read-only mode..."
+    echo u > /proc/sysrq-trigger
+    log "Copying current root partition to the unused partiton..."
+    root_dev=${root_part%p3}
 	dd if=${root_dev}p3 of=${root_dev}p2 bs=4M
+    log "Remounting boot partition as rw for the next step..."
+    mount -o remount,rw "${boot_path}"
 	log "Updating bootloader to point to first partition..."
 	case $SLUG in
 	    beaglebone*)
@@ -209,13 +228,7 @@ API_ENDPOINT=$(jq -r .apiEndpoint $CONFIGJSON)
 APP_ID=$(curl -s "${API_ENDPOINT}/v2/application?\$filter=device/id%20eq%20${DEVICEID}&apikey=${APIKEY}" -H "Content-Type: application/json" | jq .d[0].id)
 
 # Stop docker containers
-log "Stopping all containers..."
-systemctl stop update-resin-supervisor.timer > /dev/null 2>&1
-systemctl stop resin-supervisor > /dev/null 2>&1
-$DOCKER stop $($DOCKER ps -a -q) > /dev/null 2>&1 || true
-log "Removing all containers..."
-$DOCKER rm $($DOCKER ps -a -q) > /dev/null 2>&1 || true
-systemctl stop docker
+stop_all
 
 # Switch connman to use bind mounted state dir
 log "Switching connman to bind mounted state dir..."
