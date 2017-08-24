@@ -113,13 +113,13 @@ progress 5 "ResinOS: update prearation..."
 # Check board support
 case $SLUG in
     beaglebone*)
-	TARGET_VERSION=2.2.0_rev1
+	TARGET_VERSION=2.3.0_rev1
 	# In 2.x there is only a single device type
 	DEVICE=beaglebone-black
 	BINARY_TYPE=arm
 	;;
     raspberry*)
-	TARGET_VERSION=2.2.0_rev1
+	TARGET_VERSION=2.3.0_rev1
 	DEVICE=$SLUG
 	BINARY_TYPE=arm
 	;;
