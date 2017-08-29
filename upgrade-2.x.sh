@@ -88,11 +88,20 @@ function stop_services() {
     docker stop resin_supervisor > /dev/null 2>&1 || true
 }
 
+function remove_containers() {
+    stop_services
+    log "Stopping all containers.."
+    docker stop $(docker ps -a -q) > /dev/null 2>&1 || true
+    log "Removing all containers..."
+    docker rm $(docker ps -a -q) > /dev/null 2>&1 || true
+}
+
 function upgradeToReleaseSupervisor() {
     # Fetch what supervisor version the target hostOS was originally released with
     # and if it's newer than the supervisor running on the device, then fetch the
     # information that is required for supervisor update, then do the update with
     # the tools shipped with the hostOS.
+    log "Supervisor update start..."
     if [ "$STAGING" == "yes" ]; then
         DEFAULT_SUPERVISOR_VERSION_URL_BASE="https://s3.amazonaws.com/resin-staging-img/"
     else
@@ -124,7 +133,7 @@ function upgradeToReleaseSupervisor() {
                     log "Running supervisor updater..."
                     progress 90 "ResinOS: running supervisor update..."
                     update-resin-supervisor
-                    stop_services
+                    remove_containers
                 else
                     log WARN "Couldn't extract supervisor vars..."
                 fi
