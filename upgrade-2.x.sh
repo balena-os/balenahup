@@ -274,7 +274,7 @@ if ! version_gt "$VERSION" "$preferred_hostos_version" &&
             done
             ;;
         x86)
-            download_uri=https://github.com/imrehg/resinhup/raw/twototwo-fixes/upgrade-binaries/$binary_type
+            download_uri=https://github.com/resin-os/resinhup/raw/master/upgrade-binaries/$binary_type
             for binary in $tools_binaries; do
                 log "Installing $binary..."
                 curl -f -s -L -o $tools_path/$binary $download_uri/$binary || log ERROR "Couldn't download tool from $download_uri/$binary, aborting."
