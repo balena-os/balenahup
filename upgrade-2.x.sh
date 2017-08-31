@@ -102,7 +102,7 @@ function remove_containers() {
     docker rm $(docker ps -a -q) > /dev/null 2>&1 || true
 }
 
-function upgradeToReleaseSupervisor() {
+function upgradeSupervisor() {
     # Fetch what supervisor version the target hostOS was originally released with
     # and if it's newer than the supervisor running on the device, then fetch the
     # information that is required for supervisor update, then do the update with
@@ -423,7 +423,7 @@ case $SLUG in
 esac
 
 # Updating supervisor
-upgradeToReleaseSupervisor
+upgradeSupervisor
 
 # Reboot into new OS
 sync
