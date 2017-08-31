@@ -290,6 +290,21 @@ if ! version_gt "$VERSION" "$preferred_hostos_version" &&
     esac
 fi
 
+# fix resin-device-progress, between version 2.0.6 and 2.3.0
+# the script does not work using deviceApiKey
+if version_gt "$VERSION" "2.0.6" &&
+    version_gt "2.3.0" "$VERSION"; then
+        log "Fixing resin-device-progress is required..."
+        tools_path=/tmp/upgrade_tools_extra
+        mkdir -p $tools_path
+        export PATH=$tools_path:$PATH
+        download_url=https://raw.githubusercontent.com/resin-os/meta-resin/v2.3.0/meta-resin-common/recipes-support/resin-device-progress/resin-device-progress/resin-device-progress
+        curl -f -s -L -o $tools_path/resin-device-progress $download_url || log WARNING "Couldn't download tool from $download_url, progress bar won't work, but not aborting..."
+        chmod 755 $tools_path/resin-device-progress
+else
+    log "No resin-device-progress fix is required..."
+fi
+
 log "Loading info from config.json"
 if [ -f /mnt/boot/config.json ]; then
     CONFIGJSON=/mnt/boot/config.json
