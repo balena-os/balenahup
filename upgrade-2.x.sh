@@ -97,8 +97,10 @@ function stop_services() {
 function remove_containers() {
     stop_services
     log "Stopping all containers.."
+    # shellcheck disable=SC2046
     docker stop $(docker ps -a -q) > /dev/null 2>&1 || true
     log "Removing all containers..."
+    # shellcheck disable=SC2046
     docker rm $(docker ps -a -q) > /dev/null 2>&1 || true
 }
 
