@@ -131,28 +131,31 @@ function upgradeSupervisor() {
         fi
     fi
 
-    CURRENT_SUPERVISOR_VERSION=$(curl -s "${API_ENDPOINT}/v2/device(${DEVICEID})?\$select=supervisor_version&apikey=${APIKEY}" | jq -r '.d[0].supervisor_version')
-    if [ -z "$CURRENT_SUPERVISOR_VERSION" ]; then
-        log ERROR "Could not get current supervisor version from the API, bailing out."
-    else
-        if version_gt "$target_supervisor_version" "$CURRENT_SUPERVISOR_VERSION" ; then
-            log "Supervisor update: will be upgrading from v${CURRENT_SUPERVISOR_VERSION} to ${target_supervisor_version}"
-            UPDATER_SUPERVISOR_TAG="v${target_supervisor_version}"
-            # Get the supervisor id
-            if UPDATER_SUPERVISOR_ID=$(curl -s "${API_ENDPOINT}/v2/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'$UPDATER_SUPERVISOR_TAG'))&apikey=${APIKEY}" | jq -e -r '.d[0].id'); then
-                log "Extracted supervisor vars: ID: $UPDATER_SUPERVISOR_ID"
-                log "Setting supervisor version in the API..."
-                curl -s "${API_ENDPOINT}/v2/device($DEVICEID)?apikey=$APIKEY" -X PATCH -H 'Content-Type: application/json;charset=UTF-8' --data-binary "{\"supervisor_release\": \"$UPDATER_SUPERVISOR_ID\"}" > /dev/null 2>&1
-                log "Running supervisor updater..."
-                progress 90 "ResinOS: running supervisor update..."
-                update-resin-supervisor
-                remove_containers
-            else
-                log WARN "Couldn't extract supervisor vars..."
-            fi
+    if CURRENT_SUPERVISOR_VERSION=$(curl -s "${API_ENDPOINT}/v2/device(${DEVICEID})?\$select=supervisor_version&apikey=${APIKEY}" | jq -r '.d[0].supervisor_version'); then
+        if [ -z "$CURRENT_SUPERVISOR_VERSION" ]; then
+            log WARN "Could not get current supervisor version from the API, skipping update..."
         else
-            log "Supervisor update: no update needed."
+            if version_gt "$target_supervisor_version" "$CURRENT_SUPERVISOR_VERSION" ; then
+                log "Supervisor update: will be upgrading from v${CURRENT_SUPERVISOR_VERSION} to ${target_supervisor_version}"
+                UPDATER_SUPERVISOR_TAG="v${target_supervisor_version}"
+                # Get the supervisor id
+                if UPDATER_SUPERVISOR_ID=$(curl -s "${API_ENDPOINT}/v2/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'$UPDATER_SUPERVISOR_TAG'))&apikey=${APIKEY}" | jq -e -r '.d[0].id'); then
+                    log "Extracted supervisor vars: ID: $UPDATER_SUPERVISOR_ID"
+                    log "Setting supervisor version in the API..."
+                    curl -s "${API_ENDPOINT}/v2/device($DEVICEID)?apikey=$APIKEY" -X PATCH -H 'Content-Type: application/json;charset=UTF-8' --data-binary "{\"supervisor_release\": \"$UPDATER_SUPERVISOR_ID\"}" > /dev/null 2>&1
+                    log "Running supervisor updater..."
+                    progress 90 "ResinOS: running supervisor update..."
+                    update-resin-supervisor
+                    remove_containers
+                else
+                    log WARN "Couldn't extract supervisor vars..."
+                fi
+            else
+                log "Supervisor update: no update needed."
+            fi
         fi
+    else
+        log WARN "Could not parse current supervisor version from the API, skipping update..."
     fi
 }
 
