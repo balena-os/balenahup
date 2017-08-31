@@ -39,6 +39,12 @@ Options:
         Omit the 'v' in front of the version. e.g.: 2.2.0+rev1 and not v2.2.0+rev1.
         This is a mandatory argument.
 
+  --supervisor-version <SUPERVISOR_VERSION>
+        Run the supervisor update for this specific supervisor version as semver.
+        Omit the 'v' in front of the version. e.g.: 6.2.5 and not v6.2.5
+        If not defined, then the update will try to run for the HOSTOS_VERSION's
+        original supervisor release.
+
   --no-reboot
         Do not reboot if update is successful. This is useful when debugging.
 
@@ -102,44 +108,50 @@ function upgradeToReleaseSupervisor() {
     # information that is required for supervisor update, then do the update with
     # the tools shipped with the hostOS.
     log "Supervisor update start..."
-    if [ "$STAGING" == "yes" ]; then
-        DEFAULT_SUPERVISOR_VERSION_URL_BASE="https://s3.amazonaws.com/resin-staging-img/"
-    else
-        DEFAULT_SUPERVISOR_VERSION_URL_BASE="https://s3.amazonaws.com/resin-production-img-cloudformation/"
-    fi
-    # Convert the hostOS vesrsion into the format used for the resinOS storage buckets on S3
-    # The '+' in the original version might have already been turnd into a '_', take that into account.
-    HOSTOS_SLUG=$(echo "${target_version}" | sed -e 's/[_+]/%2B/' -e 's/$/.prod/')
-    DEFAULT_SUPERVISOR_VERSION_URL="${DEFAULT_SUPERVISOR_VERSION_URL_BASE}images/${SLUG}/${HOSTOS_SLUG}/VERSION"
 
-    # Get supervisor version for target resinOS release, it is in format of "va.b.c-shortsha", e.g. "v6.1.2"
-    # and tag new version for the device if it's newer than the current version, from the API
-    DEFAULT_SUPERVISOR_VERSION=$(curl -s "$DEFAULT_SUPERVISOR_VERSION_URL" | sed -e 's/v//')
-    if [ -z "$DEFAULT_SUPERVISOR_VERSION" ] || [ -z "${DEFAULT_SUPERVISOR_VERSION##*xml*}" ]; then
-        log ERROR "Could not get the default supervisor version for this resinOS release, bailing out."
-    else
-        CURRENT_SUPERVISOR_VERSION=$(curl -s "${API_ENDPOINT}/v2/device(${DEVICEID})?\$select=supervisor_version&apikey=${APIKEY}" | jq -r '.d[0].supervisor_version')
-        if [ -z "$CURRENT_SUPERVISOR_VERSION" ]; then
-            log ERROR "Could not get current supervisor version from the API, bailing out."
+    if [ -z "$target_supervisor_version" ]; then
+        log "No explicit supervisor version was provided, update to default version in target resinOS..."
+        if [ "$STAGING" == "yes" ]; then
+            DEFAULT_SUPERVISOR_VERSION_URL_BASE="https://s3.amazonaws.com/resin-staging-img/"
         else
-            if version_gt "$DEFAULT_SUPERVISOR_VERSION" "$CURRENT_SUPERVISOR_VERSION" ; then
-                log "Supervisor update: will be upgrading from v${CURRENT_SUPERVISOR_VERSION} to ${DEFAULT_SUPERVISOR_VERSION}"
-                UPDATER_SUPERVISOR_TAG="v${DEFAULT_SUPERVISOR_VERSION}"
-                # Get the supervisor id
-                if UPDATER_SUPERVISOR_ID=$(curl -s "${API_ENDPOINT}/v2/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'$UPDATER_SUPERVISOR_TAG'))&apikey=${APIKEY}" | jq -e -r '.d[0].id'); then
-                    log "Extracted supervisor vars: ID: $UPDATER_SUPERVISOR_ID"
-                    log "Setting supervisor version in the API..."
-                    curl -s "${API_ENDPOINT}/v2/device($DEVICEID)?apikey=$APIKEY" -X PATCH -H 'Content-Type: application/json;charset=UTF-8' --data-binary "{\"supervisor_release\": \"$UPDATER_SUPERVISOR_ID\"}" > /dev/null 2>&1
-                    log "Running supervisor updater..."
-                    progress 90 "ResinOS: running supervisor update..."
-                    update-resin-supervisor
-                    remove_containers
-                else
-                    log WARN "Couldn't extract supervisor vars..."
-                fi
+            DEFAULT_SUPERVISOR_VERSION_URL_BASE="https://s3.amazonaws.com/resin-production-img-cloudformation/"
+        fi
+        # Convert the hostOS vesrsion into the format used for the resinOS storage buckets on S3
+        # The '+' in the original version might have already been turnd into a '_', take that into account.
+        HOSTOS_SLUG=$(echo "${target_version}" | sed -e 's/[_+]/%2B/' -e 's/$/.prod/')
+        DEFAULT_SUPERVISOR_VERSION_URL="${DEFAULT_SUPERVISOR_VERSION_URL_BASE}images/${SLUG}/${HOSTOS_SLUG}/VERSION"
+
+        # Get supervisor version for target resinOS release, it is in format of "va.b.c-shortsha", e.g. "v6.1.2"
+        # and tag new version for the device if it's newer than the current version, from the API
+        DEFAULT_SUPERVISOR_VERSION=$(curl -s "$DEFAULT_SUPERVISOR_VERSION_URL" | sed -e 's/v//')
+        if [ -z "$DEFAULT_SUPERVISOR_VERSION" ] || [ -z "${DEFAULT_SUPERVISOR_VERSION##*xml*}" ]; then
+            log ERROR "Could not get the default supervisor version for this resinOS release, bailing out."
+        else
+            target_supervisor_version="$DEFAULT_SUPERVISOR_VERSION"
+        fi
+    fi
+
+    CURRENT_SUPERVISOR_VERSION=$(curl -s "${API_ENDPOINT}/v2/device(${DEVICEID})?\$select=supervisor_version&apikey=${APIKEY}" | jq -r '.d[0].supervisor_version')
+    if [ -z "$CURRENT_SUPERVISOR_VERSION" ]; then
+        log ERROR "Could not get current supervisor version from the API, bailing out."
+    else
+        if version_gt "$target_supervisor_version" "$CURRENT_SUPERVISOR_VERSION" ; then
+            log "Supervisor update: will be upgrading from v${CURRENT_SUPERVISOR_VERSION} to ${target_supervisor_version}"
+            UPDATER_SUPERVISOR_TAG="v${target_supervisor_version}"
+            # Get the supervisor id
+            if UPDATER_SUPERVISOR_ID=$(curl -s "${API_ENDPOINT}/v2/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'$UPDATER_SUPERVISOR_TAG'))&apikey=${APIKEY}" | jq -e -r '.d[0].id'); then
+                log "Extracted supervisor vars: ID: $UPDATER_SUPERVISOR_ID"
+                log "Setting supervisor version in the API..."
+                curl -s "${API_ENDPOINT}/v2/device($DEVICEID)?apikey=$APIKEY" -X PATCH -H 'Content-Type: application/json;charset=UTF-8' --data-binary "{\"supervisor_release\": \"$UPDATER_SUPERVISOR_ID\"}" > /dev/null 2>&1
+                log "Running supervisor updater..."
+                progress 90 "ResinOS: running supervisor update..."
+                update-resin-supervisor
+                remove_containers
             else
-                log "Supervisor update: no update needed."
+                log WARN "Couldn't extract supervisor vars..."
             fi
+        else
+            log "Supervisor update: no update needed."
         fi
     fi
 }
@@ -162,6 +174,13 @@ while [[ $# -gt 0 ]]; do
                 log ERROR "\"$1\" argument needs a value."
             fi
             target_version=$2
+            shift
+            ;;
+        --supervisor-version)
+            if [ -z "$2" ]; then
+                log ERROR "\"$1\" argument needs a value."
+            fi
+            target_supervisor_version=$2
             shift
             ;;
         --no-reboot)
