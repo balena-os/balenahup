@@ -292,8 +292,8 @@ fi
 
 # fix resin-device-progress, between version 2.0.6 and 2.3.0
 # the script does not work using deviceApiKey
-if version_gt "$VERSION" "2.0.6" &&
-    version_gt "2.3.0" "$VERSION"; then
+if version_gt "$VERSION_ID" "2.0.6" &&
+    version_gt "2.3.0" "$VERSION_ID"; then
         log "Fixing resin-device-progress is required..."
         tools_path=/tmp/upgrade_tools_extra
         mkdir -p $tools_path
