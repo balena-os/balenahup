@@ -161,6 +161,13 @@ function upgradeSupervisor() {
     fi
 }
 
+function error_handler() {
+    # If script fails (e.g. docker pull fails), restart the stopped services like the supervisor
+    systemctl start resin-supervisor
+    systemctl start update-resin-supervisor.timer
+    exit 1
+}
+
 ###
 # Script start
 ###
@@ -362,6 +369,8 @@ fi
 stop_services
 
 image=resin/resinos:${target_version}-${SLUG}
+
+trap 'error_handler' ERR
 
 log "Getting new OS image..."
 progress 50 "ResinOS: downloading update package..."
