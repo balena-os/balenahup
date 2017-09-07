@@ -134,7 +134,7 @@ function upgradeSupervisor() {
 
     if CURRENT_SUPERVISOR_VERSION=$(curl -s "${API_ENDPOINT}/v2/device(${DEVICEID})?\$select=supervisor_version&apikey=${APIKEY}" | jq -r '.d[0].supervisor_version'); then
         if [ -z "$CURRENT_SUPERVISOR_VERSION" ]; then
-            log WARN "Could not get current supervisor version from the API, skipping update..."
+            log ERROR "Could not get current supervisor version from the API..."
         else
             if version_gt "$target_supervisor_version" "$CURRENT_SUPERVISOR_VERSION" ; then
                 log "Supervisor update: will be upgrading from v${CURRENT_SUPERVISOR_VERSION} to ${target_supervisor_version}"
@@ -150,7 +150,7 @@ function upgradeSupervisor() {
                     stop_services
                     remove_containers
                 else
-                    log WARN "Couldn't extract supervisor vars..."
+                    log ERROR "Couldn't extract supervisor vars..."
                 fi
             else
                 log "Supervisor update: no update needed."
