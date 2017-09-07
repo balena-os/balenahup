@@ -1,5 +1,8 @@
 #!/bin/bash
 
+NOREBOOT=no
+STAGING=no
+
 set -o errexit
 set -o pipefail
 
@@ -7,20 +10,50 @@ set -o pipefail
 
 MIN_HOSTOS_VERSION=1.8.0
 PREFERRED_HOSTOS_VERSION=1.27
-SUPERVISOR_NEW_TAG=v6.2.1
 DOCKER=docker
 
-##
+# Log timer
+STARTTIME=$(date +%s)
+
+###
 # Helper functions
-##
+###
 
 # Dashboard progress helper
 function progress {
     percentage=$1
     message=$2
-    # Progress bar is "nice to have", but might fail on systems
-    # where we move the config.json from it's default location during the update
-    /usr/bin/resin-device-progress --percentage ${percentage} --state "${message}" > /dev/null || true
+    # Progress bar is "nice to have", but might fail on some systems.
+    # Try the default call, if that fails try the call with the updated config.json location,
+    # if that fails too then just give up and do not display a progress update
+    /usr/bin/resin-device-progress --percentage ${percentage} --state "${message}" > /dev/null || /usr/bin/resin-device-progress --config-path "/boot/config.json" --percentage ${percentage} --state "${message}" > /dev/null || true
+}
+
+function help {
+    cat << EOF
+Helper to run hostOS updates on resinOS 2.x devices
+
+Options:
+  -h, --help
+        Display this help and exit.
+
+  --hostos-version <HOSTOS_VERSION>
+        Run the updater for this specific HostOS version as semver.
+        Omit the 'v' in front of the version. e.g.: 2.2.0+rev1 and not v2.2.0+rev1.
+        This is a mandatory argument.
+
+  --supervisor-version <SUPERVISOR_VERSION>
+        Run the supervisor update for this specific supervisor version as semver.
+        Omit the 'v' in front of the version. e.g.: 6.2.5 and not v6.2.5
+        If not defined, then the update will try to run for the HOSTOS_VERSION's
+        original supervisor release.
+
+  --no-reboot
+        Do not reboot if update is successful. This is useful when debugging.
+
+  --staging
+        Get information from the resin staging environment as opposed to production.
+EOF
 }
 
 # Log function helper
@@ -54,6 +87,70 @@ function log {
 # Test if a version is greater than another
 function version_gt() {
     test "$(echo "$@" | tr " " "\n" | sort -V | head -n 1)" != "$1"
+}
+
+function upgradeSupervisor() {
+    # Fetch what supervisor version the target hostOS was originally released with
+    # and if it's newer than the supervisor running on the device, then fetch the
+    # information that is required for supervisor update, then do the update with
+    # the tools shipped with the hostOS.
+    log "Supervisor update start..."
+
+    if [ -z "$TARGET_SUPERVISOR_VERSION" ]; then
+        log "No explicit supervisor version was provided, update to default version in target resinOS..."
+        if [ "$STAGING" == "yes" ]; then
+            DEFAULT_SUPERVISOR_VERSION_URL_BASE="https://s3.amazonaws.com/resin-staging-img/"
+        else
+            DEFAULT_SUPERVISOR_VERSION_URL_BASE="https://s3.amazonaws.com/resin-production-img-cloudformation/"
+        fi
+        # Convert the hostOS vesrsion into the format used for the resinOS storage buckets on S3
+        # The '+' in the original version might have already been turnd into a '_', take that into account.
+        HOSTOS_SLUG=$(echo "${TARGET_VERSION}" | sed -e 's/[_+]/%2B/' -e 's/$/.prod/')
+        DEFAULT_SUPERVISOR_VERSION_URL="${DEFAULT_SUPERVISOR_VERSION_URL_BASE}images/${SLUG}/${HOSTOS_SLUG}/VERSION"
+
+        # Get supervisor version for target resinOS release, it is in format of "va.b.c-shortsha", e.g. "v6.1.2"
+        # and tag new version for the device if it's newer than the current version, from the API
+        DEFAULT_SUPERVISOR_VERSION=$(curl -s "$DEFAULT_SUPERVISOR_VERSION_URL" | sed -e 's/v//')
+        if [ -z "$DEFAULT_SUPERVISOR_VERSION" ] || [ -z "${DEFAULT_SUPERVISOR_VERSION##*xml*}" ]; then
+            log ERROR "Could not get the default supervisor version for this resinOS release, bailing out."
+        else
+            TARGET_SUPERVISOR_VERSION="$DEFAULT_SUPERVISOR_VERSION"
+        fi
+    fi
+
+    if CURRENT_SUPERVISOR_VERSION=$(curl -s "${API_ENDPOINT}/v2/device(${DEVICEID})?\$select=supervisor_version&apikey=${APIKEY}" | jq -r '.d[0].supervisor_version'); then
+        if [ -z "$CURRENT_SUPERVISOR_VERSION" ]; then
+            log ERROR "Could not get current supervisor version from the API..."
+        else
+            if version_gt "$TARGET_SUPERVISOR_VERSION" "$CURRENT_SUPERVISOR_VERSION" ; then
+                log "Supervisor update: will be upgrading from v${CURRENT_SUPERVISOR_VERSION} to ${TARGET_SUPERVISOR_VERSION}"
+                UPDATER_SUPERVISOR_TAG="v${TARGET_SUPERVISOR_VERSION}"
+                # Get the supervisor id, which is the unique numerical key of the supervisor version for the given device type
+                if UPDATER_SUPERVISOR_ID=$(curl -s "${API_ENDPOINT}/v2/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'$UPDATER_SUPERVISOR_TAG'))&apikey=${APIKEY}" | jq -e -r '.d[0].id'); then
+                    log "Extracted supervisor vars: ID: $UPDATER_SUPERVISOR_ID"
+                    log "Setting supervisor version in the API..."
+                    curl -s "${API_ENDPOINT}/v2/device($DEVICEID)?apikey=$APIKEY" -X PATCH -H 'Content-Type: application/json;charset=UTF-8' --data-binary "{\"supervisor_release\": \"$UPDATER_SUPERVISOR_ID\"}" > /dev/null 2>&1
+                    log "Updating local configuration at ${supervisor_conf_path}..."
+                    if grep -q "SUPERVISOR_TAG" "${supervisor_conf_path}"; then
+                        # Update supervisor tag
+                        sed -i -e 's/SUPERVISOR_TAG=.*/SUPERVISOR_TAG='"${UPDATER_SUPERVISOR_TAG}"'/' "${supervisor_conf_path}"
+                    else
+                        # Insert supervisor tag
+                        echo "SUPERVISOR_TAG=${UPDATER_SUPERVISOR_TAG}" >> "${supervisor_conf_path}"
+                    fi
+                    # Remove staging registry from the config
+                    sed -i -e 's/SUPERVISOR_IMAGE=registry.resinstaging.io\//SUPERVISOR_IMAGE=/' "${supervisor_conf_path}"
+                    log "Supervisor config update done."
+                else
+                    log ERROR "Couldn't extract supervisor vars..."
+                fi
+            else
+                log "Supervisor update: no update needed."
+            fi
+        fi
+    else
+        log WARN "Could not parse current supervisor version from the API, skipping update..."
+    fi
 }
 
 function wifi_migrate() {
@@ -101,45 +198,92 @@ function stop_all() {
     systemctl stop docker
 }
 
-##
+###
 # Script start
-##
+###
 
-# Log timer
-STARTTIME=$(date +%s)
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    arg="$1"
 
-progress 5 "ResinOS: update prearation..."
+    case $arg in
+        -h|--help)
+            help
+            exit 0
+            ;;
+        --hostos-version)
+            if [ -z "$2" ]; then
+                log ERROR "\"$1\" argument needs a value."
+            fi
+            TARGET_VERSION=$2
+            shift
+            ;;
+        --supervisor-version)
+            if [ -z "$2" ]; then
+                log ERROR "\"$1\" argument needs a value."
+            fi
+            TARGET_SUPERVISOR_VERSION=$2
+            shift
+            ;;
+        --no-reboot)
+            NOREBOOT="yes"
+            ;;
+        --staging)
+            STAGING="yes"
+            ;;
+        *)
+            log ERROR "Unrecognized option $1."
+            ;;
+    esac
+    shift
+done
+
+if [ -z ${TARGET_VERSION+x} ]; then
+    log ERROR "--hostos-version is required."
+fi
+
+progress 5 "ResinOS: update preparation..."
 
 # Check board support
 case $SLUG in
     beaglebone*)
-	TARGET_VERSION=2.3.0_rev1
-	# In 2.x there is only a single device type
-	DEVICE=beaglebone-black
-	BINARY_TYPE=arm
-	;;
+        MIN_TARGET_VERSION=2.2.0+rev1
+        # In 2.x there is only a single device type
+        DEVICE=beaglebone-black
+        BINARY_TYPE=arm
+        ;;
     raspberry*)
-	TARGET_VERSION=2.3.0_rev1
-	DEVICE=$SLUG
-	BINARY_TYPE=arm
-	;;
+        MIN_TARGET_VERSION=2.2.0+rev1
+        DEVICE=$SLUG
+        BINARY_TYPE=arm
+        ;;
     *)
-	log ERROR "Unsupported board type $SLUG."
+        log ERROR "Unsupported board type $SLUG."
 esac
 
-# Check host OS version
+# Check starting host OS version
 if version_gt $VERSION $MIN_HOSTOS_VERSION || [ "$VERSION" == $MIN_HOSTOS_VERSION ]; then
-    log "Host OS version $VERSION OK."
+    log "Starting Host OS version $VERSION OK."
 else
     case $VERSION in
 	1.*)
-	    log ERROR "Host OS version \"$VERSION\" too low, need \"$MIN_HOSTOS_VERSION\" or greater."
+	    log ERROR "Starting Host OS version \"$VERSION\" too low, need \"$MIN_HOSTOS_VERSION\" or greater."
 	    ;;
 	*)
-	    log ERROR "Host OS version \"$VERSION\" too high."
+	    log ERROR "Starting Host OS version \"$VERSION\" too high."
 	    ;;
     esac
 fi
+
+# Check target host OS version
+if version_gt $TARGET_VERSION $MIN_TARGET_VERSION || [ "$TARGET_VERSION" == $MIN_TARGET_VERSION ]; then
+    log "Target Host OS version $TARGET_VERSION OK."
+else
+    log ERROR "Target Host OS version \"$TARGET_VERSION\" too low, need \"$MIN_TARGET_VERSION\" or greater."
+fi
+
+# Translate version to one docker will accept as part of an image name
+TARGET_VERSION=$(echo "$TARGET_VERSION" | tr + _)
 
 # Find boot path
 boot_path=$(findmnt -n --raw --evaluate --output=target LABEL=resin-boot)
@@ -153,37 +297,37 @@ fi
 root_part=$(findmnt -n --raw --evaluate --output=source /)
 case $root_part in
     *p2)
-	log "Current root partition is first root partition."
-	;;
+        log "Current root partition is first root partition."
+        ;;
     *p3)
-	log "Current root partition $root_part is the second root partition. Copying existing OS to first partition..."
-    progress 10 "ResinOS: partition switching..."
-    stop_all
-    sync
-    log "Forcing remount of file systems in read-only mode..."
-    echo u > /proc/sysrq-trigger
-    log "Copying current root partition to the unused partiton..."
-    root_dev=${root_part%p3}
-	dd if=${root_dev}p3 of=${root_dev}p2 bs=4M
-    log "Remounting boot partition as rw for the next step..."
-    mount -o remount,rw "${boot_path}"
-	log "Updating bootloader to point to first partition..."
-	case $SLUG in
-	    beaglebone*)
-		sed -i -e 's/bootpart=1:3/bootpart=1:2/' "${boot_path}/uEnv.txt"
-		;;
-	    raspberry*)
-		sed -i -e 's/mmcblk0p3/mmcblk0p2/' "${boot_path}/cmdline.txt"
-		;;
-	esac
-	log "Rebooting..."
-    progress 15 "ResinOS: rebooting to continue..."
-	sync
-	reboot
-	;;
+        log "Current root partition $root_part is the second root partition. Copying existing OS to first partition..."
+        progress 10 "ResinOS: partition switching..."
+        stop_all
+        sync
+        log "Forcing remount of file systems in read-only mode..."
+        echo u > /proc/sysrq-trigger
+        log "Copying current root partition to the unused partiton..."
+        root_dev=${root_part%p3}
+        dd if=${root_dev}p3 of=${root_dev}p2 bs=4M
+        log "Remounting boot partition as rw for the next step..."
+        mount -o remount,rw "${boot_path}"
+        log "Updating bootloader to point to first partition..."
+        case $SLUG in
+            beaglebone*)
+                sed -i -e 's/bootpart=1:3/bootpart=1:2/' "${boot_path}/uEnv.txt"
+                ;;
+            raspberry*)
+                sed -i -e 's/mmcblk0p3/mmcblk0p2/' "${boot_path}/cmdline.txt"
+                ;;
+        esac
+        log "Rebooting..."
+        progress 15 "ResinOS: rebooting to continue..."
+        sync
+        nohup bash -c " /bin/sleep 5 ; /sbin/reboot " > /dev/null 2>&1 &
+        ;;
     *)
-	log ERROR "Current root partition $root_part is not first or second root partition, aborting."
-	;;
+        log ERROR "Current root partition $root_part is not first or second root partition, aborting."
+        ;;
 esac
 root_dev=${root_part%p2}
 
@@ -378,16 +522,6 @@ cp -a /etc/supervisor.conf /mnt/state/root-overlay/etc/resin-supervisor
 supervisor_conf_path="/mnt/state/root-overlay/etc/resin-supervisor/supervisor.conf"
 # resinOS 1.22 and 1.23 can have bad supervisor tags
 sed -i -e 's/@TARGET_TAG@/v2.8.3/' /mnt/state/root-overlay/etc/resin-supervisor/supervisor.conf
-# Add or replace the supervisor tag in the configuration
-if grep -q "SUPERVISOR_TAG" "${supervisor_conf_path}"; then
-    # Update supervisor tag
-    sed -i -e 's/SUPERVISOR_TAG=.*/SUPERVISOR_TAG='"${SUPERVISOR_NEW_TAG}"'/' "${supervisor_conf_path}"
-else
-    # Insert supervisor tag
-    echo "SUPERVISOR_TAG=${SUPERVISOR_NEW_TAG}" >> "${supervisor_conf_path}"
-fi
-# Remove staging registry from the config
-sed -i -e 's/SUPERVISOR_IMAGE=registry.resinstaging.io\//SUPERVISOR_IMAGE=/' "${supervisor_conf_path}"
 
 # Copy docker config
 mkdir -p /mnt/state/root-overlay/etc/docker
@@ -531,16 +665,27 @@ fi
 log "Switching root partition..."
 case $SLUG in
     beaglebone*)
-	echo 'resin_root_part=3' >"${boot_path}/resinOS_uEnv.txt"
-	sed -i -e '/mmcdev=.*/d' -e '/bootpart=.*/d' "${boot_path}/uEnv.txt"
-	;;
+        echo 'resin_root_part=3' >"${boot_path}/resinOS_uEnv.txt"
+        sed -i -e '/mmcdev=.*/d' -e '/bootpart=.*/d' "${boot_path}/uEnv.txt"
+        ;;
     raspberry*)
-	sed -i -e 's/mmcblk0p2/mmcblk0p3/' "${boot_path}/cmdline.txt"
-	;;
+        sed -i -e 's/mmcblk0p2/mmcblk0p3/' "${boot_path}/cmdline.txt"
+        ;;
 esac
 
-# Reboot into new OS
+# Upgrade supervisor in the API and in the config
+upgradeSupervisor
+# Remove stale supervisor database, so it will be recreated from scratch
+rm -rf /mnt/data/resin-data/resin-supervisor
+
 sync
-log "Rebooting into new OS after 5 seconds ..."
-progress 100 "ResinOS: Done. Rebooting..."
-nohup bash -c " /bin/sleep 5 ; /sbin/reboot " > /dev/null 2>&1 &
+if [ "$NOREBOOT" == "no" ]; then
+    # Reboot into new OS
+    log "Rebooting into new OS in 5 seconds..."
+    progress 100 "ResinOS: update successful, rebooting..."
+    nohup bash -c " /bin/sleep 5 ; /sbin/reboot " > /dev/null 2>&1 &
+else
+    log "Finished update, not rebooting as requested."
+    log "NOTE: Supervisor and stopped services kept stopped!"
+    progress 100 "ResinOS: update successful."
+fi
