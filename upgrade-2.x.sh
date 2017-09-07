@@ -95,7 +95,6 @@ function stop_services() {
 }
 
 function remove_containers() {
-    stop_services
     log "Stopping all containers.."
     # shellcheck disable=SC2046
     docker stop $(docker ps -a -q) > /dev/null 2>&1 || true
@@ -148,6 +147,7 @@ function upgradeSupervisor() {
                     log "Running supervisor updater..."
                     progress 90 "ResinOS: running supervisor update..."
                     update-resin-supervisor
+                    stop_services
                     remove_containers
                 else
                     log WARN "Couldn't extract supervisor vars..."
