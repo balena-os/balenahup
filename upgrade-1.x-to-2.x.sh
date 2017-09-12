@@ -651,13 +651,20 @@ fi
 if [ -n "$APP_ID" ] && [ -f "/mnt/data/resin-data/${APP_ID}/network.config" ]; then
     wifi_connect_config_file="/mnt/data/resin-data/${APP_ID}/network.config"
     log "Found likely resin-wifi-connect network config at ${wifi_connect_config_file}, migrating..."
-    ssid=$(cat "${wifi_connect_config_file}" |grep "service_home_wifi" -A 5 | sed -n -e 's/.*Name = \([^\\"]*\).*/\1/p')
-    psk=$(cat "${wifi_connect_config_file}" |grep "service_home_wifi" -A 5 | sed -n -e 's/.*Passphrase = \([^\\"]*\).*/\1/p')
 
-    if [ -z "$ssid" ]; then
-        log "No SSID setting found, not migrating settings..."
+    # Need to pre-check the existence of the wifi settings, otherwise grep will fail silently
+    # in the ssid/psk extraction step, breaking the script.
+    if grep service_home_wifi "$wifi_connect_config_file" >/dev/null; then
+        ssid=$(cat "${wifi_connect_config_file}" |grep "service_home_wifi" -A 5 | sed -n -e 's/.*Name = \([^\\"]*\).*/\1/p')
+        psk=$(cat "${wifi_connect_config_file}" |grep "service_home_wifi" -A 5 | sed -n -e 's/.*Passphrase = \([^\\"]*\).*/\1/p')
+
+        if [ -z "$ssid" ]; then
+            log "No SSID setting found, not migrating settings..."
+        else
+            wifi_migrate "$boot_path" "resin-wifi-connect" "$ssid" "$psk"
+        fi
     else
-        wifi_migrate "$boot_path" "resin-wifi-connect" "$ssid" "$psk"
+        log "No wifi settings seem to be present in ${wifi_connect_config_file}..."
     fi
 fi
 
