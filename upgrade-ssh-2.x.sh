@@ -41,6 +41,10 @@ Options:
         See ${main_script_name} help for more details.
         This is a mandatory argument.
 
+  --supervisor-version <SUPERVISOR_VERSION>
+        Run ${main_script_name} with --supervisor-version <SUPERVISOR_VERSION>, use e.g. 6.2.5
+        See ${main_script_name} help for more details.
+
   --no-reboot
         Run ${main_script_name} with --no-reboot . See ${main_script_name} help for more details.
 
@@ -197,6 +201,14 @@ while [[ $# -gt 0 ]]; do
             fi
             HOSTOS_VERSION=$2
             RESINHUP_ARGS+=( "--hostos-version $HOSTOS_VERSION" )
+            shift
+            ;;
+        --supervisor-version)
+            if [ -z "$2" ]; then
+                log ERROR "\"$1\" argument needs a value."
+            fi
+            SUPERVISOR_VERSION=$2
+            RESINHUP_ARGS+=( "--supervisor-version $SUPERVISOR_VERSION" )
             shift
             ;;
         --no-reboot)
