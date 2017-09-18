@@ -2,6 +2,8 @@
 
 NOREBOOT=no
 STAGING=no
+LOG=yes
+SCRIPTNAME=upgrade-2.x.sh
 
 set -o errexit
 set -o pipefail
@@ -44,6 +46,9 @@ Options:
         Omit the 'v' in front of the version. e.g.: 6.2.5 and not v6.2.5
         If not defined, then the update will try to run for the HOSTOS_VERSION's
         original supervisor release.
+
+    -n, --nolog
+        By default tool logs to stdout and file. This flag deactivates log to file.
 
   --no-reboot
         Do not reboot if update is successful. This is useful when debugging.
@@ -195,6 +200,9 @@ while [[ $# -gt 0 ]]; do
             target_supervisor_version=$2
             shift
             ;;
+        -n|--nolog)
+            LOG=no
+            ;;
         --no-reboot)
             NOREBOOT="yes"
             ;;
@@ -214,6 +222,14 @@ fi
 
 # Log timer
 starttime=$(date +%s)
+
+# LOGFILE init and header
+if [ "$LOG" == "yes" ]; then
+    LOGFILE="/mnt/data/resinhup/$SCRIPTNAME.$(date +"%Y%m%d_%H%M%S").log"
+    mkdir -p "$(dirname "$LOGFILE")"
+    echo "================$SCRIPTNAME HEADER START====================" > "$LOGFILE"
+    date >> "$LOGFILE"
+fi
 
 progress 25 "ResinOS: preparing update.."
 
