@@ -267,6 +267,9 @@ progress 5 "ResinOS: update preparation..."
 # Check board support
 case $SLUG in
     beaglebone*)
+        # increase the minimum hostOS version as Beaglebones have an eMMC bug
+        # that would break hup on docker pull with a nasty error for versions below this
+        MIN_HOSTOS_VERSION=1.30.1
         MIN_TARGET_VERSION=2.2.0+rev1
         # In 2.x there is only a single device type
         DEVICE=beaglebone-black
