@@ -349,16 +349,21 @@ API_ENDPOINT=$(jq -r '.apiEndpoint' $CONFIGJSON)
 
 # Find which partition is / and which we should write the update to
 root_part=$(findmnt -n --raw --evaluate --output=source /)
+log "Found root at ${root_part}..."
 case $root_part in
-    *p2)
-        root_dev=${root_part%p2}
-        update_part=${root_dev}p3
+    *2)
+        # on 2.x the following device types have these kinds of results for $root_part
+        # raspberrypi: /dev/mmcblk0p2
+        # beaglebone: /dev/disk/by-partuuid/93956da0-02
+        # NUC: /dev/sda2
+        root_dev=${root_part%2}
+        update_part=${root_dev}3
         update_part_no=3
         update_label=resin-rootB
         ;;
-    *p3)
-        root_dev=${root_part%p3}
-        update_part=${root_dev}p2
+    *3)
+        root_dev=${root_part%3}
+        update_part=${root_dev}2
         update_part_no=2
         update_label=resin-rootA
         ;;
