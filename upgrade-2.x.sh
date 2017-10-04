@@ -447,6 +447,9 @@ cp -a /tmp/resin-boot/* /mnt/boot/
 # Clearing up
 docker rm "$container"
 
+# Updating supervisor
+upgradeSupervisor
+
 # Switch root partition
 log "Switching root partition..."
 case $SLUG in
@@ -462,9 +465,6 @@ case $SLUG in
         sed -i -e "s/${old_label}/${update_label}/" /mnt/boot/EFI/BOOT/grub.cfg
         ;;
 esac
-
-# Updating supervisor
-upgradeSupervisor
 
 # Reboot into new OS
 sync
