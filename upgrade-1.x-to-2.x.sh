@@ -592,6 +592,9 @@ log "Getting new OS image..."
 progress 50 "ResinOS: downloading OS update..."
 # Create container for new version
 CONTAINER=$(docker create ${IMAGE} echo export)
+if [ -z "$CONTAINER" ]; then
+    log ERROR "Could not download target update image..."
+fi
 
 progress 60 "ResinOS: processig update package..."
 # Export container
