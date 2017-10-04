@@ -596,7 +596,7 @@ if [ -z "$CONTAINER" ]; then
     log ERROR "Could not download target update image..."
 fi
 
-progress 60 "ResinOS: processig update package..."
+progress 60 "ResinOS: processing update package..."
 # Export container
 log "Starting docker export"
 docker export ${CONTAINER} | gzip > ${BACKUPARCHIVE}
