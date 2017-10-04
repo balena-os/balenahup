@@ -2,11 +2,17 @@
 
 NOREBOOT=no
 STAGING=no
+LOG=yes
+SCRIPTNAME=upgrade-1.x-to-2.x.sh
 
 set -o errexit
 set -o pipefail
 
+# This will set VERSION, SLUG, and VARIANT_ID
 . /etc/os-release
+
+# Don't run anything before this source as it sets PATH here
+source /etc/profile
 
 MIN_HOSTOS_VERSION=1.8.0
 PREFERRED_HOSTOS_VERSION=1.27
@@ -50,6 +56,9 @@ Options:
 
   --no-reboot
         Do not reboot if update is successful. This is useful when debugging.
+
+  -n, --nolog
+        By default tool logs to stdout and file. This flag deactivates log to file.
 
   --staging
         Get information from the resin staging environment as opposed to production.
@@ -98,7 +107,7 @@ function upgradeSupervisor() {
 
     if [ -z "$TARGET_SUPERVISOR_VERSION" ]; then
         log "No explicit supervisor version was provided, update to default version in target resinOS..."
-        if [ "$STAGING" == "yes" ]; then
+        if [ "$STAGING" = "yes" ]; then
             DEFAULT_SUPERVISOR_VERSION_URL_BASE="https://s3.amazonaws.com/resin-staging-img/"
         else
             DEFAULT_SUPERVISOR_VERSION_URL_BASE="https://s3.amazonaws.com/resin-production-img-cloudformation/"
@@ -228,6 +237,9 @@ while [[ $# -gt 0 ]]; do
         --no-reboot)
             NOREBOOT="yes"
             ;;
+        -n|--nolog)
+            LOG=no
+            ;;
         --staging)
             STAGING="yes"
             ;;
@@ -237,6 +249,14 @@ while [[ $# -gt 0 ]]; do
     esac
     shift
 done
+
+# LOGFILE init and header
+if [ "$LOG" == "yes" ]; then
+    LOGFILE="/tmp/$SCRIPTNAME.$(date +"%Y%m%d_%H%M%S").log"
+    mkdir -p "$(dirname "$LOGFILE")"
+    echo "================$SCRIPTNAME HEADER START====================" > "$LOGFILE"
+    date >> "$LOGFILE"
+fi
 
 if [ -z ${TARGET_VERSION+x} ]; then
     log ERROR "--hostos-version is required."
@@ -324,6 +344,7 @@ case $root_part in
         progress 15 "ResinOS: rebooting to continue..."
         sync
         nohup bash -c " /bin/sleep 5 ; /sbin/reboot " > /dev/null 2>&1 &
+        exit 0
         ;;
     *)
         log ERROR "Current root partition $root_part is not first or second root partition, aborting."
@@ -554,7 +575,13 @@ systemctl start docker
 # Remount backup dir
 mount ${root_dev}p3 /tmp/backup
 
-IMAGE=resin/resinos:${TARGET_VERSION}-${DEVICE}
+if [ "$STAGING" = "yes" ]; then
+    IMAGE=resin/resinos-staging:${TARGET_VERSION}-${DEVICE}
+else
+    IMAGE=resin/resinos:${TARGET_VERSION}-${DEVICE}
+fi
+log "Using resinOS image: ${IMAGE}"
+
 BACKUPARCHIVE=/tmp/backup/newos.tar.gz
 FSARCHIVE=/mnt/data/newos.tar.gz
 
