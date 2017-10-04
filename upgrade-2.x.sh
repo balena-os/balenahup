@@ -117,7 +117,7 @@ function upgradeSupervisor() {
 
     if [ -z "$target_supervisor_version" ]; then
         log "No explicit supervisor version was provided, update to default version in target resinOS..."
-        if [ "$STAGING" == "yes" ]; then
+        if [ "$STAGING" = "yes" ]; then
             DEFAULT_SUPERVISOR_VERSION_URL_BASE="https://s3.amazonaws.com/resin-staging-img/"
         else
             DEFAULT_SUPERVISOR_VERSION_URL_BASE="https://s3.amazonaws.com/resin-production-img-cloudformation/"
@@ -389,12 +389,18 @@ fi
 # Stop docker containers
 stop_services
 
-image=resin/resinos:${target_version}-${SLUG}
-
 trap 'error_handler' ERR
 
 log "Getting new OS image..."
 progress 50 "ResinOS: downloading update package..."
+
+if [ "$STAGING" = "yes" ]; then
+    image=resin/resinos-staging:${target_version}-${SLUG}
+else
+    image=resin/resinos:${target_version}-${SLUG}
+fi
+log "Using resinOS image: ${image}"
+
 # Create container for new version
 container=$(docker create "$image" echo export)
 
