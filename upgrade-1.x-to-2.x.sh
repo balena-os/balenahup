@@ -225,6 +225,15 @@ while [[ $# -gt 0 ]]; do
                 log ERROR "\"$1\" argument needs a value."
             fi
             TARGET_VERSION=$2
+            case $TARGET_VERSION in
+                *.prod)
+                    TARGET_VERSION="${TARGET_VERSION%%.prod}"
+                    log "Normalized target version: ${TARGET_VERSION}"
+                    ;;
+                *.dev)
+                    log ERROR "Updating .dev versions is not supported..."
+                    ;;
+            esac
             shift
             ;;
         --supervisor-version)
