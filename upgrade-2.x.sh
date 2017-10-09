@@ -191,6 +191,15 @@ while [[ $# -gt 0 ]]; do
                 log ERROR "\"$1\" argument needs a value."
             fi
             target_version=$2
+            case $target_version in
+                *.prod)
+                    target_version="${target_version%%.prod}"
+                    log "Normalized target version: ${target_version}"
+                    ;;
+                *.dev)
+                    log ERROR "Updating .dev versions is not supported..."
+                    ;;
+            esac
             shift
             ;;
         --supervisor-version)
@@ -267,7 +276,8 @@ else
 fi
 
 # Check OS variant and filter update availability based on that.
-if [ ! "$VARIANT_ID" == "prod" ]; then
+log "VARIANT_ID: ${VARIANT_ID}"
+if [ -n "$VARIANT_ID" ] && [ ! "$VARIANT_ID" == "prod" ]; then
     log ERROR "Only updating production devices..."
 fi
 
