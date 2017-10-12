@@ -75,11 +75,7 @@ function log {
             ;;
     esac
     endtime=$(date +%s)
-    if [ "z$LOG" == "zyes" ] && [ -n "$LOGFILE" ]; then
-        printf "[%09d%s%s\n" "$((endtime - starttime))" "][$loglevel]" "$1" | tee -a "$LOGFILE"
-    else
-        printf "[%09d%s%s\n" "$((endtime - starttime))" "][$loglevel]" "$1"
-    fi
+    printf "[%09d%s%s\n" "$((endtime - starttime))" "][$loglevel]" "$1"
     if [ "$loglevel" == "ERROR" ]; then
         progress 100 "ResinOS: Update failed."
         exit 1
@@ -238,6 +234,8 @@ if [ "$LOG" == "yes" ]; then
     mkdir -p "$(dirname "$LOGFILE")"
     echo "================$SCRIPTNAME HEADER START====================" > "$LOGFILE"
     date >> "$LOGFILE"
+    # redirect all logs to the logfile
+    exec 1> "$LOGFILE" 2>&1
 fi
 
 progress 25 "ResinOS: preparing update.."
