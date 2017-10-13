@@ -169,6 +169,48 @@ function error_handler() {
     exit 1
 }
 
+function image_exsits() {
+    # Try to fetch the manifest of a repo:tag combo, to check for the existence of that
+    # repo and tag.
+    # Currently only works with Docker HUB
+    # The return value is "no" if can't access that manifest, and "yes" if we can find it
+    local REPO=$1
+    local TAG=$2
+    local exists=no
+    local REGISTRY_URL="https://registry.hub.docker.com/v2"
+    local MANIFEST="${REGISTRY_URL}/${REPO}/manifests/${TAG}"
+    local response
+    # Check
+    response=$(curl --write-out "%{http_code}" --silent --output /dev/null "${MANIFEST}")
+    if [ "$response" = 401 ]; then
+        # 401 is "Unauthorized", have to grab the access tokens from the provided endpoint
+        local auth_header
+        local realm
+        local service
+        local scope
+        local token
+        local response_auth
+        auth_header=$(curl -I --silent "${MANIFEST}" |grep Www-Authenticate)
+        # The auth_header looks as
+        # Www-Authenticate: Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:resin/resinos:pull"
+        # shellcheck disable=SC2001
+        realm=$(echo "$auth_header" | sed 's/.*realm="\([^,]*\)",.*/\1/' )
+        # shellcheck disable=SC2001
+        service=$(echo "$auth_header" | sed 's/.*,service="\([^,]*\)",.*/\1/' )
+        # shellcheck disable=SC2001
+        scope=$(echo "$auth_header" | sed 's/.*,scope="\([^,]*\)".*/\1/' )
+        # Grab the token from the appropriate address, and retry the manifest query with that
+        token=$(curl --silent "${realm}?service=${service}&scope=${scope}" | jq -r '.access_token')
+        response_auth=$(curl --write-out "%{http_code}" --silent --output /dev/null -H "Authorization: Bearer ${token}" "${MANIFEST}")
+        if [ "$response_auth" = 200 ]; then
+            exists=yes
+        fi
+    elif [ "$response" = 200 ]; then
+        exists=yes
+    fi
+    echo "${exists}"
+}
+
 ###
 # Script start
 ###
@@ -279,9 +321,6 @@ if [ -n "$VARIANT_ID" ] && [ ! "$VARIANT_ID" == "prod" ]; then
     log ERROR "Only updating production devices..."
 fi
 
-# Translate version to one docker will accept as part of an image name
-target_version=$(echo "$target_version" | tr + _)
-
 # Check host OS version
 case $VERSION in
     2.*)
@@ -291,6 +330,23 @@ case $VERSION in
         log ERROR "Host OS version \"$VERSION\" not supported."
         ;;
 esac
+
+# Translate version to one docker will accept as part of an image name
+target_version=$(echo "$target_version" | tr + _)
+
+# Checking whether the target versionis available to download
+if [ "$STAGING" = "yes" ]; then
+    RESINOS_REPO="resin/resinos-staging"
+else
+    RESINOS_REPO="resin/resinos"
+fi
+RESINOS_TAG=${target_version}-${SLUG}
+log "Checking for manifest of ${RESINOS_REPO}:${RESINOS_TAG}"
+if [ "$(image_exsits "$RESINOS_REPO" "$RESINOS_TAG")" = "yes" ]; then
+    log "Manifest found, good to go..."
+else
+    log ERROR "Cannot find manifest, target image might not exists. Bailing out..."
+fi
 
 # Check if we need to install some more extra tools
 if ! version_gt "$VERSION" "$preferred_hostos_version" &&
@@ -402,11 +458,7 @@ trap 'error_handler' ERR
 log "Getting new OS image..."
 progress 50 "ResinOS: downloading update package..."
 
-if [ "$STAGING" = "yes" ]; then
-    image=resin/resinos-staging:${target_version}-${SLUG}
-else
-    image=resin/resinos:${target_version}-${SLUG}
-fi
+image="${RESINOS_REPO}:${RESINOS_TAG}"
 log "Using resinOS image: ${image}"
 
 # Create container for new version
