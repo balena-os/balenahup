@@ -211,6 +211,23 @@ function image_exsits() {
     echo "${exists}"
 }
 
+function remove_sample_wifi {
+    # Removing the `resin-sample` file if it exists on the device, and has the default
+    # connection settings, as they are well known and thus insecure
+    local filename=$1
+    if [ -f "${filename}" ] && grep -Fxq "ssid=My_Wifi_Ssid" "${filename}" && grep -Fxq "psk=super_secret_wifi_password" "${filename}" ; then
+        if nmcli | grep "resin-sample"; then
+            # If a connection with that name is in use, do not actually remove the settings
+            log WARN "resin-sample configuration found at ${filename} but it might be connected, not removing..."
+        else
+            log "resin-sample configuration found at ${filename}, removing..."
+            rm "${filename}" || log WARN "couldn't remove ${filename}; continuing anyways..."
+        fi
+    else
+        log "No resin-sample found at ${filename} with default config, good..."
+    fi
+}
+
 ###
 # Script start
 ###
@@ -509,6 +526,10 @@ docker rm "$container"
 
 # Updating supervisor
 upgradeSupervisor
+
+# REmove resin-sample to plug security hole
+remove_sample_wifi "/mnt/boot/system-connections/resin-sample"
+remove_sample_wifi "/mnt/state/root-overlay/etc/NetworkManager/system-connections/resin-sample"
 
 # Switch root partition
 log "Switching root partition..."
