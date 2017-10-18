@@ -420,13 +420,9 @@ if [ -f /mnt/boot/config.json ]; then
 else
     log ERROR "Don't know where config.json is."
 fi
-APIKEY=$(jq -r '.deviceApiKey' $CONFIGJSON)
-if [ "$APIKEY" == 'null' ]; then
-    log WARN "Using apiKey as device does not have deviceApiKey yet..."
-    APIKEY=$(jq -r '.apiKey' $CONFIGJSON)
-fi
-DEVICEID=$(jq -r '.deviceId' $CONFIGJSON)
-API_ENDPOINT=$(jq -r '.apiEndpoint' $CONFIGJSON)
+# If the user api key exists we use it instead of the deviceApiKey as it means we haven't done the key exchange yet
+# shellcheck disable=SC2046
+read -r APIKEY DEVICEID API_ENDPOINT <<<$(jq -r '.apiKey // .deviceApiKey,.deviceId,.apiEndpoint' $CONFIGJSON)
 
 # Find which partition is / and which we should write the update to
 root_part=$(findmnt -n --raw --evaluate --output=source /)
