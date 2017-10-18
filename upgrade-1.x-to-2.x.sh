@@ -245,6 +245,17 @@ function image_exsits() {
     echo "${exists}"
 }
 
+function fix_supervisor_bootstrap {
+    log "Target needs supervisor bootstrap fix..."
+    local temp_fix_file=/tmp/start-resin-supervisor
+    if curl --fail --silent -o "$temp_fix_file" https://raw.githubusercontent.com/resin-os/meta-resin/7c8e882ae71894639ba8e5837c7e56efd7547c0e/meta-resin-common/recipes-containers/docker-disk/docker-resin-supervisor-disk/start-resin-supervisor ; then
+        install -m755 "$temp_fix_file" /tmp/rootB/usr/bin/start-resin-supervisor
+        log "start-resin-supervisor replaced with fixed version..."
+    else
+        log WARN "Could not download supervisor bootstrap fix..."
+    fi
+}
+
 ###
 # Script start
 ###
@@ -710,6 +721,11 @@ tar -x -X /tmp/root-exclude -C /tmp/rootB -f ${FSARCHIVE}
 tar -x -C /tmp -f ${FSARCHIVE} quirks
 cp -a /tmp/quirks/* /tmp/rootB/
 rm -rf /tmp/quirks
+
+# Fix supervisor bootstrap issue
+if version_gt "$TARGET_VERSION" "2.4.2+rev1" || [ "$TARGET_VERSION" = "2.4.2+rev1" ]; then
+    fix_supervisor_bootstrap
+fi
 
 # Unmount rootB partition
 umount /tmp/rootB
