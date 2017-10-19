@@ -227,7 +227,7 @@ while [[ $# -gt 0 ]]; do
         --no-reboot)
             RESINHUP_ARGS+=( "--no-reboot" )
             ;;
-        --no-reboot)
+        --nolog)
             RESINHUP_ARGS+=( "--nolog" )
             ;;
         --no-colors)
