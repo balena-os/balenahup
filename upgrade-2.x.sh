@@ -238,10 +238,10 @@ function remove_sample_wifi {
 
 function device_type_match {
     # slug in `device-type.json` and `deviceType` in `config.json` should be always the same on proper devices`
-    local slug
+    local deviceslug
     local devicetype
     local match
-    if slug=$(jq .slug $DEVICETYPEJSON) && devicetype=$(jq .deviceType $CONFIGJSON) && [ "$devicetype" = "$slug" ]; then
+    if deviceslug=$(jq .slug "$DEVICETYPEJSON") && devicetype=$(jq .deviceType "$CONFIGJSON") && [ "$devicetype" = "$deviceslug" ]; then
         match=yes
     else
         match=no

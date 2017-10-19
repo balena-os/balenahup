@@ -273,11 +273,12 @@ for uuid in $UUIDS; do
 
     # Connect to device
     echo "Running run-resinhup.sh ${RESINHUP_ARGS[*]} ..." >> "$log_filename"
+    # shellcheck disable=SC2029
     ssh "$SSH_HOST" -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o Hostname="${uuid}.vpn" "/tmp/${main_script_name}" "${RESINHUP_ARGS[@]}" >> "$log_filename" 2>&1 &
 
     # Manage queue of threads
     PID=$!
-    addtoqueue $PID:$uuid
+    addtoqueue "$PID:$uuid"
     while [ "$NUM" -ge "$MAX_THREADS" ]; do
         checkqueue
         sleep 0.5
