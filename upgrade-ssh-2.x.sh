@@ -45,6 +45,10 @@ Options:
         Run ${main_script_name} with --supervisor-version <SUPERVISOR_VERSION>, use e.g. 6.2.5
         See ${main_script_name} help for more details.
 
+  --ignore-sanity-checks
+        Run ${main_script_name} with --ignore-sanity-checks
+        See ${main_script_name} help for more details.
+
   --no-reboot
         Run ${main_script_name} with --no-reboot . See ${main_script_name} help for more details.
 
@@ -173,6 +177,9 @@ while [[ $# -gt 0 ]]; do
             ;;
         --staging)
             RESINHUP_ARGS+=( "--staging" )
+            ;;
+        --ignore-sanity-checks)
+            RESINHUP_ARGS+=( "--ignore-sanity-checks" )
             ;;
         -u|--uuid)
             if [ -z "$2" ]; then

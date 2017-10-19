@@ -3,6 +3,7 @@
 NOREBOOT=no
 STAGING=no
 LOG=yes
+IGNORE_SANITY_CHECKS=no
 SCRIPTNAME=upgrade-2.x.sh
 
 set -o errexit
@@ -55,6 +56,13 @@ Options:
 
   --staging
         Get information from the resin staging environment as opposed to production.
+
+  --ignore-sanity-checks
+        The update scripts runs a number of sanity checks on the device, whether or not
+        it is safe to update (e.g. device type and running system cross checks)
+        This flags turns sanity check failures from errors into warnings only, so the
+        the update is not stopped if there are any failures.
+        Use with extreme caution!
 EOF
 }
 
@@ -228,6 +236,19 @@ function remove_sample_wifi {
     fi
 }
 
+function device_type_match {
+    # slug in `device-type.json` and `deviceType` in `config.json` should be always the same on proper devices`
+    local slug
+    local devicetype
+    local match
+    if slug=$(jq .slug $DEVICETYPEJSON) && devicetype=$(jq .deviceType $CONFIGJSON) && [ "$devicetype" = "$slug" ]; then
+        match=yes
+    else
+        match=no
+    fi
+    echo "${match}"
+}
+
 ###
 # Script start
 ###
@@ -269,6 +290,9 @@ while [[ $# -gt 0 ]]; do
             ;;
         --no-reboot)
             NOREBOOT="yes"
+            ;;
+        --ignore-sanity-checks)
+            IGNORE_SANITY_CHECKS="yes"
             ;;
         --staging)
             STAGING="yes"
@@ -313,6 +337,35 @@ case $SLUG in
     *)
         log ERROR "Unsupported board type $SLUG."
 esac
+
+log "Loading info from config.json"
+if [ -f /mnt/boot/config.json ]; then
+    CONFIGJSON=/mnt/boot/config.json
+else
+    log ERROR "Don't know where config.json is."
+fi
+log "Loading info from device-type.json"
+if [ -f /mnt/boot/device-type.json ]; then
+    DEVICETYPEJSON=/mnt/boot/device-type.json
+else
+    log ERROR "Don't know where config.json is."
+fi
+# If the user api key exists we use it instead of the deviceApiKey as it means we haven't done the key exchange yet
+# shellcheck disable=SC2046
+read -r APIKEY DEVICEID API_ENDPOINT <<<$(jq -r '.apiKey // .deviceApiKey,.deviceId,.apiEndpoint' $CONFIGJSON)
+
+## Sanity checks
+device_type_check=$(device_type_match)
+if [ "$device_type_check" = "yes" ]; then
+    log "Device type check: OK"
+else
+    if [ "$IGNORE_SANITY_CHECKS" = "yes" ]; then
+        log WARN "Device type sanity check failed, but asked to ignore..."
+    else
+        log ERROR "Device type sanity check failed..."
+    fi
+fi
+## Sanity checks end
 
 if [ -n "$target_version" ]; then
     case $target_version in
@@ -413,16 +466,6 @@ if version_gt "$VERSION_ID" "2.0.6" &&
 else
     log "No resin-device-progress fix is required..."
 fi
-
-log "Loading info from config.json"
-if [ -f /mnt/boot/config.json ]; then
-    CONFIGJSON=/mnt/boot/config.json
-else
-    log ERROR "Don't know where config.json is."
-fi
-# If the user api key exists we use it instead of the deviceApiKey as it means we haven't done the key exchange yet
-# shellcheck disable=SC2046
-read -r APIKEY DEVICEID API_ENDPOINT <<<$(jq -r '.apiKey // .deviceApiKey,.deviceId,.apiEndpoint' $CONFIGJSON)
 
 # Find which partition is / and which we should write the update to
 root_part=$(findmnt -n --raw --evaluate --output=source /)
