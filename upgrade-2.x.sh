@@ -224,7 +224,7 @@ function remove_sample_wifi {
     # connection settings, as they are well known and thus insecure
     local filename=$1
     if [ -f "${filename}" ] && grep -Fxq "ssid=My_Wifi_Ssid" "${filename}" && grep -Fxq "psk=super_secret_wifi_password" "${filename}" ; then
-        if nmcli | grep "resin-sample"; then
+        if nmcli c  show --active | grep "resin-sample" ; then
             # If a connection with that name is in use, do not actually remove the settings
             log WARN "resin-sample configuration found at ${filename} but it might be connected, not removing..."
         else
