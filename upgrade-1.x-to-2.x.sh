@@ -488,7 +488,7 @@ mkfs.ext4 -F ${root_dev}p3
 mkdir -p /tmp/backup
 mount ${root_dev}p3 /tmp/backup
 log "Backing up resin-data..."
-(cd /mnt/data; tar -zcf /tmp/backup/resin-data.tar.gz resin-data)
+(cd /mnt/data; tar -zcf /tmp/backup/resin-data.tar.gz resin-data || log ERROR "Could not back up resin-data...")
 
 # Unmount p6
 log "Unmounting filesystems..."
