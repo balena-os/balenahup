@@ -49,6 +49,12 @@ Options:
         Run ${main_script_name} with --ignore-sanity-checks
         See ${main_script_name} help for more details.
 
+  --nolog
+        Run ${main_script_name} with --nolog
+        See ${main_script_name} help for more details. For running over ssh this is likely
+        recommended, as otherwise the log is just kept on the device, the local log
+        on the computer running the remote updater script will have only log headers.
+
   --no-reboot
         Run ${main_script_name} with --no-reboot . See ${main_script_name} help for more details.
 
@@ -220,6 +226,9 @@ while [[ $# -gt 0 ]]; do
             ;;
         --no-reboot)
             RESINHUP_ARGS+=( "--no-reboot" )
+            ;;
+        --no-reboot)
+            RESINHUP_ARGS+=( "--nolog" )
             ;;
         --no-colors)
             NOCOLORS=yes
