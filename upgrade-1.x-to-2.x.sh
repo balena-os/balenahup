@@ -101,6 +101,16 @@ function upgradeSupervisor() {
     # the tools shipped with the hostOS.
     log "Supervisor update start..."
 
+    if version_gt "$TARGET_VERSION" "2.4.0+rev0" &&
+        version_gt "2.7.3+rev1" "$TARGET_VERSION" &&
+        [ -z "$TARGET_SUPERVISOR_VERSION" ] ; then
+        # Fixing up supervisor version https://github.com/resin-io/resin-supervisor/issues/495
+        # by selecting the first fixed supervisor after the issues
+        # Needs to apply to version 2.4.2+rev1 <= version < 2.7.3+rev1;
+        # only if no explicit sypervisor is set
+        TARGET_SUPERVISOR_VERSION="6.3.5"
+    fi
+
     if [ -z "$TARGET_SUPERVISOR_VERSION" ]; then
         log "No explicit supervisor version was provided, update to default version in target resinOS..."
         if [ "$STAGING" = "yes" ]; then
