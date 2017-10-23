@@ -486,7 +486,12 @@ log "Switching connman to bind mounted state dir..."
 mkdir -p /tmp/connman
 cp -a /var/lib/connman/* /tmp/connman/
 # Versions before 1.20 need this to prevent dropping VPN
-sed -i -e 's/NetworkInterfaceBlacklist=docker,veth,tun,p2p/NetworkInterfaceBlacklist=docker,veth,tun,p2p,resin-vpn/' /etc/connman/main.conf
+if grep -q 'NetworkInterfaceBlacklist=.*resin-vpn.*'  /etc/connman/main.conf ; then
+    log "resin-vpn is already blacklisted in connman configuration"
+else
+    log "resin-vpn needs to be blacklisted in connman configuration"
+    sed -i -e 's/NetworkInterfaceBlacklist=\(.*\)/NetworkInterfaceBlacklist=resin-vpn,\1/' /etc/connman/main.conf
+fi
 mount -o bind /tmp/connman /var/lib/connman
 # some systems require daemon-reload to correctly restart connman later
 systemctl daemon-reload
