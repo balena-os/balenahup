@@ -2,11 +2,17 @@
 
 NOREBOOT=no
 STAGING=no
+LOG=yes
+SCRIPTNAME=upgrade-1.x-to-2.x.sh
 
 set -o errexit
 set -o pipefail
 
+# This will set VERSION, SLUG, and VARIANT_ID
 . /etc/os-release
+
+# Don't run anything before this source as it sets PATH here
+source /etc/profile
 
 MIN_HOSTOS_VERSION=1.8.0
 PREFERRED_HOSTOS_VERSION=1.27
@@ -51,6 +57,9 @@ Options:
   --no-reboot
         Do not reboot if update is successful. This is useful when debugging.
 
+  -n, --nolog
+        By default tool logs to stdout and file. This flag deactivates log to file.
+
   --staging
         Get information from the resin staging environment as opposed to production.
 EOF
@@ -73,11 +82,7 @@ function log {
             ;;
     esac
     ENDTIME=$(date +%s)
-    if [ "z$LOG" == "zyes" ] && [ -n "$LOGFILE" ]; then
-        printf "[%09d%s%s\n" "$(($ENDTIME - $STARTTIME))" "][$loglevel]" "$1" | tee -a $LOGFILE
-    else
-        printf "[%09d%s%s\n" "$(($ENDTIME - $STARTTIME))" "][$loglevel]" "$1"
-    fi
+    printf "[%09d%s%s\n" "$(($ENDTIME - $STARTTIME))" "][$loglevel]" "$1"
     if [ "$loglevel" == "ERROR" ]; then
         progress 100 "ResinOS: Update failed."
         exit 1
@@ -96,9 +101,19 @@ function upgradeSupervisor() {
     # the tools shipped with the hostOS.
     log "Supervisor update start..."
 
+    if version_gt "$TARGET_VERSION" "2.4.0+rev0" &&
+        version_gt "2.7.3+rev1" "$TARGET_VERSION" &&
+        [ -z "$TARGET_SUPERVISOR_VERSION" ] ; then
+        # Fixing up supervisor version https://github.com/resin-io/resin-supervisor/issues/495
+        # by selecting the first fixed supervisor after the issues
+        # Needs to apply to version 2.4.2+rev1 <= version < 2.7.3+rev1;
+        # only if no explicit sypervisor is set
+        TARGET_SUPERVISOR_VERSION="6.3.5"
+    fi
+
     if [ -z "$TARGET_SUPERVISOR_VERSION" ]; then
         log "No explicit supervisor version was provided, update to default version in target resinOS..."
-        if [ "$STAGING" == "yes" ]; then
+        if [ "$STAGING" = "yes" ]; then
             DEFAULT_SUPERVISOR_VERSION_URL_BASE="https://s3.amazonaws.com/resin-staging-img/"
         else
             DEFAULT_SUPERVISOR_VERSION_URL_BASE="https://s3.amazonaws.com/resin-production-img-cloudformation/"
@@ -198,6 +213,59 @@ function stop_all() {
     systemctl stop docker
 }
 
+function image_exists() {
+    # Try to fetch the manifest of a repo:tag combo, to check for the existence of that
+    # repo and tag.
+    # Currently only works with Docker HUB
+    # The return value is "no" if can't access that manifest, and "yes" if we can find it
+    local REPO=$1
+    local TAG=$2
+    local exists=no
+    local REGISTRY_URL="https://registry.hub.docker.com/v2"
+    local MANIFEST="${REGISTRY_URL}/${REPO}/manifests/${TAG}"
+    local response
+    # Check
+    response=$(curl --write-out "%{http_code}" --silent --output /dev/null "${MANIFEST}")
+    if [ "$response" = 401 ]; then
+        # 401 is "Unauthorized", have to grab the access tokens from the provided endpoint
+        local auth_header
+        local realm
+        local service
+        local scope
+        local token
+        local response_auth
+        auth_header=$(curl -I --silent "${MANIFEST}" |grep Www-Authenticate)
+        # The auth_header looks as
+        # Www-Authenticate: Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:resin/resinos:pull"
+        # shellcheck disable=SC2001
+        realm=$(echo "$auth_header" | sed 's/.*realm="\([^,]*\)",.*/\1/' )
+        # shellcheck disable=SC2001
+        service=$(echo "$auth_header" | sed 's/.*,service="\([^,]*\)",.*/\1/' )
+        # shellcheck disable=SC2001
+        scope=$(echo "$auth_header" | sed 's/.*,scope="\([^,]*\)".*/\1/' )
+        # Grab the token from the appropriate address, and retry the manifest query with that
+        token=$(curl --silent "${realm}?service=${service}&scope=${scope}" | jq -r '.access_token')
+        response_auth=$(curl --write-out "%{http_code}" --silent --output /dev/null -H "Authorization: Bearer ${token}" "${MANIFEST}")
+        if [ "$response_auth" = 200 ]; then
+            exists=yes
+        fi
+    elif [ "$response" = 200 ]; then
+        exists=yes
+    fi
+    echo "${exists}"
+}
+
+function fix_supervisor_bootstrap {
+    log "Target needs supervisor bootstrap fix..."
+    local temp_fix_file=/tmp/start-resin-supervisor
+    if curl --fail --silent -o "$temp_fix_file" https://raw.githubusercontent.com/resin-os/meta-resin/7c8e882ae71894639ba8e5837c7e56efd7547c0e/meta-resin-common/recipes-containers/docker-disk/docker-resin-supervisor-disk/start-resin-supervisor ; then
+        install -m755 "$temp_fix_file" /tmp/rootB/usr/bin/start-resin-supervisor
+        log "start-resin-supervisor replaced with fixed version..."
+    else
+        log WARN "Could not download supervisor bootstrap fix..."
+    fi
+}
+
 ###
 # Script start
 ###
@@ -216,6 +284,15 @@ while [[ $# -gt 0 ]]; do
                 log ERROR "\"$1\" argument needs a value."
             fi
             TARGET_VERSION=$2
+            case $TARGET_VERSION in
+                *.prod)
+                    TARGET_VERSION="${TARGET_VERSION%%.prod}"
+                    log "Normalized target version: ${TARGET_VERSION}"
+                    ;;
+                *.dev)
+                    log ERROR "Updating .dev versions is not supported..."
+                    ;;
+            esac
             shift
             ;;
         --supervisor-version)
@@ -228,6 +305,9 @@ while [[ $# -gt 0 ]]; do
         --no-reboot)
             NOREBOOT="yes"
             ;;
+        -n|--nolog)
+            LOG=no
+            ;;
         --staging)
             STAGING="yes"
             ;;
@@ -238,6 +318,16 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
+# LOGFILE init and header
+if [ "$LOG" == "yes" ]; then
+    LOGFILE="/tmp/$SCRIPTNAME.$(date +"%Y%m%d_%H%M%S").log"
+    mkdir -p "$(dirname "$LOGFILE")"
+    echo "================$SCRIPTNAME HEADER START====================" > "$LOGFILE"
+    date >> "$LOGFILE"
+    # redirect all logs to the logfile
+    exec 1> "$LOGFILE" 2>&1
+fi
+
 if [ -z ${TARGET_VERSION+x} ]; then
     log ERROR "--hostos-version is required."
 fi
@@ -247,6 +337,9 @@ progress 5 "ResinOS: update preparation..."
 # Check board support
 case $SLUG in
     beaglebone*)
+        # increase the minimum hostOS version as Beaglebones have an eMMC bug
+        # that would break hup on docker pull with a nasty error for versions below this
+        MIN_HOSTOS_VERSION=1.30.1
         MIN_TARGET_VERSION=2.2.0+rev1
         # In 2.x there is only a single device type
         DEVICE=beaglebone-black
@@ -284,6 +377,19 @@ fi
 
 # Translate version to one docker will accept as part of an image name
 TARGET_VERSION=$(echo "$TARGET_VERSION" | tr + _)
+# Checking whether the target versionis available to download
+if [ "$STAGING" = "yes" ]; then
+    RESINOS_REPO="resin/resinos-staging"
+else
+    RESINOS_REPO="resin/resinos"
+fi
+RESINOS_TAG="${TARGET_VERSION}-${DEVICE}"
+log "Checking for manifest of ${RESINOS_REPO}:${RESINOS_TAG}"
+if [ "$(image_exists "$RESINOS_REPO" "$RESINOS_TAG")" = "yes" ]; then
+    log "Manifest found, good to go..."
+else
+    log ERROR "Cannot find manifest, target image might not exists. Bailing out..."
+fi
 
 # Find boot path
 boot_path=$(findmnt -n --raw --evaluate --output=target LABEL=resin-boot)
@@ -324,6 +430,7 @@ case $root_part in
         progress 15 "ResinOS: rebooting to continue..."
         sync
         nohup bash -c " /bin/sleep 5 ; /sbin/reboot " > /dev/null 2>&1 &
+        exit 0
         ;;
     *)
         log ERROR "Current root partition $root_part is not first or second root partition, aborting."
@@ -379,7 +486,12 @@ log "Switching connman to bind mounted state dir..."
 mkdir -p /tmp/connman
 cp -a /var/lib/connman/* /tmp/connman/
 # Versions before 1.20 need this to prevent dropping VPN
-sed -i -e 's/NetworkInterfaceBlacklist=docker,veth,tun,p2p/NetworkInterfaceBlacklist=docker,veth,tun,p2p,resin-vpn/' /etc/connman/main.conf
+if grep -q 'NetworkInterfaceBlacklist=.*resin-vpn.*'  /etc/connman/main.conf ; then
+    log "resin-vpn is already blacklisted in connman configuration"
+else
+    log "resin-vpn needs to be blacklisted in connman configuration"
+    sed -i -e 's/NetworkInterfaceBlacklist=\(.*\)/NetworkInterfaceBlacklist=resin-vpn,\1/' /etc/connman/main.conf
+fi
 mount -o bind /tmp/connman /var/lib/connman
 # some systems require daemon-reload to correctly restart connman later
 systemctl daemon-reload
@@ -391,7 +503,7 @@ mkfs.ext4 -F ${root_dev}p3
 mkdir -p /tmp/backup
 mount ${root_dev}p3 /tmp/backup
 log "Backing up resin-data..."
-(cd /mnt/data; tar -zcf /tmp/backup/resin-data.tar.gz resin-data)
+(cd /mnt/data; tar -zcf /tmp/backup/resin-data.tar.gz resin-data || log ERROR "Could not back up resin-data...")
 
 # Unmount p6
 log "Unmounting filesystems..."
@@ -554,7 +666,9 @@ systemctl start docker
 # Remount backup dir
 mount ${root_dev}p3 /tmp/backup
 
-IMAGE=resin/resinos:${TARGET_VERSION}-${DEVICE}
+IMAGE="${RESINOS_REPO}:${RESINOS_TAG}"
+log "Using resinOS image: ${IMAGE}"
+
 BACKUPARCHIVE=/tmp/backup/newos.tar.gz
 FSARCHIVE=/mnt/data/newos.tar.gz
 
@@ -562,8 +676,11 @@ log "Getting new OS image..."
 progress 50 "ResinOS: downloading OS update..."
 # Create container for new version
 CONTAINER=$(docker create ${IMAGE} echo export)
+if [ -z "$CONTAINER" ]; then
+    log ERROR "Could not download target update image..."
+fi
 
-progress 60 "ResinOS: processig update package..."
+progress 60 "ResinOS: processing update package..."
 # Export container
 log "Starting docker export"
 docker export ${CONTAINER} | gzip > ${BACKUPARCHIVE}
@@ -619,6 +736,11 @@ tar -x -X /tmp/root-exclude -C /tmp/rootB -f ${FSARCHIVE}
 tar -x -C /tmp -f ${FSARCHIVE} quirks
 cp -a /tmp/quirks/* /tmp/rootB/
 rm -rf /tmp/quirks
+
+# Fix supervisor bootstrap issue
+if version_gt "$TARGET_VERSION" "2.4.2+rev1" || [ "$TARGET_VERSION" = "2.4.2+rev1" ]; then
+    fix_supervisor_bootstrap
+fi
 
 # Unmount rootB partition
 umount /tmp/rootB
