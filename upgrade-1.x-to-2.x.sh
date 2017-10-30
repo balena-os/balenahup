@@ -213,7 +213,7 @@ function stop_all() {
     systemctl stop docker
 }
 
-function image_exsits() {
+function image_exists() {
     # Try to fetch the manifest of a repo:tag combo, to check for the existence of that
     # repo and tag.
     # Currently only works with Docker HUB
@@ -385,7 +385,7 @@ else
 fi
 RESINOS_TAG="${TARGET_VERSION}-${DEVICE}"
 log "Checking for manifest of ${RESINOS_REPO}:${RESINOS_TAG}"
-if [ "$(image_exsits "$RESINOS_REPO" "$RESINOS_TAG")" = "yes" ]; then
+if [ "$(image_exists "$RESINOS_REPO" "$RESINOS_TAG")" = "yes" ]; then
     log "Manifest found, good to go..."
 else
     log ERROR "Cannot find manifest, target image might not exists. Bailing out..."
