@@ -2,6 +2,9 @@
 
 NOREBOOT=no
 STAGING=no
+LOG=yes
+IGNORE_SANITY_CHECKS=no
+SCRIPTNAME=upgrade-2.x.sh
 
 set -o errexit
 set -o pipefail
@@ -45,11 +48,21 @@ Options:
         If not defined, then the update will try to run for the HOSTOS_VERSION's
         original supervisor release.
 
+    -n, --nolog
+        By default tool logs to stdout and file. This flag deactivates log to file.
+
   --no-reboot
         Do not reboot if update is successful. This is useful when debugging.
 
   --staging
         Get information from the resin staging environment as opposed to production.
+
+  --ignore-sanity-checks
+        The update scripts runs a number of sanity checks on the device, whether or not
+        it is safe to update (e.g. device type and running system cross checks)
+        This flags turns sanity check failures from errors into warnings only, so the
+        the update is not stopped if there are any failures.
+        Use with extreme caution!
 EOF
 }
 
@@ -70,11 +83,7 @@ function log {
             ;;
     esac
     endtime=$(date +%s)
-    if [ "z$LOG" == "zyes" ] && [ -n "$LOGFILE" ]; then
-        printf "[%09d%s%s\n" "$((endtime - starttime))" "][$loglevel]" "$1" | tee -a "$LOGFILE"
-    else
-        printf "[%09d%s%s\n" "$((endtime - starttime))" "][$loglevel]" "$1"
-    fi
+    printf "[%09d%s%s\n" "$((endtime - starttime))" "][$loglevel]" "$1"
     if [ "$loglevel" == "ERROR" ]; then
         progress 100 "ResinOS: Update failed."
         exit 1
@@ -112,7 +121,7 @@ function upgradeSupervisor() {
 
     if [ -z "$target_supervisor_version" ]; then
         log "No explicit supervisor version was provided, update to default version in target resinOS..."
-        if [ "$STAGING" == "yes" ]; then
+        if [ "$STAGING" = "yes" ]; then
             DEFAULT_SUPERVISOR_VERSION_URL_BASE="https://s3.amazonaws.com/resin-staging-img/"
         else
             DEFAULT_SUPERVISOR_VERSION_URL_BASE="https://s3.amazonaws.com/resin-production-img-cloudformation/"
@@ -168,6 +177,78 @@ function error_handler() {
     exit 1
 }
 
+function image_exsits() {
+    # Try to fetch the manifest of a repo:tag combo, to check for the existence of that
+    # repo and tag.
+    # Currently only works with Docker HUB
+    # The return value is "no" if can't access that manifest, and "yes" if we can find it
+    local REPO=$1
+    local TAG=$2
+    local exists=no
+    local REGISTRY_URL="https://registry.hub.docker.com/v2"
+    local MANIFEST="${REGISTRY_URL}/${REPO}/manifests/${TAG}"
+    local response
+    # Check
+    response=$(curl --write-out "%{http_code}" --silent --output /dev/null "${MANIFEST}")
+    if [ "$response" = 401 ]; then
+        # 401 is "Unauthorized", have to grab the access tokens from the provided endpoint
+        local auth_header
+        local realm
+        local service
+        local scope
+        local token
+        local response_auth
+        auth_header=$(curl -I --silent "${MANIFEST}" |grep Www-Authenticate)
+        # The auth_header looks as
+        # Www-Authenticate: Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:resin/resinos:pull"
+        # shellcheck disable=SC2001
+        realm=$(echo "$auth_header" | sed 's/.*realm="\([^,]*\)",.*/\1/' )
+        # shellcheck disable=SC2001
+        service=$(echo "$auth_header" | sed 's/.*,service="\([^,]*\)",.*/\1/' )
+        # shellcheck disable=SC2001
+        scope=$(echo "$auth_header" | sed 's/.*,scope="\([^,]*\)".*/\1/' )
+        # Grab the token from the appropriate address, and retry the manifest query with that
+        token=$(curl --silent "${realm}?service=${service}&scope=${scope}" | jq -r '.access_token')
+        response_auth=$(curl --write-out "%{http_code}" --silent --output /dev/null -H "Authorization: Bearer ${token}" "${MANIFEST}")
+        if [ "$response_auth" = 200 ]; then
+            exists=yes
+        fi
+    elif [ "$response" = 200 ]; then
+        exists=yes
+    fi
+    echo "${exists}"
+}
+
+function remove_sample_wifi {
+    # Removing the `resin-sample` file if it exists on the device, and has the default
+    # connection settings, as they are well known and thus insecure
+    local filename=$1
+    if [ -f "${filename}" ] && grep -Fxq "ssid=My_Wifi_Ssid" "${filename}" && grep -Fxq "psk=super_secret_wifi_password" "${filename}" ; then
+        if nmcli c  show --active | grep "resin-sample" ; then
+            # If a connection with that name is in use, do not actually remove the settings
+            log WARN "resin-sample configuration found at ${filename} but it might be connected, not removing..."
+        else
+            log "resin-sample configuration found at ${filename}, removing..."
+            rm "${filename}" || log WARN "couldn't remove ${filename}; continuing anyways..."
+        fi
+    else
+        log "No resin-sample found at ${filename} with default config, good..."
+    fi
+}
+
+function device_type_match {
+    # slug in `device-type.json` and `deviceType` in `config.json` should be always the same on proper devices`
+    local deviceslug
+    local devicetype
+    local match
+    if deviceslug=$(jq .slug "$DEVICETYPEJSON") && devicetype=$(jq .deviceType "$CONFIGJSON") && [ "$devicetype" = "$deviceslug" ]; then
+        match=yes
+    else
+        match=no
+    fi
+    echo "${match}"
+}
+
 ###
 # Script start
 ###
@@ -186,6 +267,15 @@ while [[ $# -gt 0 ]]; do
                 log ERROR "\"$1\" argument needs a value."
             fi
             target_version=$2
+            case $target_version in
+                *.prod)
+                    target_version="${target_version%%.prod}"
+                    log "Normalized target version: ${target_version}"
+                    ;;
+                *.dev)
+                    log ERROR "Updating .dev versions is not supported..."
+                    ;;
+            esac
             shift
             ;;
         --supervisor-version)
@@ -195,8 +285,14 @@ while [[ $# -gt 0 ]]; do
             target_supervisor_version=$2
             shift
             ;;
+        -n|--nolog)
+            LOG=no
+            ;;
         --no-reboot)
             NOREBOOT="yes"
+            ;;
+        --ignore-sanity-checks)
+            IGNORE_SANITY_CHECKS="yes"
             ;;
         --staging)
             STAGING="yes"
@@ -215,6 +311,16 @@ fi
 # Log timer
 starttime=$(date +%s)
 
+# LOGFILE init and header
+if [ "$LOG" == "yes" ]; then
+    LOGFILE="/mnt/data/resinhup/$SCRIPTNAME.$(date +"%Y%m%d_%H%M%S").log"
+    mkdir -p "$(dirname "$LOGFILE")"
+    echo "================$SCRIPTNAME HEADER START====================" > "$LOGFILE"
+    date >> "$LOGFILE"
+    # redirect all logs to the logfile
+    exec 1> "$LOGFILE" 2>&1
+fi
+
 progress 25 "ResinOS: preparing update.."
 
 # Check board support
@@ -231,6 +337,35 @@ case $SLUG in
     *)
         log ERROR "Unsupported board type $SLUG."
 esac
+
+log "Loading info from config.json"
+if [ -f /mnt/boot/config.json ]; then
+    CONFIGJSON=/mnt/boot/config.json
+else
+    log ERROR "Don't know where config.json is."
+fi
+log "Loading info from device-type.json"
+if [ -f /mnt/boot/device-type.json ]; then
+    DEVICETYPEJSON=/mnt/boot/device-type.json
+else
+    log ERROR "Don't know where config.json is."
+fi
+# If the user api key exists we use it instead of the deviceApiKey as it means we haven't done the key exchange yet
+# shellcheck disable=SC2046
+read -r APIKEY DEVICEID API_ENDPOINT <<<$(jq -r '.apiKey // .deviceApiKey,.deviceId,.apiEndpoint' $CONFIGJSON)
+
+## Sanity checks
+device_type_check=$(device_type_match)
+if [ "$device_type_check" = "yes" ]; then
+    log "Device type check: OK"
+else
+    if [ "$IGNORE_SANITY_CHECKS" = "yes" ]; then
+        log WARN "Device type sanity check failed, but asked to ignore..."
+    else
+        log ERROR "Device type sanity check failed..."
+    fi
+fi
+## Sanity checks end
 
 if [ -n "$target_version" ]; then
     case $target_version in
@@ -251,12 +386,10 @@ else
 fi
 
 # Check OS variant and filter update availability based on that.
-if [ ! "$VARIANT_ID" == "prod" ]; then
+log "VARIANT_ID: ${VARIANT_ID}"
+if [ -n "$VARIANT_ID" ] && [ ! "$VARIANT_ID" == "prod" ]; then
     log ERROR "Only updating production devices..."
 fi
-
-# Translate version to one docker will accept as part of an image name
-target_version=$(echo "$target_version" | tr + _)
 
 # Check host OS version
 case $VERSION in
@@ -267,6 +400,23 @@ case $VERSION in
         log ERROR "Host OS version \"$VERSION\" not supported."
         ;;
 esac
+
+# Translate version to one docker will accept as part of an image name
+target_version=$(echo "$target_version" | tr + _)
+
+# Checking whether the target versionis available to download
+if [ "$STAGING" = "yes" ]; then
+    RESINOS_REPO="resin/resinos-staging"
+else
+    RESINOS_REPO="resin/resinos"
+fi
+RESINOS_TAG=${target_version}-${SLUG}
+log "Checking for manifest of ${RESINOS_REPO}:${RESINOS_TAG}"
+if [ "$(image_exsits "$RESINOS_REPO" "$RESINOS_TAG")" = "yes" ]; then
+    log "Manifest found, good to go..."
+else
+    log ERROR "Cannot find manifest, target image might not exists. Bailing out..."
+fi
 
 # Check if we need to install some more extra tools
 if ! version_gt "$VERSION" "$preferred_hostos_version" &&
@@ -311,38 +461,29 @@ if version_gt "$VERSION_ID" "2.0.6" &&
         mkdir -p $tools_path
         export PATH=$tools_path:$PATH
         download_url=https://raw.githubusercontent.com/resin-os/meta-resin/v2.3.0/meta-resin-common/recipes-support/resin-device-progress/resin-device-progress/resin-device-progress
-        curl -f -s -L -o $tools_path/resin-device-progress $download_url || log WARNING "Couldn't download tool from $download_url, progress bar won't work, but not aborting..."
+        curl -f -s -L -o $tools_path/resin-device-progress $download_url || log WARN "Couldn't download tool from $download_url, progress bar won't work, but not aborting..."
         chmod 755 $tools_path/resin-device-progress
 else
     log "No resin-device-progress fix is required..."
 fi
 
-log "Loading info from config.json"
-if [ -f /mnt/boot/config.json ]; then
-    CONFIGJSON=/mnt/boot/config.json
-else
-    log ERROR "Don't know where config.json is."
-fi
-APIKEY=$(jq -r '.deviceApiKey' $CONFIGJSON)
-if [ "$APIKEY" == 'null' ]; then
-    log WARN "Using apiKey as device does not have deviceApiKey yet..."
-    APIKEY=$(jq -r '.apiKey' $CONFIGJSON)
-fi
-DEVICEID=$(jq -r '.deviceId' $CONFIGJSON)
-API_ENDPOINT=$(jq -r '.apiEndpoint' $CONFIGJSON)
-
 # Find which partition is / and which we should write the update to
 root_part=$(findmnt -n --raw --evaluate --output=source /)
+log "Found root at ${root_part}..."
 case $root_part in
-    *p2)
-        root_dev=${root_part%p2}
-        update_part=${root_dev}p3
+    *2)
+        # on 2.x the following device types have these kinds of results for $root_part
+        # raspberrypi: /dev/mmcblk0p2
+        # beaglebone: /dev/disk/by-partuuid/93956da0-02
+        # NUC: /dev/sda2
+        root_dev=${root_part%2}
+        update_part=${root_dev}3
         update_part_no=3
         update_label=resin-rootB
         ;;
-    *p3)
-        root_dev=${root_part%p3}
-        update_part=${root_dev}p2
+    *3)
+        root_dev=${root_part%3}
+        update_part=${root_dev}2
         update_part_no=2
         update_label=resin-rootA
         ;;
@@ -368,12 +509,14 @@ fi
 # Stop docker containers
 stop_services
 
-image=resin/resinos:${target_version}-${SLUG}
-
 trap 'error_handler' ERR
 
 log "Getting new OS image..."
 progress 50 "ResinOS: downloading update package..."
+
+image="${RESINOS_REPO}:${RESINOS_TAG}"
+log "Using resinOS image: ${image}"
+
 # Create container for new version
 container=$(docker create "$image" echo export)
 
@@ -420,6 +563,13 @@ cp -a /tmp/resin-boot/* /mnt/boot/
 # Clearing up
 docker rm "$container"
 
+# Updating supervisor
+upgradeSupervisor
+
+# REmove resin-sample to plug security hole
+remove_sample_wifi "/mnt/boot/system-connections/resin-sample"
+remove_sample_wifi "/mnt/state/root-overlay/etc/NetworkManager/system-connections/resin-sample"
+
 # Switch root partition
 log "Switching root partition..."
 case $SLUG in
@@ -435,9 +585,6 @@ case $SLUG in
         sed -i -e "s/${old_label}/${update_label}/" /mnt/boot/EFI/BOOT/grub.cfg
         ;;
 esac
-
-# Updating supervisor
-upgradeSupervisor
 
 # Reboot into new OS
 sync

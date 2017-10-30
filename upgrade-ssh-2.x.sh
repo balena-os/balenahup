@@ -45,6 +45,16 @@ Options:
         Run ${main_script_name} with --supervisor-version <SUPERVISOR_VERSION>, use e.g. 6.2.5
         See ${main_script_name} help for more details.
 
+  --ignore-sanity-checks
+        Run ${main_script_name} with --ignore-sanity-checks
+        See ${main_script_name} help for more details.
+
+  --nolog
+        Run ${main_script_name} with --nolog
+        See ${main_script_name} help for more details. For running over ssh this is likely
+        recommended, as otherwise the log is just kept on the device, the local log
+        on the computer running the remote updater script will have only log headers.
+
   --no-reboot
         Run ${main_script_name} with --no-reboot . See ${main_script_name} help for more details.
 
@@ -174,6 +184,9 @@ while [[ $# -gt 0 ]]; do
         --staging)
             RESINHUP_ARGS+=( "--staging" )
             ;;
+        --ignore-sanity-checks)
+            RESINHUP_ARGS+=( "--ignore-sanity-checks" )
+            ;;
         -u|--uuid)
             if [ -z "$2" ]; then
                 log ERROR "\"$1\" argument needs a value."
@@ -213,6 +226,9 @@ while [[ $# -gt 0 ]]; do
             ;;
         --no-reboot)
             RESINHUP_ARGS+=( "--no-reboot" )
+            ;;
+        --nolog)
+            RESINHUP_ARGS+=( "--nolog" )
             ;;
         --no-colors)
             NOCOLORS=yes
@@ -257,11 +273,12 @@ for uuid in $UUIDS; do
 
     # Connect to device
     echo "Running run-resinhup.sh ${RESINHUP_ARGS[*]} ..." >> "$log_filename"
+    # shellcheck disable=SC2029
     ssh "$SSH_HOST" -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o Hostname="${uuid}.vpn" "/tmp/${main_script_name}" "${RESINHUP_ARGS[@]}" >> "$log_filename" 2>&1 &
 
     # Manage queue of threads
     PID=$!
-    addtoqueue $PID:$uuid
+    addtoqueue "$PID:$uuid"
     while [ "$NUM" -ge "$MAX_THREADS" ]; do
         checkqueue
         sleep 0.5
