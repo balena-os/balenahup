@@ -526,6 +526,11 @@ fi
 # Unmount p1
 umount "${boot_path}"
 
+# Set soon-to-be-removed block devices to read-only, and flush the buffers
+blockdev --setro ${root_dev}p6
+blockdev --setro ${root_dev}p5
+blockdev --flushbufs ${root_dev}
+
 log "Creating new partition table stage 1..."
 # Delete partitions 4-6
 parted -s $root_dev rm 6
