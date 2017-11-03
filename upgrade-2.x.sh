@@ -467,6 +467,22 @@ else
     log "No resin-device-progress fix is required..."
 fi
 
+# Fix for issue: https://github.com/resin-os/meta-resin/pull/864
+# Also includes change from: https://github.com/resin-os/meta-resin/pull/882
+if version_gt "$VERSION_ID" "2.0.8" &&
+    version_gt "2.7.0" "$VERSION_ID"; then
+        log "Fixing supervisor updater..."
+        if curl --fail --silent -o "/tmp/update-resin-supervisor" https://raw.githubusercontent.com/resin-os/meta-resin/40d5a174da6b52d530c978e0cae22aa61f65d203/meta-resin-common/recipes-containers/docker-disk/docker-resin-supervisor-disk/update-resin-supervisor ; then
+            chmod 755 "/tmp/update-resin-supervisor"
+            PATH="/tmp:$PATH"
+            log "Added temporary supervisor updater replaced with fixed version..."
+        else
+            log ERROR "Could not download temporary supervisor updater..."
+        fi
+else
+    log "No supervisor updater fix is required..."
+fi
+
 # Find which partition is / and which we should write the update to
 root_part=$(findmnt -n --raw --evaluate --output=source /)
 log "Found root at ${root_part}..."
