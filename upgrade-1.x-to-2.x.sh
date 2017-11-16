@@ -737,8 +737,9 @@ tar -x -C /tmp -f ${FSARCHIVE} quirks
 cp -a /tmp/quirks/* /tmp/rootB/
 rm -rf /tmp/quirks
 
-# Fix supervisor bootstrap issue
-if version_gt "$TARGET_VERSION" "2.4.2+rev1" || [ "$TARGET_VERSION" = "2.4.2+rev1" ]; then
+# Fix supervisor bootstrap issue between 2.4.2 and 2.7.3 versions
+# https://github.com/resin-os/meta-resin/pull/877
+if version_gt "$TARGET_VERSION" "2.4.2" && version_gt "2.7.3" "$TARGET_VERSION"; then
     fix_supervisor_bootstrap
 fi
 
