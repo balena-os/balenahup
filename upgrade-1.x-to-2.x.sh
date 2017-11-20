@@ -177,6 +177,7 @@ function wifi_migrate() {
     local psk=$4
 
     # Write NetworkManager setup
+    mkdir -p "${path}/system-connections/"
     cat >"${path}/system-connections/${wifi_config_name}" <<EOF
 [connection]
 id=$wifi_config_name
@@ -197,6 +198,57 @@ method=auto
 
 [ipv6]
 addr-gen-mode=stable-privacy
+method=auto
+EOF
+}
+
+
+function mask2cdr ()
+{
+    # From https://stackoverflow.com/questions/20762575/explanation-of-convertor-of-cidr-to-netmask-in-linux-shell-netmask2cdir-and-cdir
+    # Assumes there's no "255." after a non-255 byte in the mask
+    local x=${1##*255.}
+    set -- 0^^^128^192^224^240^248^252^254^ $(( (${#1} - ${#x})*2 )) "${x%%.*}"
+    x=${1%%$3*}
+    echo $(( $2 + (${#x}/4) ))
+}
+
+function static_migrate() {
+    # Migrating static IP settings from connman to NetworkManager
+    # Only Ethernet is considered
+    local path=$1
+    local static_config_name=$2
+    local interface_name=$3
+    local static_ip=$4
+    local netmask=$5
+    local gateway=$6
+    local dns=$7
+
+    local prefix
+    prefix=$(mask2cdr "${netmask}")
+
+    # Write NetworkManager setup
+    mkdir -p "${path}/system-connections/"
+    cat >"${path}/system-connections/${static_config_name}" <<EOF
+[connection]
+id=${static_config_name}
+type=ethernet
+interface-name=${interface_name}
+permissions=
+secondaries=
+
+[ethernet]
+mac-address-blacklist=
+
+[ipv4]
+address1=${static_ip}/${prefix},${gateway}
+dns=${dns}
+dns-search=
+method=manual
+
+[ipv6]
+addr-gen-mode=stable-privacy
+dns-search=
 method=auto
 EOF
 }
@@ -789,6 +841,13 @@ if [ -n "$APP_ID" ] && [ -f "/mnt/data/resin-data/${APP_ID}/network.config" ]; t
     else
         log "No wifi settings seem to be present in ${wifi_connect_config_file}..."
     fi
+fi
+# Migrate static IP settings
+if grep "service_home_ethernet.*IPv4" "${boot_path}/config.json" >/dev/null; then
+    log "Found static IP setting, migrating..."
+    read -r static_ip static_mask static_gw <<<"$(jq <"${boot_path}/config.json" '.["files"]."network/network.config"' | sed -e 's/.*IPv4 = \([^\\"]*\).*/\1/' | tr '/' ' ')"
+    read -r dns <<<"$(jq <"${boot_path}/config.json" '.["files"]."network/network.config"' | sed -e 's/.*Nameservers = \([^\\"]*\).*/\1/' | tr ',' ';')"
+    static_migrate "${boot_path}" "resin-static-ethernet" "eth0" "${static_ip}" "${static_mask}" "${static_gw}" "${dns}"
 fi
 
 # Switch root partition
