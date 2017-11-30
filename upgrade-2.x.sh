@@ -264,7 +264,7 @@ function pre_update_fix_bootfiles_hook {
     log "Applying bootfiles hostapp-hook fix"
     local bootfiles_temp
     bootfiles_temp=$(mktemp)
-    curl -f -s -L -o "$bootfiles_temp" https://raw.githubusercontent.com/resin-os/resinhup/master/upgrade-patches/0-bootfiles || log ERROR "Couldn't download fixed '0-bootfiles', aborting."
+    curl -f -s -L -o "$bootfiles_temp" https://raw.githubusercontent.com/resin-os/resinhup/77401f3ecdeddaac843b26827f0a44d3b044efdd/upgrade-patches/0-bootfiles || log ERROR "Couldn't download fixed '0-bootfiles', aborting."
     chmod 755 "$bootfiles_temp"
     mount --bind "$bootfiles_temp"  /etc/hostapp-update-hooks.d/0-bootfiles
 }
@@ -295,18 +295,18 @@ function hostapp_based_update {
         storage_driver=$(cat /boot/storage-driver)
         log "Starting docker-host with ${storage_driver} storage driver"
         dockerd --log-driver=journald -s="${storage_driver}" --data-root="${sysroot}/docker" -H unix:///var/run/docker-host.sock --pidfile=/var/run/docker-host.pid --exec-root=/var/run/docker-host --bip 10.114.101.1/24 --fixed-cidr=10.114.101.128/25 --iptables=false &
-        sleep 10
+        until DOCKER_HOST="unix:///var/run/docker-host.sock" docker ps &> /dev/null; do sleep 0.2; done
     else
         if [ -f "$sysroot/resinos.fingerprint" ]; then
-            # Happens on a device, which has HUP'd from a non-hostapp resinOS first
-            # then updated again but this time with hostapp-update. The previous "active"
-            # partition now inactive, and still has leftover data
+            # Happens on a device, which has HUP'd from a non-hostapp resinOS to
+            # a hostapp version. The previous "active", partition now inactive,
+            # and still has leftover data
             log "Have docker-host running, with dirty inactive partition"
             systemctl stop docker-host
             log "Clean inactive partition"
             rm -rf "${sysroot:?}/"*
             systemctl start docker-host
-            sleep 10
+            until DOCKER_HOST="unix:///var/run/docker-host.sock" docker ps &> /dev/null; do sleep 0.2; done
         fi
     fi
 
@@ -324,7 +324,7 @@ function non_hostapp_to_hostapp_update {
 
     # Mount spare root partition
     umount "${update_part}" || true
-    mkfs.ext4 -F -L "${update_label}" "${update_part}"
+    mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0 -i 8192 -L "${update_label}" "${update_part}"
     temp_sysroot=$(mktemp -d)
     mount "${update_part}" "${temp_sysroot}" || log ERROR "Cannot mount inactive partition ${update_part} to ${temp_sysroot}..."
 
@@ -361,20 +361,67 @@ function non_hostapp_to_hostapp_update {
       -v /tmp/resinos-image.docker:/resinos-image.docker \
       -v /mnt/data/resinhup/tmp:/mnt/data/resinhup/tmp \
       "${update_package}" \
-      /bin/bash -c 'storage_driver=$(cat /boot/storage-driver) ; DOCKER_TMPDIR=/mnt/data/resinhup/tmp/ dockerd --log-driver=journald -s=$storage_driver --data-root='"${sysroot}"'/docker -H unix:///var/run/docker-host.sock --pidfile=/var/run/docker-host.pid --exec-root=/var/run/docker-host --bip 10.114.201.1/24 --fixed-cidr=10.114.201.128/25 --iptables=false & sleep 10; echo "Starting hostapp-update"; hostapp-update -f /resinos-image.docker' \
+      /bin/bash -c 'storage_driver=$(cat /boot/storage-driver) ; DOCKER_TMPDIR=/mnt/data/resinhup/tmp/ dockerd --log-driver=journald -s=$storage_driver --data-root='"${sysroot}"'/docker -H unix:///var/run/docker-host.sock --pidfile=/var/run/docker-host.pid --exec-root=/var/run/docker-host --bip 10.114.201.1/24 --fixed-cidr=10.114.201.128/25 --iptables=false & until DOCKER_HOST="unix:///var/run/docker-host.sock" docker ps &> /dev/null; do sleep 0.2; done; echo "Starting hostapp-update"; hostapp-update -f /resinos-image.docker' \
     || log ERROR "Update based on hostapp-update has failed..."
 }
 
 function find_partitions {
     # Find which partition is / and which we should write the update to
+    # This function is only used in pre-hostapp-update-enabled 2.x devices
     root_part=$(findmnt -n --raw --evaluate --output=source /)
     log "Found root at ${root_part}..."
-    case $root_part in
+    case ${root_part} in
+        # on 2.x the following device types have these kinds of results for $root_part, examples
+        # raspberrypi: /dev/mmcblk0p2
+        # beaglebone: /dev/disk/by-partuuid/93956da0-02
+        # edison: /dev/disk/by-partuuid/012b3303-34ac-284d-99b4-34e03a2335f4
+        # NUC: /dev/disk/by-label/resin-rootA and underlying /dev/sda2
+        # up-board: /dev/disk/by-label/resin-rootA and underlying /dev/mmcblk0p2
+        /dev/disk/by-partuuid/*)
+            # reread the physical device that that part refers to
+            root_part=$(readlink -f $root_part)
+            case ${root_part} in
+                *p2)
+                    root_dev=${root_part%p2}
+                    update_part=${root_dev}p3
+                    update_part_no=3
+                    update_label=resin-rootB
+                    ;;
+                *p3)
+                    root_dev=${root_part%p3}
+                    update_part=${root_dev}p2
+                    update_part_no=2
+                    update_label=resin-rootA
+                    ;;
+                *p8)
+                    root_dev=${root_part%p8}
+                    update_part=${root_dev}p9
+                    update_part_no=9
+                    update_label=resin-rootB
+                    ;;
+                *p9)
+                    root_dev=${root_part%p9}
+                    update_part=${root_dev}p8
+                    update_part_no=8
+                    update_label=resin-rootA
+                    ;;
+                *)
+                    log ERROR "Couldn't get the root partition from the part-uuid..."
+            esac
+            ;;
+        /dev/disk/by-label/resin-rootA)
+            old_label=resin-rootA
+            update_label=resin-rootB
+            root_part_dev=$(readlink -f /dev/disk/by-label/${old_label})
+            update_part=${root_part_dev%2}3
+            ;;
+        /dev/disk/by-label/resin-rootB)
+            old_label=resin-rootB
+            update_label=resin-rootA
+            root_part_dev=$(readlink -f /dev/disk/by-label/${old_label})
+            update_part=${root_part_dev%3}2
+            ;;
         *2)
-            # on 2.x the following device types have these kinds of results for $root_part
-            # raspberrypi: /dev/mmcblk0p2
-            # beaglebone: /dev/disk/by-partuuid/93956da0-02
-            # NUC: /dev/sda2
             root_dev=${root_part%2}
             update_part=${root_dev}3
             update_part_no=3
@@ -386,24 +433,13 @@ function find_partitions {
             update_part_no=2
             update_label=resin-rootA
             ;;
-        *rootA)
-            old_label=resin-rootA
-            update_label=resin-rootB
-            root_part_dev=$(blkid | grep "${old_label}" | awk '{print $1}' | sed 's/://')
-            update_part=${root_part_dev%2}3
-            ;;
-        *rootB)
-            old_label=resin-rootB
-            update_label=resin-rootA
-            root_part_dev=$(blkid | grep "${old_label}" | awk '{print $1}' | sed 's/://')
-            update_part=${root_part_dev%3}2
-            ;;
         *)
-            log ERROR "Unknown root partition \"$root_part\"."
+            log ERROR "Unknown root partition ${root_part}."
     esac
-    if [ ! -b "$update_part" ]; then
+    if [ ! -b "${update_part}" ]; then
         log ERROR "Update partition detected as ${update_part} but it's not a block device."
     fi
+    log "Update partition: ${update_part}"
 }
 
 function finish_up() {
@@ -412,7 +448,7 @@ function finish_up() {
         # Reboot into new OS
         log "Rebooting into new OS in 5 seconds..."
         progress 100 "ResinOS: update successful, rebooting..."
-        nohup bash -c " /bin/sleep 5 ; /sbin/reboot " > /dev/null 2>&1 &
+        nohup bash -c "sleep 5 ; reboot " > /dev/null 2>&1 &
     else
         log "Finished update, not rebooting as requested."
         progress 100 "ResinOS: update successful."
@@ -658,7 +694,8 @@ fi
 
 ### hostapp-update based updater
 
-if [ -x "$(command -v hostapp-update)" ]; then
+if version_gt "${VERSION_ID}" "${minimum_hostapp_target_version}" ||
+    [ "${VERSION_ID}" == "${minimum_hostapp_target_version}" ]; then
     log "hostapp-update command exists, use that for update"
     progress 50 "ResinOS: running host OS update"
     hostapp_based_update "${image}"
@@ -698,7 +735,7 @@ progress 75 "ResinOS: running updater..."
 log "Making new OS filesystem..."
 # Format alternate root partition
 log "Update partition: ${update_part}"
-mkfs.ext4 -F -L "$update_label" "$update_part"
+mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0 -i 8192 -L "$update_label" "$update_part"
 
 # Mount alternate root partition
 mkdir -p /tmp/updateroot
