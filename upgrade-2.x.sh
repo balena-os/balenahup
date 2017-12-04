@@ -257,7 +257,7 @@ function pre_update_pi_bootfiles_removal {
         echo "Removing $f from boot partition"
         rm -f "/mnt/boot/$f"
     done
-    sync
+    sync /mnt/boot
 }
 
 function pre_update_fix_bootfiles_hook {
@@ -295,7 +295,8 @@ function hostapp_based_update {
         storage_driver=$(cat /boot/storage-driver)
         log "Starting docker-host with ${storage_driver} storage driver"
         dockerd --log-driver=journald -s="${storage_driver}" --data-root="${sysroot}/docker" -H unix:///var/run/docker-host.sock --pidfile=/var/run/docker-host.pid --exec-root=/var/run/docker-host --bip 10.114.101.1/24 --fixed-cidr=10.114.101.128/25 --iptables=false &
-        until DOCKER_HOST="unix:///var/run/docker-host.sock" docker ps &> /dev/null; do sleep 0.2; done
+        local timeout_seconds=$((SECONDS+30));
+        until DOCKER_HOST="unix:///var/run/docker-host.sock" docker ps &> /dev/null; do sleep 0.2; if [ $SECONDS -gt $timeout_seconds ]; then log ERROR "docker-host did not come up before check timed out..."; fi; done
     else
         if [ -f "$sysroot/resinos.fingerprint" ]; then
             # Happens on a device, which has HUP'd from a non-hostapp resinOS to
@@ -306,7 +307,8 @@ function hostapp_based_update {
             log "Clean inactive partition"
             rm -rf "${sysroot:?}/"*
             systemctl start docker-host
-            until DOCKER_HOST="unix:///var/run/docker-host.sock" docker ps &> /dev/null; do sleep 0.2; done
+            local timeout_seconds=$((SECONDS+30));
+            until DOCKER_HOST="unix:///var/run/docker-host.sock" docker ps &> /dev/null; do sleep 0.2; if [ $SECONDS -gt $timeout_seconds ]; then log ERROR "docker-host did not come up before check timed out..."; fi; done
         fi
     fi
 
@@ -361,7 +363,7 @@ function non_hostapp_to_hostapp_update {
       -v /tmp/resinos-image.docker:/resinos-image.docker \
       -v /mnt/data/resinhup/tmp:/mnt/data/resinhup/tmp \
       "${update_package}" \
-      /bin/bash -c 'storage_driver=$(cat /boot/storage-driver) ; DOCKER_TMPDIR=/mnt/data/resinhup/tmp/ dockerd --log-driver=journald -s=$storage_driver --data-root='"${sysroot}"'/docker -H unix:///var/run/docker-host.sock --pidfile=/var/run/docker-host.pid --exec-root=/var/run/docker-host --bip 10.114.201.1/24 --fixed-cidr=10.114.201.128/25 --iptables=false & until DOCKER_HOST="unix:///var/run/docker-host.sock" docker ps &> /dev/null; do sleep 0.2; done; echo "Starting hostapp-update"; hostapp-update -f /resinos-image.docker' \
+      /bin/bash -c 'storage_driver=$(cat /boot/storage-driver) ; DOCKER_TMPDIR=/mnt/data/resinhup/tmp/ dockerd --log-driver=journald -s=$storage_driver --data-root='"${sysroot}"'/docker -H unix:///var/run/docker-host.sock --pidfile=/var/run/docker-host.pid --exec-root=/var/run/docker-host --bip 10.114.201.1/24 --fixed-cidr=10.114.201.128/25 --iptables=false & timeout_seconds=$((SECONDS+30)); until DOCKER_HOST="unix:///var/run/docker-host.sock" docker ps &> /dev/null; do sleep 0.2; if [ $SECONDS -gt $timeout_seconds ]; then echo "docker-host did not come up before check timed out..."; exit 1; fi; done; echo "Starting hostapp-update"; hostapp-update -f /resinos-image.docker' \
     || log ERROR "Update based on hostapp-update has failed..."
 }
 
@@ -379,7 +381,7 @@ function find_partitions {
         # up-board: /dev/disk/by-label/resin-rootA and underlying /dev/mmcblk0p2
         /dev/disk/by-partuuid/*)
             # reread the physical device that that part refers to
-            root_part=$(readlink -f $root_part)
+            root_part=$(readlink -f "${root_part}")
             case ${root_part} in
                 *p2)
                     root_dev=${root_part%p2}
