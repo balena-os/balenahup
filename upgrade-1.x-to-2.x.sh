@@ -557,7 +557,7 @@ parted -s $root_dev mkpart logical ext4 696MiB 100%
 
 log "Creating new state and data filesystems..."
 # Create resin-state filesystem
-mkfs.ext4 -F -L resin-state ${root_dev}p5
+mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0 -i 8192 -L resin-state ${root_dev}p5
 
 # Create resin-data filesystem
 mkfs.btrfs -f -L resin-data ${root_dev}p6
@@ -588,8 +588,8 @@ log "Creating new root filesystems..."
 # Resize first root partition
 resize2fs ${root_dev}p2
 
-# Create second root filesystem
-mkfs.ext4 -F -L resin-rootB ${root_dev}p3
+# Create second root filesystem (for backup, this will be reformatted later)
+mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0 -i 8192 -L resin-rootB ${root_dev}p3
 
 # Relabel first root filesystem
 e2label ${root_dev}p2 resin-rootA
@@ -705,7 +705,7 @@ progress 75 "ResinOS: running updater..."
 
 # Make ext4 data partition
 log "Creating new ext4 resin-data filesystem..."
-mkfs.ext4 -F -L resin-data ${root_dev}p6
+mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0 -i 8192 -L resin-data ${root_dev}p6
 
 # Mount it
 mount ${root_dev}p6 /mnt/data
@@ -720,7 +720,7 @@ umount /tmp/backup
 
 # Make new fs for rootB
 log "Creating new root filesystem for new OS..."
-mkfs.ext4 -F -L resin-rootB ${root_dev}p3
+mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0 -i 8192 -L resin-rootB ${root_dev}p3
 
 # Mount rootB partition
 mkdir -p /tmp/rootB
