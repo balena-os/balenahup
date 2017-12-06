@@ -370,12 +370,12 @@ fi
 if [ -n "$target_version" ]; then
     case $target_version in
         2.*)
-	    if ! version_gt "$target_version" "$minimum_target_version" &&
-		    ! [ "$target_version" == "$minimum_target_version" ]; then
-		log ERROR "Target OS version \"$target_version\" too low, please use \"$minimum_target_version\" or above."
-	    else
-		log "Target OS version \"$target_version\" OK."
-	    fi
+        if ! version_gt "$target_version" "$minimum_target_version" &&
+            ! [ "$target_version" == "$minimum_target_version" ]; then
+        log ERROR "Target OS version \"$target_version\" too low, please use \"$minimum_target_version\" or above."
+        else
+        log "Target OS version \"$target_version\" OK."
+        fi
             ;;
         *)
             log ERROR "Target OS version \"$target_version\" not supported."

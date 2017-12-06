@@ -411,12 +411,12 @@ if version_gt $VERSION $MIN_HOSTOS_VERSION || [ "$VERSION" == $MIN_HOSTOS_VERSIO
     log "Starting Host OS version $VERSION OK."
 else
     case $VERSION in
-	1.*)
-	    log ERROR "Starting Host OS version \"$VERSION\" too low, need \"$MIN_HOSTOS_VERSION\" or greater."
-	    ;;
-	*)
-	    log ERROR "Starting Host OS version \"$VERSION\" too high."
-	    ;;
+    1.*)
+        log ERROR "Starting Host OS version \"$VERSION\" too low, need \"$MIN_HOSTOS_VERSION\" or greater."
+        ;;
+    *)
+        log ERROR "Starting Host OS version \"$VERSION\" too high."
+        ;;
     esac
 fi
 
@@ -500,17 +500,17 @@ if ! version_gt $VERSION $PREFERRED_HOSTOS_VERSION && ! [ "$VERSION" == $PREFERR
     mkdir -p $tools_path
     export PATH=$tools_path:$PATH
     case $BINARY_TYPE in
-	arm)
-	    download_uri=https://github.com/resin-os/resinhup/raw/master/upgrade-binaries/$BINARY_TYPE
-	    for binary in $tools_binaries; do
-		log "Installing $binary..."
-		curl -f -s -L -o $tools_path/$binary $download_uri/$binary || log ERROR "Couldn't download tool from $download_uri/$binary, aborting."
-		chmod 755 $tools_path/$binary
-	    done
-	    ;;
-	*)
-	    log ERROR "Binary type $BINARY_TYPE not supported."
-	    ;;
+        arm)
+            download_uri=https://github.com/resin-os/resinhup/raw/master/upgrade-binaries/$BINARY_TYPE
+            for binary in $tools_binaries; do
+                log "Installing $binary..."
+                curl -f -s -L -o $tools_path/$binary $download_uri/$binary || log ERROR "Couldn't download tool from $download_uri/$binary, aborting."
+                chmod 755 $tools_path/$binary
+            done
+            ;;
+        *)
+            log ERROR "Binary type $BINARY_TYPE not supported."
+            ;;
     esac
 fi
 
