@@ -11,6 +11,7 @@ set -o pipefail
 
 preferred_hostos_version=2.0.7
 minimum_target_version=2.0.7
+minimum_hostapp_target_version=2.5.1
 
 # This will set VERSION, SLUG, and VARIANT_ID
 . /etc/os-release
@@ -249,6 +250,214 @@ function device_type_match {
     echo "${match}"
 }
 
+# Pre update cleanup: remove some not-required files from the boot partition to clear some space
+function pre_update_pi_bootfiles_removal {
+    local boot_files_for_removal=('start_db.elf' 'fixup_db.dat')
+    for f in "${boot_files_for_removal[@]}"; do
+        echo "Removing $f from boot partition"
+        rm -f "/mnt/boot/$f"
+    done
+    sync /mnt/boot
+}
+
+function pre_update_fix_bootfiles_hook {
+    log "Applying bootfiles hostapp-hook fix"
+    local bootfiles_temp
+    bootfiles_temp=$(mktemp)
+    curl -f -s -L -o "$bootfiles_temp" https://raw.githubusercontent.com/resin-os/resinhup/77401f3ecdeddaac843b26827f0a44d3b044efdd/upgrade-patches/0-bootfiles || log ERROR "Couldn't download fixed '0-bootfiles', aborting."
+    chmod 755 "$bootfiles_temp"
+    mount --bind "$bootfiles_temp"  /etc/hostapp-update-hooks.d/0-bootfiles
+}
+
+function hostapp_based_update {
+    local update_package=$1
+    local storage_driver
+    local sysroot="/mnt/sysroot/inactive"
+
+    case ${SLUG} in
+        raspberry*)
+            log "Running pre-update fixes for ${SLUG}"
+            pre_update_pi_bootfiles_removal
+            if ! version_gt "${VERSION_ID}" "2.7.6" ; then
+                pre_update_fix_bootfiles_hook
+            fi
+            ;;
+        *)
+            log "No device-specific pre-update fix for ${SLUG}"
+    esac
+
+    if ! [ -S "/var/run/docker-host.sock" ]; then
+        ## Happens on devices booting after a regular HUP update onto a hostapps enabled resinOS
+        log "Do not have docker-host running"
+        log "Clean inactive partition"
+        rm -rf "${sysroot:?}/"*
+        log "Getting storage driver info"
+        storage_driver=$(cat /boot/storage-driver)
+        log "Starting docker-host with ${storage_driver} storage driver"
+        dockerd --log-driver=journald -s="${storage_driver}" --data-root="${sysroot}/docker" -H unix:///var/run/docker-host.sock --pidfile=/var/run/docker-host.pid --exec-root=/var/run/docker-host --bip 10.114.101.1/24 --fixed-cidr=10.114.101.128/25 --iptables=false &
+        local timeout_seconds=$((SECONDS+30));
+        until DOCKER_HOST="unix:///var/run/docker-host.sock" docker ps &> /dev/null; do sleep 0.2; if [ $SECONDS -gt $timeout_seconds ]; then log ERROR "docker-host did not come up before check timed out..."; fi; done
+    else
+        if [ -f "$sysroot/resinos.fingerprint" ]; then
+            # Happens on a device, which has HUP'd from a non-hostapp resinOS to
+            # a hostapp version. The previous "active", partition now inactive,
+            # and still has leftover data
+            log "Have docker-host running, with dirty inactive partition"
+            systemctl stop docker-host
+            log "Clean inactive partition"
+            rm -rf "${sysroot:?}/"*
+            systemctl start docker-host
+            local timeout_seconds=$((SECONDS+30));
+            until DOCKER_HOST="unix:///var/run/docker-host.sock" docker ps &> /dev/null; do sleep 0.2; if [ $SECONDS -gt $timeout_seconds ]; then log ERROR "docker-host did not come up before check timed out..."; fi; done
+        fi
+    fi
+
+    log "Starting hostapp-update"
+    hostapp-update -i "${update_package}" || log ERROR "hostapp-update has failed..."-
+}
+
+function non_hostapp_to_hostapp_update {
+    local update_package=$1
+    local sysroot="/mnt/sysroot/inactive"
+    local temp_sysroot
+
+    find_partitions
+    stop_services
+
+    # Mount spare root partition
+    umount "${update_part}" || true
+    mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0 -i 8192 -L "${update_label}" "${update_part}"
+    temp_sysroot=$(mktemp -d)
+    mount "${update_part}" "${temp_sysroot}" || log ERROR "Cannot mount inactive partition ${update_part} to ${temp_sysroot}..."
+
+    case "${SLUG}" in
+        raspberry*)
+            log "Running pre-update fixes for ${SLUG}"
+            pre_update_pi_bootfiles_removal
+            ;;
+        *)
+            log "No device-specific pre-update fix for ${SLUG}"
+    esac
+
+    docker pull "${update_package}" || log ERROR "Couldn't pull docker image..."
+    mkfifo /tmp/resinos-image.docker
+    docker save "${update_package}" > /tmp/resinos-image.docker &
+    mkdir -p /mnt/data/resinhup/tmp
+
+    log "Starting hostapp-update"
+    # Note that the following docker daemon is started with a different --bip and --fixed-cidr
+    # setting, otherwise it is clashing with the system docker on resinOS >=2.3.0 || <2.5.1
+    # and then docker pull would not succeed
+    # The requrired volumes are:
+    #  * /mnt/sysroot/inactive: the new rootfs
+    #  * /mnt/boot: the boot partition
+    #  * /tmp/resinos-image: the FIFO file that is used to transfer the resinOS image into the container
+    #  * /mnt/data/resinhup/tmp: a location to use as docker temporary directory within the container
+    # shellcheck disable=SC2016
+    docker run \
+      --rm \
+      --name resinhup \
+      --privileged \
+      -v "${temp_sysroot}":/mnt/sysroot/inactive \
+      -v /mnt/boot:/mnt/boot \
+      -v /tmp/resinos-image.docker:/resinos-image.docker \
+      -v /mnt/data/resinhup/tmp:/mnt/data/resinhup/tmp \
+      "${update_package}" \
+      /bin/bash -c 'storage_driver=$(cat /boot/storage-driver) ; DOCKER_TMPDIR=/mnt/data/resinhup/tmp/ dockerd --log-driver=journald -s=$storage_driver --data-root='"${sysroot}"'/docker -H unix:///var/run/docker-host.sock --pidfile=/var/run/docker-host.pid --exec-root=/var/run/docker-host --bip 10.114.201.1/24 --fixed-cidr=10.114.201.128/25 --iptables=false & timeout_seconds=$((SECONDS+30)); until DOCKER_HOST="unix:///var/run/docker-host.sock" docker ps &> /dev/null; do sleep 0.2; if [ $SECONDS -gt $timeout_seconds ]; then echo "docker-host did not come up before check timed out..."; exit 1; fi; done; echo "Starting hostapp-update"; hostapp-update -f /resinos-image.docker' \
+    || log ERROR "Update based on hostapp-update has failed..."
+}
+
+function find_partitions {
+    # Find which partition is / and which we should write the update to
+    # This function is only used in pre-hostapp-update-enabled 2.x devices
+    root_part=$(findmnt -n --raw --evaluate --output=source /)
+    log "Found root at ${root_part}..."
+    case ${root_part} in
+        # on 2.x the following device types have these kinds of results for $root_part, examples
+        # raspberrypi: /dev/mmcblk0p2
+        # beaglebone: /dev/disk/by-partuuid/93956da0-02
+        # edison: /dev/disk/by-partuuid/012b3303-34ac-284d-99b4-34e03a2335f4
+        # NUC: /dev/disk/by-label/resin-rootA and underlying /dev/sda2
+        # up-board: /dev/disk/by-label/resin-rootA and underlying /dev/mmcblk0p2
+        /dev/disk/by-partuuid/*)
+            # reread the physical device that that part refers to
+            root_part=$(readlink -f "${root_part}")
+            case ${root_part} in
+                *p2)
+                    root_dev=${root_part%p2}
+                    update_part=${root_dev}p3
+                    update_part_no=3
+                    update_label=resin-rootB
+                    ;;
+                *p3)
+                    root_dev=${root_part%p3}
+                    update_part=${root_dev}p2
+                    update_part_no=2
+                    update_label=resin-rootA
+                    ;;
+                *p8)
+                    root_dev=${root_part%p8}
+                    update_part=${root_dev}p9
+                    update_part_no=9
+                    update_label=resin-rootB
+                    ;;
+                *p9)
+                    root_dev=${root_part%p9}
+                    update_part=${root_dev}p8
+                    update_part_no=8
+                    update_label=resin-rootA
+                    ;;
+                *)
+                    log ERROR "Couldn't get the root partition from the part-uuid..."
+            esac
+            ;;
+        /dev/disk/by-label/resin-rootA)
+            old_label=resin-rootA
+            update_label=resin-rootB
+            root_part_dev=$(readlink -f /dev/disk/by-label/${old_label})
+            update_part=${root_part_dev%2}3
+            ;;
+        /dev/disk/by-label/resin-rootB)
+            old_label=resin-rootB
+            update_label=resin-rootA
+            root_part_dev=$(readlink -f /dev/disk/by-label/${old_label})
+            update_part=${root_part_dev%3}2
+            ;;
+        *2)
+            root_dev=${root_part%2}
+            update_part=${root_dev}3
+            update_part_no=3
+            update_label=resin-rootB
+            ;;
+        *3)
+            root_dev=${root_part%3}
+            update_part=${root_dev}2
+            update_part_no=2
+            update_label=resin-rootA
+            ;;
+        *)
+            log ERROR "Unknown root partition ${root_part}."
+    esac
+    if [ ! -b "${update_part}" ]; then
+        log ERROR "Update partition detected as ${update_part} but it's not a block device."
+    fi
+    log "Update partition: ${update_part}"
+}
+
+function finish_up() {
+    sync
+    if [ "${NOREBOOT}" == "no" ]; then
+        # Reboot into new OS
+        log "Rebooting into new OS in 5 seconds..."
+        progress 100 "ResinOS: update successful, rebooting..."
+        nohup bash -c "sleep 5 ; reboot " > /dev/null 2>&1 &
+    else
+        log "Finished update, not rebooting as requested."
+        progress 100 "ResinOS: update successful."
+    fi
+    exit 0
+}
+
 ###
 # Script start
 ###
@@ -417,6 +626,8 @@ if [ "$(image_exsits "$RESINOS_REPO" "$RESINOS_TAG")" = "yes" ]; then
 else
     log ERROR "Cannot find manifest, target image might not exists. Bailing out..."
 fi
+image="${RESINOS_REPO}:${RESINOS_TAG}"
+log "Using resinOS image: ${image}"
 
 # Check if we need to install some more extra tools
 if ! version_gt "$VERSION" "$preferred_hostos_version" &&
@@ -483,44 +694,45 @@ else
     log "No supervisor updater fix is required..."
 fi
 
-# Find which partition is / and which we should write the update to
-root_part=$(findmnt -n --raw --evaluate --output=source /)
-log "Found root at ${root_part}..."
-case $root_part in
-    *2)
-        # on 2.x the following device types have these kinds of results for $root_part
-        # raspberrypi: /dev/mmcblk0p2
-        # beaglebone: /dev/disk/by-partuuid/93956da0-02
-        # NUC: /dev/sda2
-        root_dev=${root_part%2}
-        update_part=${root_dev}3
-        update_part_no=3
-        update_label=resin-rootB
-        ;;
-    *3)
-        root_dev=${root_part%3}
-        update_part=${root_dev}2
-        update_part_no=2
-        update_label=resin-rootA
-        ;;
-    *rootA)
-        old_label=resin-rootA
-        update_label=resin-rootB
-        root_part_dev=$(blkid | grep "${old_label}" | awk '{print $1}' | sed 's/://')
-        update_part=${root_part_dev%2}3
-        ;;
-    *rootB)
-        old_label=resin-rootB
-        update_label=resin-rootA
-        root_part_dev=$(blkid | grep "${old_label}" | awk '{print $1}' | sed 's/://')
-        update_part=${root_part_dev%2}3
-        ;;
-    *)
-        log ERROR "Unknown root partition \"$root_part\"."
-esac
-if [ ! -b "$update_part" ]; then
-    log ERROR "Update partition detected as ${update_part} but it's not a block device."
+# The timesyncd.conf lives on the state partition starting from resinOS 2.1.0
+# For devices that were updated before this fix came to effect, fix things up, otherwise migrate when updating
+if [ -d "/mnt/state/root-overlay/etc/systemd/timesyncd.conf" ]; then
+    rm -rf "/mnt/state/root-overlay/etc/systemd/timesyncd.conf"
+    cp "/etc/systemd/timesyncd.conf" "/mnt/state/root-overlay/etc/systemd/timesyncd.conf"
+    systemctl restart etc-systemd-timesyncd.conf.mount
+    log "timesyncd.conf mount service fixed up"
+elif ! [ -f "/mnt/state/root-overlay/etc/systemd/timesyncd.conf" ] && version_gt "$target_version" "2.1.0"; then
+    cp "/etc/systemd/timesyncd.conf" "/mnt/state/root-overlay/etc/systemd/timesyncd.conf"
+    log "timesyncd.conf migrated to the state partition"
 fi
+
+### hostapp-update based updater
+
+if version_gt "${VERSION_ID}" "${minimum_hostapp_target_version}" ||
+    [ "${VERSION_ID}" == "${minimum_hostapp_target_version}" ]; then
+    log "hostapp-update command exists, use that for update"
+    progress 50 "ResinOS: running host OS update"
+    hostapp_based_update "${image}"
+
+    upgradeSupervisor
+
+    finish_up
+
+elif version_gt "${target_version}" "${minimum_hostapp_target_version}" ||
+     [ "${target_version}" == "${minimum_hostapp_target_version}" ]; then
+    log "Running update from a non-hostapp-update enabled version to a hostapp-update enabled version..."
+    progress 50 "ResinOS: running host OS update"
+    non_hostapp_to_hostapp_update "${image}"
+
+    upgradeSupervisor
+
+    finish_up
+fi
+
+### Below here is the regular, non-hostapp resinOS host update
+
+# Find partition information
+find_partitions
 
 # Stop docker containers
 stop_services
@@ -529,10 +741,6 @@ trap 'error_handler' ERR
 
 log "Getting new OS image..."
 progress 50 "ResinOS: downloading update package..."
-
-image="${RESINOS_REPO}:${RESINOS_TAG}"
-log "Using resinOS image: ${image}"
-
 # Create container for new version
 container=$(docker create "$image" echo export)
 
@@ -541,7 +749,7 @@ progress 75 "ResinOS: running updater..."
 log "Making new OS filesystem..."
 # Format alternate root partition
 log "Update partition: ${update_part}"
-mkfs.ext4 -F -L "$update_label" "$update_part"
+mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0 -i 8192 -L "$update_label" "$update_part"
 
 # Mount alternate root partition
 mkdir -p /tmp/updateroot
@@ -602,14 +810,4 @@ case $SLUG in
         ;;
 esac
 
-# Reboot into new OS
-sync
-if [ "$NOREBOOT" == "no" ]; then
-    log "Rebooting into new OS in 5 seconds..."
-    progress 100 "ResinOS: update successful, rebooting..."
-    nohup bash -c " /bin/sleep 5 ; /sbin/reboot " > /dev/null 2>&1 &
-else
-    log "Finished update, not rebooting as requested."
-    log "NOTE: Supervisor and stopped services kept stopped!"
-    progress 100 "ResinOS: update successful."
-fi
+finish_up
