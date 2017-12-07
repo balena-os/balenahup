@@ -318,6 +318,19 @@ function fix_supervisor_bootstrap {
     fi
 }
 
+function check_btrfs_umount() {
+    # Check whether /data has been correctly umounted, which is the only btrfs
+    # partition;  if not, then bail out before anything's destroyed
+    local timeout_seconds=$((SECONDS+30));
+    while pidof btrfs-worker > /dev/null; do
+        if [ $SECONDS -gt ${timeout_seconds} ]; then
+            log ERROR "Timing out waiting for btrfs file system to be umounted..."
+        fi
+        sleep 0.2
+    done
+    log "Btrfs partition successfully umounted..."
+}
+
 ###
 # Script start
 ###
@@ -563,6 +576,8 @@ umount /mnt/data
 umount /var/lib/docker
 umount /resin-data
 
+check_btrfs_umount
+
 # Save conf contents to /boot
 if [ -f "/mnt/conf/config.json" ]; then
     # the boot partition might be mounted ro on some systems, remount
@@ -752,6 +767,8 @@ systemctl stop docker
 # Unmount data partition
 umount /mnt/data
 umount /var/lib/docker
+
+check_btrfs_umount
 
 progress 75 "ResinOS: running updater..."
 
