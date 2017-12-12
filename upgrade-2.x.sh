@@ -113,32 +113,44 @@ function remove_containers() {
     docker rm $(docker ps -a -q) > /dev/null 2>&1 || true
 }
 
-function upgradeSupervisor() {
-    # Fetch what supervisor version the target hostOS was originally released with
-    # and if it's newer than the supervisor running on the device, then fetch the
-    # information that is required for supervisor update, then do the update with
-    # the tools shipped with the hostOS.
+#######################################
+# Upgrade the supervisor on the device.
+# Extract the supervisor version with which the the target hostOS is shipped,
+# and if it's newer than the supervisor running on the device, then fetch the
+# information that is required for supervisor update, and do the update with
+# the tools shipped with the hostOS.
+# Globals:
+#   API_ENDPOINT
+#   APIKEY
+#   DEVICEID
+#   SLUG
+#   target_supervisor_version
+# Arguments:
+#   image: the docker image to exctract the config from
+#   non_docker_host: empty value will use docker-host, non empty value will use the main docker
+# Returns:
+#   None
+#######################################
+function upgrade_supervisor() {
+    local image=$1
+    local no_docker_host=$2
     log "Supervisor update start..."
 
     if [ -z "$target_supervisor_version" ]; then
         log "No explicit supervisor version was provided, update to default version in target resinOS..."
-        if [ "$STAGING" = "yes" ]; then
-            DEFAULT_SUPERVISOR_VERSION_URL_BASE="https://s3.amazonaws.com/resin-staging-img/"
+        local DEFAULT_SUPERVISOR_VERSION
+        versioncheck_cmd=("run" "--rm" "${image}" "bash" "-c" "cat /etc/resin-supervisor/supervisor.conf | sed -rn 's/SUPERVISOR_TAG=v(.*)/\\1/p'")
+        if [ -z "$no_docker_host" ]; then
+            DEFAULT_SUPERVISOR_VERSION=$(DOCKER_HOST="unix:///var/run/docker-host.sock" docker "${versioncheck_cmd[@]}")
         else
-            DEFAULT_SUPERVISOR_VERSION_URL_BASE="https://s3.amazonaws.com/resin-production-img-cloudformation/"
+            DEFAULT_SUPERVISOR_VERSION=$(docker "${versioncheck_cmd[@]}")
         fi
-        # Convert the hostOS vesrsion into the format used for the resinOS storage buckets on S3
-        # The '+' in the original version might have already been turnd into a '_', take that into account.
-        HOSTOS_SLUG=$(echo "${target_version}" | sed -e 's/[_+]/%2B/' -e 's/$/.prod/')
-        DEFAULT_SUPERVISOR_VERSION_URL="${DEFAULT_SUPERVISOR_VERSION_URL_BASE}images/${SLUG}/${HOSTOS_SLUG}/VERSION"
-
-        # Get supervisor version for target resinOS release, it is in format of "va.b.c-shortsha", e.g. "v6.1.2"
-        # and tag new version for the device if it's newer than the current version, from the API
-        DEFAULT_SUPERVISOR_VERSION=$(curl -s "$DEFAULT_SUPERVISOR_VERSION_URL" | sed -e 's/v//')
-        if [ -z "$DEFAULT_SUPERVISOR_VERSION" ] || [ -z "${DEFAULT_SUPERVISOR_VERSION##*xml*}" ]; then
+        if [ -z "$DEFAULT_SUPERVISOR_VERSION" ]; then
             log ERROR "Could not get the default supervisor version for this resinOS release, bailing out."
         else
+            log "Extracted default version is v$DEFAULT_SUPERVISOR_VERSION..."
             target_supervisor_version="$DEFAULT_SUPERVISOR_VERSION"
+
         fi
     fi
 
@@ -147,7 +159,7 @@ function upgradeSupervisor() {
             log ERROR "Could not get current supervisor version from the API..."
         else
             if version_gt "$target_supervisor_version" "$CURRENT_SUPERVISOR_VERSION" ; then
-                log "Supervisor update: will be upgrading from v${CURRENT_SUPERVISOR_VERSION} to ${target_supervisor_version}"
+                log "Supervisor update: will be upgrading from v${CURRENT_SUPERVISOR_VERSION} to v${target_supervisor_version}"
                 UPDATER_SUPERVISOR_TAG="v${target_supervisor_version}"
                 # Get the supervisor id
                 if UPDATER_SUPERVISOR_ID=$(curl -s "${API_ENDPOINT}/v2/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'$UPDATER_SUPERVISOR_TAG'))&apikey=${APIKEY}" | jq -e -r '.d[0].id'); then
@@ -714,7 +726,7 @@ if version_gt "${VERSION_ID}" "${minimum_hostapp_target_version}" ||
     progress 50 "ResinOS: running host OS update"
     hostapp_based_update "${image}"
 
-    upgradeSupervisor
+    upgrade_supervisor "${image}"
 
     finish_up
 
@@ -724,7 +736,7 @@ elif version_gt "${target_version}" "${minimum_hostapp_target_version}" ||
     progress 50 "ResinOS: running host OS update"
     non_hostapp_to_hostapp_update "${image}"
 
-    upgradeSupervisor
+    upgrade_supervisor "${image}" no_docker_host
 
     finish_up
 fi
@@ -788,7 +800,7 @@ cp -a /tmp/resin-boot/* /mnt/boot/
 docker rm "$container"
 
 # Updating supervisor
-upgradeSupervisor
+upgrade_supervisor "$image" no_docker_host
 
 # REmove resin-sample to plug security hole
 remove_sample_wifi "/mnt/boot/system-connections/resin-sample"
