@@ -84,7 +84,7 @@ function log {
     ENDTIME=$(date +%s)
     printf "[%09d%s%s\n" "$(($ENDTIME - $STARTTIME))" "][$loglevel]" "$1"
     if [ "$loglevel" == "ERROR" ]; then
-        progress 100 "ResinOS: Update failed."
+        progress 100 "OS update failed"
         exit 1
     fi
 }
@@ -397,7 +397,7 @@ if [ -z ${TARGET_VERSION+x} ]; then
     log ERROR "--hostos-version is required."
 fi
 
-progress 5 "ResinOS: update preparation..."
+progress 5 "Preparing OS update"
 
 # Check board support
 case $SLUG in
@@ -472,7 +472,7 @@ case $root_part in
         ;;
     *p3)
         log "Current root partition $root_part is the second root partition. Copying existing OS to first partition..."
-        progress 10 "ResinOS: partition switching..."
+        progress 10 "Switching partitions"
         stop_all
         sync
         log "Forcing remount of file systems in read-only mode..."
@@ -492,7 +492,7 @@ case $root_part in
                 ;;
         esac
         log "Rebooting..."
-        progress 15 "ResinOS: rebooting to continue..."
+        progress 15 "Rebooting from new partition"
         sync
         nohup bash -c " /bin/sleep 5 ; /sbin/reboot " > /dev/null 2>&1 &
         exit 0
@@ -503,7 +503,7 @@ case $root_part in
 esac
 root_dev=${root_part%p2}
 
-progress 25 "ResinOS: system preparation..."
+progress 25 "Preparing OS update"
 
 # Check if we need to install some more extra tools
 if ! version_gt $VERSION $PREFERRED_HOSTOS_VERSION && ! [ "$VERSION" == $PREFERRED_HOSTOS_VERSION ]; then
@@ -740,14 +740,14 @@ BACKUPARCHIVE=/tmp/backup/newos.tar.gz
 FSARCHIVE=/mnt/data/newos.tar.gz
 
 log "Getting new OS image..."
-progress 50 "ResinOS: downloading OS update..."
+progress 50 "Downloading OS update"
 # Create container for new version
 CONTAINER=$(docker create ${IMAGE} echo export)
 if [ -z "$CONTAINER" ]; then
     log ERROR "Could not download target update image..."
 fi
 
-progress 60 "ResinOS: processing update package..."
+progress 60 "Processing OS update package"
 # Export container
 log "Starting docker export"
 docker export ${CONTAINER} | gzip > ${BACKUPARCHIVE}
@@ -770,7 +770,7 @@ umount /var/lib/docker
 
 check_btrfs_umount
 
-progress 75 "ResinOS: running updater..."
+progress 75 "Running OS update"
 
 # Make ext4 data partition
 log "Creating new ext4 resin-data filesystem..."
@@ -888,10 +888,10 @@ sync
 if [ "$NOREBOOT" == "no" ]; then
     # Reboot into new OS
     log "Rebooting into new OS in 5 seconds..."
-    progress 100 "ResinOS: update successful, rebooting..."
+    progress 100 "Update successful, rebooting"
     nohup bash -c " /bin/sleep 5 ; /sbin/reboot " > /dev/null 2>&1 &
 else
     log "Finished update, not rebooting as requested."
     log "NOTE: Supervisor and stopped services kept stopped!"
-    progress 100 "ResinOS: update successful."
+    progress 100 "Update successful"
 fi
