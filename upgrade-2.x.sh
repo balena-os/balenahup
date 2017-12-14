@@ -86,7 +86,7 @@ function log {
     endtime=$(date +%s)
     printf "[%09d%s%s\n" "$((endtime - starttime))" "][$loglevel]" "$1"
     if [ "$loglevel" == "ERROR" ]; then
-        progress 100 "ResinOS: Update failed."
+        progress 100 "OS update failed"
         exit 1
     fi
 }
@@ -155,7 +155,7 @@ function upgradeSupervisor() {
                     log "Setting supervisor version in the API..."
                     curl -s "${API_ENDPOINT}/v2/device($DEVICEID)?apikey=$APIKEY" -X PATCH -H 'Content-Type: application/json;charset=UTF-8' --data-binary "{\"supervisor_release\": \"$UPDATER_SUPERVISOR_ID\"}" > /dev/null 2>&1
                     log "Running supervisor updater..."
-                    progress 90 "ResinOS: running supervisor update..."
+                    progress 90 "Running supervisor update"
                     update-resin-supervisor
                     stop_services
                     remove_containers
@@ -449,11 +449,11 @@ function finish_up() {
     if [ "${NOREBOOT}" == "no" ]; then
         # Reboot into new OS
         log "Rebooting into new OS in 5 seconds..."
-        progress 100 "ResinOS: update successful, rebooting..."
+        progress 100 "Update successful, rebooting"
         nohup bash -c "sleep 5 ; reboot " > /dev/null 2>&1 &
     else
         log "Finished update, not rebooting as requested."
-        progress 100 "ResinOS: update successful."
+        progress 100 "Update successful"
     fi
     exit 0
 }
@@ -530,7 +530,7 @@ if [ "$LOG" == "yes" ]; then
     exec 1> "$LOGFILE" 2>&1
 fi
 
-progress 25 "ResinOS: preparing update.."
+progress 25 "Preparing OS update"
 
 # Check board support
 case $SLUG in
@@ -711,7 +711,7 @@ fi
 if version_gt "${VERSION_ID}" "${minimum_hostapp_target_version}" ||
     [ "${VERSION_ID}" == "${minimum_hostapp_target_version}" ]; then
     log "hostapp-update command exists, use that for update"
-    progress 50 "ResinOS: running host OS update"
+    progress 50 "Running OS update"
     hostapp_based_update "${image}"
 
     upgradeSupervisor
@@ -721,7 +721,7 @@ if version_gt "${VERSION_ID}" "${minimum_hostapp_target_version}" ||
 elif version_gt "${target_version}" "${minimum_hostapp_target_version}" ||
      [ "${target_version}" == "${minimum_hostapp_target_version}" ]; then
     log "Running update from a non-hostapp-update enabled version to a hostapp-update enabled version..."
-    progress 50 "ResinOS: running host OS update"
+    progress 50 "Running OS update"
     non_hostapp_to_hostapp_update "${image}"
 
     upgradeSupervisor
@@ -740,11 +740,11 @@ stop_services
 trap 'error_handler' ERR
 
 log "Getting new OS image..."
-progress 50 "ResinOS: downloading update package..."
+progress 50 "Downloading OS update"
 # Create container for new version
 container=$(docker create "$image" echo export)
 
-progress 75 "ResinOS: running updater..."
+progress 75 "Running OS update"
 
 log "Making new OS filesystem..."
 # Format alternate root partition
