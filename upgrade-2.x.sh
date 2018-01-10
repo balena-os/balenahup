@@ -12,12 +12,21 @@ set -o pipefail
 preferred_hostos_version=2.0.7
 minimum_target_version=2.0.7
 minimum_hostapp_target_version=2.5.1
+minimum_balena_target_version=2.9.0
 
 # This will set VERSION, SLUG, and VARIANT_ID
 . /etc/os-release
 
 # Don't run anything before this source as it sets PATH here
 source /etc/profile
+
+if [ -x "$(command -v balena)" ]; then
+    DOCKER_CMD="balena"
+    DOCKERD="balenad"
+else
+    DOCKER_CMD="docker"
+    DOCKERD="dockerd"
+fi
 
 ###
 # Helper functions
@@ -101,16 +110,16 @@ function stop_services() {
     log "Stopping supervisor and related services..."
     systemctl stop update-resin-supervisor.timer > /dev/null 2>&1
     systemctl stop resin-supervisor > /dev/null 2>&1
-    docker stop resin_supervisor > /dev/null 2>&1 || true
+    ${DOCKER_CMD} stop resin_supervisor > /dev/null 2>&1 || true
 }
 
 function remove_containers() {
     log "Stopping all containers.."
     # shellcheck disable=SC2046
-    docker stop $(docker ps -a -q) > /dev/null 2>&1 || true
+    ${DOCKER_CMD} stop $(${DOCKER_CMD} ps -a -q) > /dev/null 2>&1 || true
     log "Removing all containers..."
     # shellcheck disable=SC2046
-    docker rm $(docker ps -a -q) > /dev/null 2>&1 || true
+    ${DOCKER_CMD} rm $(${DOCKER_CMD} ps -a -q) > /dev/null 2>&1 || true
 }
 
 #######################################
@@ -141,9 +150,9 @@ function upgrade_supervisor() {
         local DEFAULT_SUPERVISOR_VERSION
         versioncheck_cmd=("run" "--rm" "${image}" "bash" "-c" "cat /etc/resin-supervisor/supervisor.conf | sed -rn 's/SUPERVISOR_TAG=v(.*)/\\1/p'")
         if [ -z "$no_docker_host" ]; then
-            DEFAULT_SUPERVISOR_VERSION=$(DOCKER_HOST="unix:///var/run/docker-host.sock" docker "${versioncheck_cmd[@]}")
+            DEFAULT_SUPERVISOR_VERSION=$(DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} "${versioncheck_cmd[@]}")
         else
-            DEFAULT_SUPERVISOR_VERSION=$(docker "${versioncheck_cmd[@]}")
+            DEFAULT_SUPERVISOR_VERSION=$(${DOCKER_CMD} "${versioncheck_cmd[@]}")
         fi
         if [ -z "$DEFAULT_SUPERVISOR_VERSION" ]; then
             log ERROR "Could not get the default supervisor version for this resinOS release, bailing out."
@@ -281,10 +290,92 @@ function pre_update_fix_bootfiles_hook {
     mount --bind "$bootfiles_temp"  /etc/hostapp-update-hooks.d/0-bootfiles
 }
 
+#######################################
+# Prepares and runs update based on hostapp-update
+# Includes pre-update fixes and balena migration
+# Globals:
+#   DOCKER_CMD
+#   target_version
+#   minimum_balena_target_version
+# Arguments:
+#   update_package: the docker image to use for the update
+#   tmp_inactive: host path to the directory that will be bind-mounted to /mnt/sysroot/inactive inside the container
+# Returns:
+#   None
+#######################################
+function in_container_hostapp_update {
+    local update_package=$1
+    local tmp_inactive=$2
+    local inactive="/mnt/sysroot/inactive"
+    local hostapp_update_extra_args=""
+    local target_docker_cmd
+    local target_dockerd
+    local volumes_args=()
+
+    stop_services
+
+    # Disable rollbacks when doing migration to rollback enabled system, as couldn't roll back anyways
+    if version_gt "${target_version}" "2.9.3"; then
+        hostapp_update_extra_args="-x"
+    fi
+    # Set the name of the docker/balena command within the target image to the appropriate one
+    if version_gt "${target_version}" "${minimum_balena_target_version}"; then
+        target_docker_cmd="balena"
+        target_dockerd="balenad"
+    else
+        target_docker_cmd="docker"
+        target_dockerd="dockerd"
+    fi
+
+    ${DOCKER_CMD} pull "${update_package}" || log ERROR "Couldn't pull docker image..."
+    mkfifo /tmp/resinos-image.docker
+    ${DOCKER_CMD} save "${update_package}" > /tmp/resinos-image.docker &
+    mkdir -p /mnt/data/resinhup/tmp
+
+    # The setting up the required volumes
+    volumes_args+=("-v" "/dev/disk:/dev/disk")
+    volumes_args+=("-v" "/mnt/boot:/mnt/boot")
+    volumes_args+=("-v" "/mnt/data/resinhup/tmp:/mnt/data/resinhup/tmp")
+    if [ -d "/mnt/sysroot/active" ]; then
+        volumes_args+=("-v" "/mnt/sysroot/active:/mnt/sysroot/active")
+    fi
+    volumes_args+=("-v" "${tmp_inactive}:${inactive}")
+    volumes_args+=("-v" "/tmp/resinos-image.docker:/resinos-image.docker")
+
+    log "Starting hostapp-update within a container"
+    # Note that the following docker daemon is started with a different --bip and --fixed-cidr
+    # setting, otherwise it is clashing with the system docker on resinOS >=2.3.0 || <2.5.1
+    # and then docker pull would not succeed
+    # shellcheck disable=SC2016
+    ${DOCKER_CMD} run \
+      --rm \
+      --name resinhup \
+      --privileged \
+      "${volumes_args[@]}" \
+      "${update_package}" \
+      /bin/bash -c 'storage_driver=$(cat /boot/storage-driver) ; DOCKER_TMPDIR=/mnt/data/resinhup/tmp/ '"${target_dockerd}"' --storage-driver=$storage_driver --data-root='"${inactive}"'/'"${target_docker_cmd}"' --host=unix:///var/run/'"${target_docker_cmd}"'-host.sock --pidfile=/var/run/'"${target_docker_cmd}"'-host.pid --exec-root=/var/run/'"${target_docker_cmd}"'-host --bip=10.114.201.1/24 --fixed-cidr=10.114.201.128/25 --iptables=false & timeout_seconds=$((SECONDS+30)); until DOCKER_HOST="unix:///var/run/'"${target_docker_cmd}"'-host.sock" '"${target_docker_cmd}"' ps &> /dev/null; do sleep 0.2; if [ $SECONDS -gt $timeout_seconds ]; then echo "'"${target_docker_cmd}"'-host did not come up before check timed out..."; exit 1; fi; done; echo "Starting hostapp-update"; hostapp-update -f /resinos-image.docker '"${hostapp_update_extra_args}"'' \
+    || log ERROR "Update based on hostapp-update has failed..."
+}
+
+#######################################
+# Prepares and runs update based on hostapp-update
+# Includes pre-update fixes and balena migration
+# Globals:
+#   DOCKER_CMD
+#   DOCKERD
+#   SLUG
+#   VERSION_ID
+#   target_version
+#   minimum_balena_target_version
+# Arguments:
+#   update_package: the docker image to use for the update
+# Returns:
+#   None
+#######################################
 function hostapp_based_update {
     local update_package=$1
     local storage_driver
-    local sysroot="/mnt/sysroot/inactive"
+    local inactive="/mnt/sysroot/inactive"
 
     case ${SLUG} in
         raspberry*)
@@ -298,49 +389,79 @@ function hostapp_based_update {
             log "No device-specific pre-update fix for ${SLUG}"
     esac
 
-    if ! [ -S "/var/run/docker-host.sock" ]; then
+    if ! [ -S "/var/run/${DOCKER_CMD}-host.sock" ]; then
         ## Happens on devices booting after a regular HUP update onto a hostapps enabled resinOS
-        log "Do not have docker-host running"
+        log "Do not have ${DOCKER_CMD}-host running"
         log "Clean inactive partition"
-        rm -rf "${sysroot:?}/"*
+        rm -rf "${inactive:?}/"*
         log "Getting storage driver info"
         storage_driver=$(cat /boot/storage-driver)
-        log "Starting docker-host with ${storage_driver} storage driver"
-        dockerd --log-driver=journald -s="${storage_driver}" --data-root="${sysroot}/docker" -H unix:///var/run/docker-host.sock --pidfile=/var/run/docker-host.pid --exec-root=/var/run/docker-host --bip 10.114.101.1/24 --fixed-cidr=10.114.101.128/25 --iptables=false &
+        log "Starting ${DOCKER_CMD}-host with ${storage_driver} storage driver"
+        ${DOCKERD} --log-driver=journald --storage-driver="${storage_driver}" --data-root="${inactive}/${DOCKER_CMD}" --host="unix:///var/run/${DOCKER_CMD}-host.sock" --pidfile="/var/run/${DOCKER_CMD}-host.pid" --exec-root="/var/run/${DOCKER_CMD}-host" --bip=10.114.101.1/24 --fixed-cidr=10.114.101.128/25 --iptables=false &
         local timeout_seconds=$((SECONDS+30));
-        until DOCKER_HOST="unix:///var/run/docker-host.sock" docker ps &> /dev/null; do sleep 0.2; if [ $SECONDS -gt $timeout_seconds ]; then log ERROR "docker-host did not come up before check timed out..."; fi; done
+        until DOCKER_HOST="unix:///var/run/{DOCKER_CMD}-host.sock" ${DOCKER_CMD} ps &> /dev/null; do sleep 0.2; if [ $SECONDS -gt $timeout_seconds ]; then log ERROR "${DOCKER_CMD}-host did not come up before check timed out..."; fi; done
     else
-        if [ -f "$sysroot/resinos.fingerprint" ]; then
+        if [ -f "$inactive/resinos.fingerprint" ]; then
             # Happens on a device, which has HUP'd from a non-hostapp resinOS to
             # a hostapp version. The previous "active", partition now inactive,
             # and still has leftover data
-            log "Have docker-host running, with dirty inactive partition"
-            systemctl stop docker-host
+            log "Have ${DOCKER_CMD}-host running, with dirty inactive partition"
+            systemctl stop "${DOCKER_CMD}-host"
             log "Clean inactive partition"
-            rm -rf "${sysroot:?}/"*
-            systemctl start docker-host
+            rm -rf "${inactive:?}/"*
+            systemctl start "${DOCKER_CMD}-host"
             local timeout_seconds=$((SECONDS+30));
-            until DOCKER_HOST="unix:///var/run/docker-host.sock" docker ps &> /dev/null; do sleep 0.2; if [ $SECONDS -gt $timeout_seconds ]; then log ERROR "docker-host did not come up before check timed out..."; fi; done
+            until DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} ps &> /dev/null; do sleep 0.2; if [ $SECONDS -gt $timeout_seconds ]; then log ERROR "${DOCKER_CMD}-host did not come up before check timed out..."; fi; done
+        fi
+        if [ "${DOCKER_CMD}" = "balena" ] &&
+            [ -d "$inactive/docker" ]; then
+                log "Removing leftover docker folder on a balena device"
+                rm -rf "$inactive/docker"
         fi
     fi
 
-    log "Starting hostapp-update"
-    hostapp-update -i "${update_package}" || log ERROR "hostapp-update has failed..."-
+    if [ "${DOCKER_CMD}" = "docker" ] &&
+        version_gt "${target_version}" "${minimum_balena_target_version}" ; then
+            # Migrating to balena and hostapp-update hooks run inside the target container
+
+            log "Balena migration"
+            systemctl stop docker-host
+            if [ ! -d "/mnt/sysroot/inactive/balena" ] ; then
+                log "Need to move docker folder on the inactive partition"
+                mv /mnt/sysroot/inactive/{docker,balena} && ln -s /mnt/sysroot/inactive/{balena,docker}
+            fi
+
+            in_container_hostapp_update "${update_package}" "${inactive}"
+
+            systemctl start docker-host
+    else
+        log "Starting hostapp-update"
+        hostapp-update -i "${update_package}" || log ERROR "hostapp-update has failed..."-
+    fi
 }
 
+#######################################
+# Upgrade from a non-hostapp (<2.7.0) to a hostapp-enabled resinOS version
+# Handles both pre-balena and balena updates
+# Globals:
+#   SLUG
+#   minimum_balena_target_version
+#   target_version
+# Arguments:
+#   update_package: the docker image to use for the update
+# Returns:
+#   None
+#######################################
 function non_hostapp_to_hostapp_update {
     local update_package=$1
-    local sysroot="/mnt/sysroot/inactive"
-    local temp_sysroot
-
-    find_partitions
-    stop_services
+    local tmp_inactive
 
     # Mount spare root partition
+    find_partitions
     umount "${update_part}" || true
     mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0 -i 8192 -L "${update_label}" "${update_part}"
-    temp_sysroot=$(mktemp -d)
-    mount "${update_part}" "${temp_sysroot}" || log ERROR "Cannot mount inactive partition ${update_part} to ${temp_sysroot}..."
+    tmp_inactive=$(mktemp -d)
+    mount "${update_part}" "${tmp_inactive}" || log ERROR "Cannot mount inactive partition ${update_part} to ${tmp_inactive}..."
 
     case "${SLUG}" in
         raspberry*)
@@ -351,32 +472,7 @@ function non_hostapp_to_hostapp_update {
             log "No device-specific pre-update fix for ${SLUG}"
     esac
 
-    docker pull "${update_package}" || log ERROR "Couldn't pull docker image..."
-    mkfifo /tmp/resinos-image.docker
-    docker save "${update_package}" > /tmp/resinos-image.docker &
-    mkdir -p /mnt/data/resinhup/tmp
-
-    log "Starting hostapp-update"
-    # Note that the following docker daemon is started with a different --bip and --fixed-cidr
-    # setting, otherwise it is clashing with the system docker on resinOS >=2.3.0 || <2.5.1
-    # and then docker pull would not succeed
-    # The requrired volumes are:
-    #  * /mnt/sysroot/inactive: the new rootfs
-    #  * /mnt/boot: the boot partition
-    #  * /tmp/resinos-image: the FIFO file that is used to transfer the resinOS image into the container
-    #  * /mnt/data/resinhup/tmp: a location to use as docker temporary directory within the container
-    # shellcheck disable=SC2016
-    docker run \
-      --rm \
-      --name resinhup \
-      --privileged \
-      -v "${temp_sysroot}":/mnt/sysroot/inactive \
-      -v /mnt/boot:/mnt/boot \
-      -v /tmp/resinos-image.docker:/resinos-image.docker \
-      -v /mnt/data/resinhup/tmp:/mnt/data/resinhup/tmp \
-      "${update_package}" \
-      /bin/bash -c 'storage_driver=$(cat /boot/storage-driver) ; DOCKER_TMPDIR=/mnt/data/resinhup/tmp/ dockerd --log-driver=journald -s=$storage_driver --data-root='"${sysroot}"'/docker -H unix:///var/run/docker-host.sock --pidfile=/var/run/docker-host.pid --exec-root=/var/run/docker-host --bip 10.114.201.1/24 --fixed-cidr=10.114.201.128/25 --iptables=false & timeout_seconds=$((SECONDS+30)); until DOCKER_HOST="unix:///var/run/docker-host.sock" docker ps &> /dev/null; do sleep 0.2; if [ $SECONDS -gt $timeout_seconds ]; then echo "docker-host did not come up before check timed out..."; exit 1; fi; done; echo "Starting hostapp-update"; hostapp-update -f /resinos-image.docker' \
-    || log ERROR "Update based on hostapp-update has failed..."
+    in_container_hostapp_update "${update_package}" "${tmp_inactive}"
 }
 
 function find_partitions {
@@ -754,7 +850,7 @@ trap 'error_handler' ERR
 log "Getting new OS image..."
 progress 50 "Downloading OS update"
 # Create container for new version
-container=$(docker create "$image" echo export)
+container=$(${DOCKER_CMD} create "$image" echo export)
 
 progress 75 "Running OS update"
 
@@ -773,10 +869,10 @@ cat >/tmp/root-exclude <<EOF
 quirks
 resin-boot
 EOF
-docker export "$container" | tar -x -X /tmp/root-exclude -C /tmp/updateroot
+${DOCKER_CMD} export "$container" | tar -x -X /tmp/root-exclude -C /tmp/updateroot
 
 # Extract quirks
-docker export "$container" | tar -x -C /tmp quirks
+${DOCKER_CMD} export "$container" | tar -x -C /tmp quirks
 cp -a /tmp/quirks/* /tmp/updateroot/
 rm -rf /tmp/quirks
 
@@ -793,11 +889,11 @@ resin-boot/uEnv.txt
 resin-boot/EFI/BOOT/grub.cfg
 resin-boot/config.json
 EOF
-docker export "$container" | tar -x -X /tmp/boot-exclude -C /tmp resin-boot
+${DOCKER_CMD} export "$container" | tar -x -X /tmp/boot-exclude -C /tmp resin-boot
 cp -a /tmp/resin-boot/* /mnt/boot/
 
 # Clearing up
-docker rm "$container"
+${DOCKER_CMD} rm "$container"
 
 # Updating supervisor
 upgrade_supervisor "$image" no_docker_host
