@@ -648,7 +648,7 @@ case $SLUG in
     raspberry*)
         binary_type=arm
         ;;
-    intel-nuc|up-board)
+    intel-nuc|iot2000|up-board)
         binary_type=x86
         ;;
     *)
