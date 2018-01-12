@@ -22,8 +22,10 @@ Options:
         Display this help and exit.
 
   --staging
-        Do this update for devices in staging.
-        By default resinhup assumes the devices are in production.
+        WARNING: this flag has been deprecated for this script, set --resinos-repo
+        to set the location of the staging resinOS images.
+        For backwards compatibility, this flag acts the same as
+        --resinos-repo resin/resinos-staging
 
   -u <UUID>, --uuid <UUID>
         Update this UUID. Multiple -u can be provided to updated mutiple devices.
@@ -36,10 +38,26 @@ Options:
         not network bash network if devices are in the same one. If value is 0, all
         updates will start in parallel.
 
+  --force-slug <SLUG>
+        Run ${main_script_name} with --force-slug <SLUG>
+        See ${main_script_name} help for more details.
+
   --hostos-version <HOSTOS_VERSION>
         Run ${main_script_name} with --hostos-version <HOSTOS_VERSION>, use e.g. 2.2.0+rev1
         See ${main_script_name} help for more details.
         This is a mandatory argument.
+
+  --resinos-registry <REGISTRY>
+       Run ${main_script_name} with --resinos-registry <REGISTRY>, e.g. 'registry.hub.docker.com'
+       See ${main_script_name} help for more details.
+
+  --resinos-repo <REPOSITORY>
+        Run ${main_script_name} with --resinos-repo <REPOSITORY>, e.g. 'resin/resinos'
+        See ${main_script_name} help for more details.
+
+  --resinos-tag <TAG>
+        Run ${main_script_name} with --resinos-tag <TAG>, e.g. '2.9.5_rev1-raspberrypi3'
+        See ${main_script_name} help for more details.
 
   --supervisor-version <SUPERVISOR_VERSION>
         Run ${main_script_name} with --supervisor-version <SUPERVISOR_VERSION>, use e.g. 6.2.5
@@ -182,6 +200,7 @@ while [[ $# -gt 0 ]]; do
             exit 0
             ;;
         --staging)
+            log WARN "--staging has been deprecated, in the future --resinos-repo to set the right place to pull the images from."
             RESINHUP_ARGS+=( "--staging" )
             ;;
         --ignore-sanity-checks)
@@ -208,12 +227,44 @@ while [[ $# -gt 0 ]]; do
             MAX_THREADS=$2
             shift
             ;;
+        --force-slug)
+            if [ -z "$2" ]; then
+                log ERROR "\"$1\" argument needs a value."
+            fi
+            SLUG=$2
+            RESINHUP_ARGS+=( "--force-slug $SLUG" )
+            shift
+            ;;
         --hostos-version)
             if [ -z "$2" ]; then
                 log ERROR "\"$1\" argument needs a value."
             fi
             HOSTOS_VERSION=$2
             RESINHUP_ARGS+=( "--hostos-version $HOSTOS_VERSION" )
+            shift
+            ;;
+        --resinos-registry)
+            if [ -z "$2" ]; then
+                log ERROR "\"$1\" argument needs a value."
+            fi
+            RESINOS_REGISTRY=$2
+            RESINHUP_ARGS+=( "--resinos-registry $RESINOS_REGISTRY" )
+            shift
+            ;;
+        --resinos-repo)
+            if [ -z "$2" ]; then
+                log ERROR "\"$1\" argument needs a value."
+            fi
+            RESINOS_REPO=$2
+            RESINHUP_ARGS+=( "--resinos-repo $RESINOS_REPO" )
+            shift
+            ;;
+        --resinos-tag)
+            if [ -z "$2" ]; then
+                log ERROR "\"$1\" argument needs a value."
+            fi
+            RESINOS_TAG=$2
+            RESINHUP_ARGS+=( "--resinos-tag $RESINOS_TAG" )
             shift
             ;;
         --supervisor-version)
@@ -234,7 +285,7 @@ while [[ $# -gt 0 ]]; do
             NOCOLORS=yes
             ;;
         *)
-            log ERROR "Unrecognized option $1."
+            log WARN "Unrecognized option $1."
             ;;
     esac
     shift

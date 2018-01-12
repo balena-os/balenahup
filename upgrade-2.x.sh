@@ -1,9 +1,10 @@
 #!/bin/bash
 
 NOREBOOT=no
-STAGING=no
 LOG=yes
 IGNORE_SANITY_CHECKS=no
+RESINOS_REGISTRY="registry.hub.docker.com"
+RESINOS_REPO="resin/resinos"
 SCRIPTNAME=upgrade-2.x.sh
 
 set -o errexit
@@ -47,6 +48,9 @@ Options:
   -h, --help
         Display this help and exit.
 
+  --force-slug <SLUG>
+        Override slug detection and force this slug to be used for the script.
+
   --hostos-version <HOSTOS_VERSION>
         Run the updater for this specific HostOS version as semver.
         Omit the 'v' in front of the version. e.g.: 2.2.0+rev1 and not v2.2.0+rev1.
@@ -64,8 +68,22 @@ Options:
   --no-reboot
         Do not reboot if update is successful. This is useful when debugging.
 
+  --resinos-registry <REGISTRY>
+        The docker registry to look for the resinOS image. If not defined,
+        it will default to Docker Hub (registry.hub.docker.com)
+
+  --resinos-repo <REPOSITORY>
+        The docker repository where to pull the resinOS image from. Defaults to
+        'resin/resinos'.
+
+  --resinos-tag <TAG>
+        This flag replaces overrides the default, host OS version and slug based,
+        tag when looking for the resinOS image to use for the update.
+
   --staging
-        Get information from the resin staging environment as opposed to production.
+        This is deprecated, use --resinos-repo <REPOSITORY>
+        For backwards compatibility, this flag acts the same as
+        --resinos-repo resin/resinos-staging
 
   --ignore-sanity-checks
         The update scripts runs a number of sanity checks on the device, whether or not
@@ -202,14 +220,16 @@ function error_handler() {
 function image_exsits() {
     # Try to fetch the manifest of a repo:tag combo, to check for the existence of that
     # repo and tag.
-    # Currently only works with Docker HUB
+    # Currently only works with v2 registries
     # The return value is "no" if can't access that manifest, and "yes" if we can find it
-    local REPO=$1
-    local TAG=$2
+    local REGISTRY=$1
+    local REPO=$2
+    local TAG=$3
     local exists=no
-    local REGISTRY_URL="https://registry.hub.docker.com/v2"
+    local REGISTRY_URL="https://${REGISTRY}/v2"
     local MANIFEST="${REGISTRY_URL}/${REPO}/manifests/${TAG}"
     local response
+
     # Check
     response=$(curl --write-out "%{http_code}" --silent --output /dev/null "${MANIFEST}")
     if [ "$response" = 401 ]; then
@@ -220,7 +240,7 @@ function image_exsits() {
         local scope
         local token
         local response_auth
-        auth_header=$(curl -I --silent "${MANIFEST}" |grep Www-Authenticate)
+        auth_header=$(curl -I --silent "${MANIFEST}" |grep -i www-authenticate)
         # The auth_header looks as
         # Www-Authenticate: Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:resin/resinos:pull"
         # shellcheck disable=SC2001
@@ -230,7 +250,7 @@ function image_exsits() {
         # shellcheck disable=SC2001
         scope=$(echo "$auth_header" | sed 's/.*,scope="\([^,]*\)".*/\1/' )
         # Grab the token from the appropriate address, and retry the manifest query with that
-        token=$(curl --silent "${realm}?service=${service}&scope=${scope}" | jq -r '.access_token')
+        token=$(curl --silent "${realm}?service=${service}&scope=${scope}" | jq -r '.access_token // .token')
         response_auth=$(curl --write-out "%{http_code}" --silent --output /dev/null -H "Authorization: Bearer ${token}" "${MANIFEST}")
         if [ "$response_auth" = 200 ]; then
             exists=yes
@@ -579,6 +599,13 @@ while [[ $# -gt 0 ]]; do
             help
             exit 0
             ;;
+        --force-slug)
+            if [ -z "$2" ]; then
+                log ERROR "\"$1\" argument needs a value."
+            fi
+            SLUG=$2
+            shift
+            ;;
         --hostos-version)
             if [ -z "$2" ]; then
                 log ERROR "\"$1\" argument needs a value."
@@ -593,6 +620,27 @@ while [[ $# -gt 0 ]]; do
                     log ERROR "Updating .dev versions is not supported..."
                     ;;
             esac
+            shift
+            ;;
+        --resinos-registry)
+            if [ -z "$2" ]; then
+                log ERROR "\"$1\" argument needs a value."
+            fi
+            RESINOS_REGISTRY=$2
+            shift
+            ;;
+        --resinos-repo)
+            if [ -z "$2" ]; then
+                log ERROR "\"$1\" argument needs a value."
+            fi
+            RESINOS_REPO=$2
+            shift
+            ;;
+        --resinos-tag)
+            if [ -z "$2" ]; then
+                log ERROR "\"$1\" argument needs a value."
+            fi
+            RESINOS_TAG=$2
             shift
             ;;
         --supervisor-version)
@@ -612,10 +660,12 @@ while [[ $# -gt 0 ]]; do
             IGNORE_SANITY_CHECKS="yes"
             ;;
         --staging)
-            STAGING="yes"
+            log WARN "The --staging flag is deprecated for this script, use --resinos-repo <REPOSITORY>"
+            log WARN "For backwards compatibility, this flag acts the same as --resinos-repo resin/resinos-staging"
+            RESINOS_REPO="resin/resinos-staging"
             ;;
         *)
-            log ERROR "Unrecognized option $1."
+            log WARN "Unrecognized option $1."
             ;;
     esac
     shift
@@ -722,20 +772,16 @@ esac
 target_version=$(echo "$target_version" | tr + _)
 
 # Checking whether the target versionis available to download
-if [ "$STAGING" = "yes" ]; then
-    RESINOS_REPO="resin/resinos-staging"
-else
-    RESINOS_REPO="resin/resinos"
+if [ -z "$RESINOS_TAG" ]; then
+    RESINOS_TAG=${target_version}-${SLUG}
 fi
-RESINOS_TAG=${target_version}-${SLUG}
-log "Checking for manifest of ${RESINOS_REPO}:${RESINOS_TAG}"
-if [ "$(image_exsits "$RESINOS_REPO" "$RESINOS_TAG")" = "yes" ]; then
+image="${RESINOS_REGISTRY}/${RESINOS_REPO}:${RESINOS_TAG}"
+log "Checking for manifest of ${image}"
+if [ "$(image_exsits "$RESINOS_REGISTRY" "$RESINOS_REPO" "$RESINOS_TAG")" = "yes" ]; then
     log "Manifest found, good to go..."
 else
     log ERROR "Cannot find manifest, target image might not exists. Bailing out..."
 fi
-image="${RESINOS_REPO}:${RESINOS_TAG}"
-log "Using resinOS image: ${image}"
 
 # Check if we need to install some more extra tools
 if ! version_gt "$VERSION" "$preferred_hostos_version" &&

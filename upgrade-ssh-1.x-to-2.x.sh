@@ -227,7 +227,7 @@ while [[ $# -gt 0 ]]; do
             NOCOLORS=yes
             ;;
         *)
-            log ERROR "Unrecognized option $1."
+            log WARN "Unrecognized option $1."
             ;;
     esac
     shift
