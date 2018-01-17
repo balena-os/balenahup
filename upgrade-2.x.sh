@@ -198,6 +198,10 @@ function upgrade_supervisor() {
                     update-resin-supervisor
                     stop_services
                     remove_containers
+                    if version_gt "6.5.9" "${target_supervisor_version}" ; then
+                        log "Removing supervisor database for migration"
+                        rm /resin-data/resin-supervisor/database.sqlite || true
+                    fi
                 else
                     log ERROR "Couldn't extract supervisor vars..."
                 fi
