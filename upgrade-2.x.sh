@@ -69,7 +69,7 @@ Options:
         Do not reboot if update is successful. This is useful when debugging.
 
   --resinos-registry <REGISTRY>
-        The docker registry to look for the resinOS image. If not defined,
+        The docker registry where to look for the resinOS image. If not defined,
         it will default to Docker Hub (registry.hub.docker.com)
 
   --resinos-repo <REPOSITORY>
@@ -77,8 +77,8 @@ Options:
         'resin/resinos'.
 
   --resinos-tag <TAG>
-        This flag replaces overrides the default, host OS version and slug based,
-        tag when looking for the resinOS image to use for the update.
+        This flag overrides the default tag, which is based on host OS version
+        and slug, when looking for the resinOS image to use for the update.
 
   --staging
         This is deprecated, use --resinos-repo <REPOSITORY>
@@ -661,8 +661,8 @@ while [[ $# -gt 0 ]]; do
             ;;
         --staging)
             log WARN "The --staging flag is deprecated for this script, use --resinos-repo <REPOSITORY>"
-            log WARN "For backwards compatibility, this flag acts the same as --resinos-repo resin/resinos-staging"
-            RESINOS_REPO="resin/resinos-staging"
+            log WARN "For backwards compatibility, this flag acts the same as --resinos-repo resin/resinos-staging, and overrides that flag if set"
+            RESINOS_REPO_STAGING="resin/resinos-staging"
             ;;
         *)
             log WARN "Unrecognized option $1."
@@ -670,6 +670,10 @@ while [[ $# -gt 0 ]]; do
     esac
     shift
 done
+
+if [ -n "$RESINOS_REPO_STAGING" ]; then
+    RESINOS_REPO="${RESINOS_REPO_STAGING}"
+fi
 
 if [ -z "$target_version" ]; then
     log ERROR "--hostos-version is required."
@@ -771,7 +775,7 @@ esac
 # Translate version to one docker will accept as part of an image name
 target_version=$(echo "$target_version" | tr + _)
 
-# Checking whether the target versionis available to download
+# Checking whether the target version is available to download
 if [ -z "$RESINOS_TAG" ]; then
     RESINOS_TAG=${target_version}-${SLUG}
 fi
