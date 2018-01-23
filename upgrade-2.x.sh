@@ -709,6 +709,9 @@ case $SLUG in
     jetson-tx2|skx2)
         binary_type=arm
         ;;
+    ts4900)
+        binary_type=arm
+        ;;
     intel-nuc|iot2000|up-board)
         binary_type=x86
         ;;
