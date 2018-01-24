@@ -712,7 +712,7 @@ case $SLUG in
     ts4900)
         binary_type=arm
         ;;
-    intel-nuc|iot2000|up-board)
+    intel-nuc|iot2000|up-board|qemux86*)
         binary_type=x86
         ;;
     *)
