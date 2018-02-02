@@ -423,7 +423,7 @@ function hostapp_based_update {
         log "Starting ${DOCKER_CMD}-host with ${storage_driver} storage driver"
         ${DOCKERD} --log-driver=journald --storage-driver="${storage_driver}" --data-root="${inactive}/${DOCKER_CMD}" --host="unix:///var/run/${DOCKER_CMD}-host.sock" --pidfile="/var/run/${DOCKER_CMD}-host.pid" --exec-root="/var/run/${DOCKER_CMD}-host" --bip=10.114.101.1/24 --fixed-cidr=10.114.101.128/25 --iptables=false &
         local timeout_seconds=$((SECONDS+30));
-        until DOCKER_HOST="unix:///var/run/{DOCKER_CMD}-host.sock" ${DOCKER_CMD} ps &> /dev/null; do sleep 0.2; if [ $SECONDS -gt $timeout_seconds ]; then log ERROR "${DOCKER_CMD}-host did not come up before check timed out..."; fi; done
+        until DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} ps &> /dev/null; do sleep 0.2; if [ $SECONDS -gt $timeout_seconds ]; then log ERROR "${DOCKER_CMD}-host did not come up before check timed out..."; fi; done
     else
         if [ -f "$inactive/resinos.fingerprint" ]; then
             # Happens on a device, which has HUP'd from a non-hostapp resinOS to
