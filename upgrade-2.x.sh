@@ -6,6 +6,7 @@ IGNORE_SANITY_CHECKS=no
 RESINOS_REGISTRY="registry.hub.docker.com"
 RESINOS_REPO="resin/resinos"
 SCRIPTNAME=upgrade-2.x.sh
+LEGACY_UPDATE=no
 
 set -o errexit
 set -o pipefail
@@ -360,8 +361,10 @@ function in_container_hostapp_update {
     volumes_args+=("-v" "/dev/disk:/dev/disk")
     volumes_args+=("-v" "/mnt/boot:/mnt/boot")
     volumes_args+=("-v" "/mnt/data/resinhup/tmp:/mnt/data/resinhup/tmp")
-    if [ -d "/mnt/sysroot/active" ]; then
+    if mountpoint "/mnt/sysroot/active"; then
         volumes_args+=("-v" "/mnt/sysroot/active:/mnt/sysroot/active")
+    else
+        volumes_args+=("-v" "/:/mnt/sysroot/active")
     fi
     volumes_args+=("-v" "${tmp_inactive}:${inactive}")
     volumes_args+=("-v" "/tmp/resinos-image.docker:/resinos-image.docker")
@@ -387,6 +390,7 @@ function in_container_hostapp_update {
 # Globals:
 #   DOCKER_CMD
 #   DOCKERD
+#   LEGACY_UPDATE
 #   SLUG
 #   VERSION_ID
 #   target_version
@@ -400,6 +404,7 @@ function hostapp_based_update {
     local update_package=$1
     local storage_driver
     local inactive="/mnt/sysroot/inactive"
+    local balena_migration=no
 
     case ${SLUG} in
         raspberry*)
@@ -413,17 +418,26 @@ function hostapp_based_update {
             log "No device-specific pre-update fix for ${SLUG}"
     esac
 
+
+    if [ "${DOCKER_CMD}" = "docker" ] &&
+        version_gt "${target_version}" "${minimum_balena_target_version}" ; then
+            balena_migration="yes"
+    fi
+
     if ! [ -S "/var/run/${DOCKER_CMD}-host.sock" ]; then
         ## Happens on devices booting after a regular HUP update onto a hostapps enabled resinOS
-        log "Do not have ${DOCKER_CMD}-host running"
+        log "Do not have ${DOCKER_CMD}-host running; legacy mode"
+        LEGACY_UPDATE=yes
         log "Clean inactive partition"
         rm -rf "${inactive:?}/"*
-        log "Getting storage driver info"
-        storage_driver=$(cat /boot/storage-driver)
-        log "Starting ${DOCKER_CMD}-host with ${storage_driver} storage driver"
-        ${DOCKERD} --log-driver=journald --storage-driver="${storage_driver}" --data-root="${inactive}/${DOCKER_CMD}" --host="unix:///var/run/${DOCKER_CMD}-host.sock" --pidfile="/var/run/${DOCKER_CMD}-host.pid" --exec-root="/var/run/${DOCKER_CMD}-host" --bip=10.114.101.1/24 --fixed-cidr=10.114.101.128/25 --iptables=false &
-        local timeout_seconds=$((SECONDS+30));
-        until DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} ps &> /dev/null; do sleep 0.2; if [ $SECONDS -gt $timeout_seconds ]; then log ERROR "${DOCKER_CMD}-host did not come up before check timed out..."; fi; done
+        if [ "$balena_migration" = "no" ]; then
+            local storage_driver
+            storage_driver=$(cat /boot/storage-driver)
+            log "Starting ${DOCKER_CMD}-host with ${storage_driver} storage driver"
+            ${DOCKERD} --log-driver=journald --storage-driver="${storage_driver}" --data-root="${inactive}/${DOCKER_CMD}" --host="unix:///var/run/${DOCKER_CMD}-host.sock" --pidfile="/var/run/${DOCKER_CMD}-host.pid" --exec-root="/var/run/${DOCKER_CMD}-host" --bip=10.114.101.1/24 --fixed-cidr=10.114.101.128/25 --iptables=false &
+            local timeout_seconds=$((SECONDS+30));
+            until DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} ps &> /dev/null; do sleep 0.2; if [ $SECONDS -gt $timeout_seconds ]; then log ERROR "${DOCKER_CMD}-host did not come up before check timed out..."; fi; done
+        fi
     else
         if [ -f "$inactive/resinos.fingerprint" ]; then
             # Happens on a device, which has HUP'd from a non-hostapp resinOS to
@@ -444,20 +458,21 @@ function hostapp_based_update {
         fi
     fi
 
-    if [ "${DOCKER_CMD}" = "docker" ] &&
-        version_gt "${target_version}" "${minimum_balena_target_version}" ; then
+    if [ "$balena_migration" = "yes" ]; then
             # Migrating to balena and hostapp-update hooks run inside the target container
-
             log "Balena migration"
-            systemctl stop docker-host
-            if [ ! -d "/mnt/sysroot/inactive/balena" ] ; then
-                log "Need to move docker folder on the inactive partition"
-                mv /mnt/sysroot/inactive/{docker,balena} && ln -s /mnt/sysroot/inactive/{balena,docker}
+            systemctl stop docker-host || true
+            if [ -d "/mnt/sysroot/inactive/docker" ] &&
+                [ ! -d "/mnt/sysroot/inactive/balena" ] ; then
+                    log "Need to move docker folder on the inactive partition"
+                    mv /mnt/sysroot/inactive/{docker,balena} && ln -s /mnt/sysroot/inactive/{balena,docker}
             fi
 
             in_container_hostapp_update "${update_package}" "${inactive}"
 
-            systemctl start docker-host
+            if [ "${LEGACY_UPDATE}" != "yes" ]; then
+                systemctl start docker-host
+            fi
     else
         log "Starting hostapp-update"
         hostapp-update -i "${update_package}" || log ERROR "hostapp-update has failed..."-
@@ -882,7 +897,11 @@ if version_gt "${VERSION_ID}" "${minimum_hostapp_target_version}" ||
     progress 50 "Running OS update"
     hostapp_based_update "${image}"
 
-    upgrade_supervisor "${image}"
+    if [ "${LEGACY_UPDATE}" = "yes" ]; then
+        upgrade_supervisor "${image}" no_docker_host
+    else
+        upgrade_supervisor "${image}"
+    fi
 
     finish_up
 
