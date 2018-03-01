@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# default configuration
 NOREBOOT=no
 LOG=yes
 IGNORE_SANITY_CHECKS=no
@@ -7,6 +8,7 @@ RESINOS_REGISTRY="registry.hub.docker.com"
 RESINOS_REPO="resin/resinos"
 SCRIPTNAME=upgrade-2.x.sh
 LEGACY_UPDATE=no
+STOP_ALL=no
 
 set -o errexit
 set -o pipefail
@@ -85,6 +87,10 @@ Options:
         This is deprecated, use --resinos-repo <REPOSITORY>
         For backwards compatibility, this flag acts the same as
         --resinos-repo resin/resinos-staging
+
+  --stop-all
+        Request the updater to stop all containers (including user application)
+        before the update.
 
   --ignore-sanity-checks
         The update scripts runs a number of sanity checks on the device, whether or not
@@ -338,6 +344,9 @@ function in_container_hostapp_update {
     local volumes_args=()
 
     stop_services
+    if [ "${STOP_ALL}" == "yes" ]; then
+        remove_containers
+    fi
 
     # Disable rollbacks when doing migration to rollback enabled system, as couldn't roll back anyways
     if version_gt "${target_version}" "2.9.3"; then
@@ -474,6 +483,10 @@ function hostapp_based_update {
                 systemctl start docker-host
             fi
     else
+        if [ "$STOP_ALL" = "yes" ]; then
+            stop_services
+            remove_containers
+        fi
         log "Starting hostapp-update"
         hostapp-update -i "${update_package}" || log ERROR "hostapp-update has failed..."-
     fi
@@ -682,6 +695,9 @@ while [[ $# -gt 0 ]]; do
             log WARN "The --staging flag is deprecated for this script, use --resinos-repo <REPOSITORY>"
             log WARN "For backwards compatibility, this flag acts the same as --resinos-repo resin/resinos-staging, and overrides that flag if set"
             RESINOS_REPO_STAGING="resin/resinos-staging"
+            ;;
+        --stop-all)
+            STOP_ALL="yes"
             ;;
         *)
             log WARN "Unrecognized option $1."
@@ -923,8 +939,11 @@ fi
 # Find partition information
 find_partitions
 
-# Stop docker containers
+# Stop supervisor, plus all running containers if requested
 stop_services
+if [ "${STOP_ALL}" = "yes" ]; then
+    remove_containers
+fi
 
 trap 'error_handler' ERR
 

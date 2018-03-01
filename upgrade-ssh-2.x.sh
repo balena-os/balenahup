@@ -63,6 +63,9 @@ Options:
         Run ${main_script_name} with --supervisor-version <SUPERVISOR_VERSION>, use e.g. 6.2.5
         See ${main_script_name} help for more details.
 
+  --stop-all
+        Run ${main_script_name} with --stop-all, to stop running containers before the update.
+
   --ignore-sanity-checks
         Run ${main_script_name} with --ignore-sanity-checks
         See ${main_script_name} help for more details.
@@ -265,6 +268,10 @@ while [[ $# -gt 0 ]]; do
             fi
             RESINOS_TAG=$2
             RESINHUP_ARGS+=( "--resinos-tag $RESINOS_TAG" )
+            shift
+            ;;
+        --stop-all)
+            RESINHUP_ARGS+=( "--stop-all" )
             shift
             ;;
         --supervisor-version)
