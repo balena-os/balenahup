@@ -29,26 +29,31 @@ Use run-resinhup.sh [wrapper](https://github.com/resin-os/meta-resin/blob/master
 
 Pro Hint: In order to make sure these scripts are updated and able to run resinhup on multiple devices (batch/fleet updates), **admins** can use a wrapper on top of _run-resinhup.sh_ called [run-resinhup-ssh.sh](https://github.com/resin-os/meta-resin/blob/master/scripts/resinhup/run-resinhup-ssh.sh). This wrapper is not intended for public use as it requires SSH access to the devices over VPN along with admin permissions for API queries. Check _run-resinhup-ssh.sh_ help message for all the configurations you can use.
 
-## Resinhup architecture
+## Resinhup architecture for 1.x->1.x updates
 Currently there are 3 components involved in updating a device:
 + resinhup (docker images)
 + run-resinhup.sh (bash wrapper)
 + run-resinhup-ssh.sh (bash wrapper)
 
 ### resinhup
+
 This component is distributed from this repository as docker images (explained above). The overall workflow of the tool is:
 ![Minion](images/resinhup-workflow.png)
 
 ### run-resinhup.sh
+
 This is a wrapper which pulls the proper resinhup image and runs the updater:
 
-+ takes care of all the prerequisites 
++ takes care of all the prerequisites
 + adds support for supervisor update
 + pulls resinhup image
 + runs resinhup container
 + if updater is successful, reboots the board
 
-### run-resinhup-ssh.sh 
+This script is found in [resin-os/meta-resin, 1.x branch](https://github.com/resin-os/meta-resin/tree/1.X)/.
+
+### run-resinhup-ssh.sh
+
 This is a tool which:
 
 + Uploads over ssh all the needed tools from meta-resin (update-resin-supervisor, run-resinhup.sh and resin-device-progress).
@@ -56,6 +61,52 @@ This is a tool which:
 + Can run the updater over multiple devices in parallel.
 
 It requires SSH access over VPN to devices.
+
+This script is found in [resin-os/meta-resin, 1.x branch](https://github.com/resin-os/meta-resin/tree/1.X)/.
+
+## ResinHUP architecture for 1.x->2.x and 2.x->2.x updates
+
+Currently there are 2 components involved in updating a device for these versions
+
++ `upgrade-<...>.sh` (bash wrapper)
++ `upgrade-ssh-<...>.sh` (bash wrapper)
+
+## upgrade-<...>.sh
+
+The `upgrade-1.x-to-2.x.sh` and `upgrade-2.x.sh` are wrappers that which pulls the proper host OS image and runs the updater:
+
++ takes care of all the prerequisites
++ adds support for supervisor update
++ if updater is successful, reboots the board (default, but adjustable over command line paramters)
+
+Run them with the `--help` flag to see all the options
+
+### upgrade-ssh-<...>.sh
+
+The `upgrade-ssh-1.x-to-2.x.sh` and `upgrade-ssh-2.x.sh` scripts are wrappers which:
+
++ Runs run-resinhup.sh over a set of devices.
++ Can run the updater over multiple devices in parallel.
+
+It requires SSH access over VPN to devices, which is enabled for general users for resinOS version 2.7.5 and above.
+
+Set up your device connection settings in your SSH `config` by adding a record like this:
+
+```
+Host resindevice
+  User <username>
+  Hostname ssh.resindevice.io
+  LogLevel ERROR
+  StrictHostKeyChecking no
+  UserKnownHostsFile /dev/null
+  ControlMaster no
+  IdentityFile <path-to-identity-file>
+```
+
+The `User` and `IdentityFile` sections are optional, and depend on your SSH setup. The name `resindevice` is arbitrary, and you can use any other value (unique within the `config`). That will be the name that you need to use with the `-s` command line flag.
+
+For for [staging](https://dashboard.resinstaging.io) use `Hostname ssh.devices.resinstaging.io`.
+
 
 ## Development
 Want to contribute? Great! Throw pull requests at us.
@@ -70,4 +121,3 @@ See resinhupmeta.py.
 
 ## License
 See resinhupmeta.py.
-

@@ -185,10 +185,8 @@ pushd "$(dirname "$0")" > /dev/null 2>&1
 SCRIPTPATH=$(pwd)
 popd > /dev/null 2>&1
 
-# Tools we need on device
-UPDATE_TOOLS=(
-"$SCRIPTPATH/${main_script_name}"
-)
+# The script running the update on the device
+UPDATE_SCRIPT="$SCRIPTPATH/${main_script_name}"
 
 # Log timer
 STARTTIME=$(date +%s)
@@ -318,21 +316,14 @@ for uuid in $UUIDS; do
     log "[$CURRENT_UPDATE/$NR_UPDATES] Updating $uuid on $SSH_HOST."
     log_filename="$uuid.upgrade2x.log"
 
-    if ! ssh "$SSH_HOST" -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o "Hostname=${uuid}.vpn" exit > /dev/null 2>&1; then
+    if ! ssh "$SSH_HOST" host -s "${uuid}" "exit"> /dev/null 2>&1; then
         log WARN "[$CURRENT_UPDATE/$NR_UPDATES] Can't connect to device. Skipping..."
         continue
     fi
 
-    # Transfer the scripts
-    if ! scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o Hostname="${uuid}.vpn" "${UPDATE_TOOLS[@]}" "$SSH_HOST":/tmp/ > "$log_filename" 2>&1; then
-        log WARN "[$CURRENT_UPDATE/$NR_UPDATES] Could not scp needed tools to device. Skipping..."
-        continue
-    fi
-
     # Connect to device
-    echo "Running run-resinhup.sh ${RESINHUP_ARGS[*]} ..." >> "$log_filename"
-    # shellcheck disable=SC2029
-    ssh "$SSH_HOST" -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o Hostname="${uuid}.vpn" "/tmp/${main_script_name}" "${RESINHUP_ARGS[@]}" >> "$log_filename" 2>&1 &
+    echo "Running ${main_script_name} ${RESINHUP_ARGS[*]} ..." >> "$log_filename"
+    ssh "$SSH_HOST" host -s "${uuid}" "bash -s" -- "${RESINHUP_ARGS[@]}"  < "${UPDATE_SCRIPT}" >> "$log_filename" 2>&1 &
 
     # Manage queue of threads
     PID=$!
