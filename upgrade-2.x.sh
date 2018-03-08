@@ -765,8 +765,9 @@ else
     log ERROR "Don't know where device-type.json is."
 fi
 # If the user api key exists we use it instead of the deviceApiKey as it means we haven't done the key exchange yet
-# shellcheck disable=SC2046
-read -r APIKEY DEVICEID API_ENDPOINT <<<$(jq -r '.apiKey // .deviceApiKey,.deviceId,.apiEndpoint' $CONFIGJSON)
+APIKEY=$(jq -r '.apiKey // .deviceApiKey' $CONFIGJSON)
+DEVICEID=$(jq -r '.deviceId' $CONFIGJSON)
+API_ENDPOINT=$(jq -r '.apiEndpoint' $CONFIGJSON)
 
 ## Sanity checks
 device_type_check=$(device_type_match)
@@ -893,6 +894,16 @@ if version_gt "$VERSION_ID" "2.0.8" &&
         fi
 else
     log "No supervisor updater fix is required..."
+fi
+
+# Fix issue with `read` on 2.10.x/2.11.0 resinOS versions
+if version_gt "$VERSION_ID" "2.9.7" &&
+    version_gt "2.11.1" "$VERSION_ID"; then
+        log "Fixing supervisor updater if needed..."
+        #shellcheck disable=SC2016
+        sed 's/read tag image_name <<<$data/read tag <<<"$(echo "$data" | head -n 1)" ; read image_name <<<"$(echo "$data" | tail -n 1)"/' /usr/bin/update-resin-supervisor > /tmp/fixed-update-resin-supervisor && \
+          chmod +x /tmp/fixed-update-resin-supervisor && \
+          mount -o bind /tmp/fixed-update-resin-supervisor /usr/bin/update-resin-supervisor
 fi
 
 # The timesyncd.conf lives on the state partition starting from resinOS 2.1.0
