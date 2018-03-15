@@ -216,8 +216,8 @@ function upgrade_supervisor() {
                     progress 90 "Running supervisor update"
                     update-resin-supervisor
                     stop_services
-                    remove_containers
                     if version_gt "6.5.9" "${target_supervisor_version}" ; then
+                        remove_containers
                         log "Removing supervisor database for migration"
                         rm /resin-data/resin-supervisor/database.sqlite || true
                     fi
