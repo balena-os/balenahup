@@ -249,7 +249,7 @@ for uuid in $UUIDS; do
     CURRENT_UPDATE=$((CURRENT_UPDATE+1))
 
     log "[$CURRENT_UPDATE/$NR_UPDATES] Updating $uuid on $SSH_HOST."
-    log_filename="$uuid.upgrade2x.log"
+    log_filename="$uuid.upgrade1x2x.log"
 
     if ! ssh "$SSH_HOST" host -s "${uuid}" "exit" > /dev/null 2>&1; then
         log WARN "[$CURRENT_UPDATE/$NR_UPDATES] Can't connect to device. Skipping..."
