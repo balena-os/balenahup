@@ -746,6 +746,9 @@ progress 25 "Preparing OS update"
 
 # Check board support
 case $SLUG in
+    artik710)
+        binary_type=arm
+        ;;
     beaglebone*)
         binary_type=arm
         ;;
@@ -855,15 +858,7 @@ if ! version_gt "$VERSION" "$preferred_hostos_version" &&
     mkdir -p $tools_path
     export PATH=$tools_path:$PATH
     case $binary_type in
-        arm)
-            download_uri=https://github.com/resin-os/resinhup/raw/master/upgrade-binaries/$binary_type
-            for binary in $tools_binaries; do
-                log "Installing $binary..."
-                curl -f -s -L -o $tools_path/$binary $download_uri/$binary || log ERROR "Couldn't download tool from $download_uri/$binary, aborting."
-                chmod 755 $tools_path/$binary
-            done
-            ;;
-        x86)
+        arm|x86)
             download_uri=https://github.com/resin-os/resinhup/raw/master/upgrade-binaries/$binary_type
             for binary in $tools_binaries; do
                 log "Installing $binary..."
@@ -1031,7 +1026,7 @@ remove_sample_wifi "/mnt/state/root-overlay/etc/NetworkManager/system-connection
 # Switch root partition
 log "Switching root partition..."
 case $SLUG in
-    beaglebone*)
+    artik710|beaglebone*)
         echo "resin_root_part=$update_part_no" >/mnt/boot/resinOS_uEnv.txt
         ;;
     raspberry*)
