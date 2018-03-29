@@ -37,14 +37,12 @@ fi
 ###
 
 # Preventing running multiple instances of upgrades running
-LOCKFILE="/var/lock/resinhup"
+LOCKFILE="/var/lock/resinhup.lock"
 LOCKFD=99
 ## Private functions
 _lock()             { flock "-$1" $LOCKFD; }
 _no_more_locking()  { _lock u; _lock xn && rm -f $LOCKFILE; }
 _prepare_locking()  { eval "exec $LOCKFD>\"$LOCKFILE\""; trap _no_more_locking EXIT; }
-# Run on start
-_prepare_locking
 # Public functions
 exlock_now()        { _lock xn; }  # obtain an exclusive lock immediately or fail
 
@@ -634,9 +632,6 @@ function finish_up() {
 # Script start
 ###
 
-# Try to get lock, and exit if cannot, meaning another instance is running already
-exlock_now || exit 9
-
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     arg="$1"
@@ -720,6 +715,11 @@ while [[ $# -gt 0 ]]; do
     esac
     shift
 done
+
+# Run on start
+_prepare_locking
+# Try to get lock, and exit if cannot, meaning another instance is running already
+exlock_now || exit 9
 
 if [ -n "$RESINOS_REPO_STAGING" ]; then
     RESINOS_REPO="${RESINOS_REPO_STAGING}"
