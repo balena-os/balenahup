@@ -632,6 +632,11 @@ function finish_up() {
 # Script start
 ###
 
+# If no arguments passed, just display the help
+if [ $# -eq 0 ]; then
+    help
+    exit 0
+fi
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     arg="$1"

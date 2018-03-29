@@ -166,6 +166,11 @@ UPDATE_SCRIPT="$SCRIPTPATH/${main_script_name}"
 # Log timer
 STARTTIME=$(date +%s)
 
+# If no arguments passed, just display the help
+if [ $# -eq 0 ]; then
+    help
+    exit 0
+fi
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     arg="$1"
