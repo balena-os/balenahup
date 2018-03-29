@@ -70,6 +70,10 @@ Options:
         Run ${main_script_name} with --ignore-sanity-checks
         See ${main_script_name} help for more details.
 
+  --assume-supported
+        Run ${main_script_name} with --assume-supported
+        See ${main_script_name} help for more details.
+
   --nolog
         Run ${main_script_name} with --nolog
         See ${main_script_name} help for more details. For running over ssh this is likely
@@ -211,6 +215,9 @@ while [[ $# -gt 0 ]]; do
             ;;
         --ignore-sanity-checks)
             RESINHUP_ARGS+=( "--ignore-sanity-checks" )
+            ;;
+        --assume-supported)
+            RESINHUP_ARGS+=( "--assume-supported" )
             ;;
         -u|--uuid)
             if [ -z "$2" ]; then
