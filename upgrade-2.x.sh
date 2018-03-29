@@ -108,6 +108,12 @@ Options:
         This flags turns sanity check failures from errors into warnings only, so the
         the update is not stopped if there are any failures.
         Use with extreme caution!
+
+  --assume-supported
+        Assuming supported device, and disabling the relevant check.
+        Only enabled for updates that use update hooks, otherwise the updater
+        wouldn't know how to switch partitions, so only available for resinOS ${minimum_hostapp_target_version}.
+        You probably want to supply your own '--resinos-tag' as well in this case.
 EOF
 }
 
@@ -714,6 +720,9 @@ while [[ $# -gt 0 ]]; do
         --stop-all)
             STOP_ALL="yes"
             ;;
+        --assume-supported)
+            SUPPORTED="yes"
+            ;;
         *)
             log WARN "Unrecognized option $1."
             ;;
@@ -770,7 +779,12 @@ case $SLUG in
         binary_type=x86
         ;;
     *)
-        log ERROR "Unsupported board type $SLUG."
+        if { version_gt "$target_version" "$minimum_hostapp_target_version" || [ "$target_version" == "$minimum_hostapp_target_version" ]; } &&
+            [ -n "${SUPPORTED}" ]; then
+                log WARN "Assuming supported device (with extracted slug of ${SLUG})."
+        else
+            log ERROR "Unsupported board type $SLUG."
+        fi
 esac
 
 log "Loading info from config.json"
