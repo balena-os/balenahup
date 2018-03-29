@@ -17,6 +17,20 @@ SUPERVISOR_RELEASE_UPDATE=yes
 # Don't run anything before this source as it sets PATH here
 source /etc/profile
 
+###
+# Helper functions
+###
+
+# Preventing running multiple instances of upgrades running
+LOCKFILE="/var/lock/resinhup.lock"
+LOCKFD=99
+## Private functions
+_lock()             { flock "-$1" $LOCKFD; }
+_no_more_locking()  { _lock u; _lock xn && rm -f $LOCKFILE; }
+_prepare_locking()  { eval "exec $LOCKFD>\"$LOCKFILE\""; trap _no_more_locking EXIT; }
+# Public functions
+exlock_now()        { _lock xn; }  # obtain an exclusive lock immediately or fail
+
 # Help function
 function help {
     cat << EOF
@@ -540,6 +554,11 @@ while [[ $# -gt 0 ]]; do
     esac
     shift
 done
+
+# Run on start
+_prepare_locking
+# Try to get lock, and exit if cannot, meaning another instance is running already
+exlock_now || exit 9
 
 # Detect BTRFS_MOUNTPOINT
 if [ -d /mnt/data ]; then
