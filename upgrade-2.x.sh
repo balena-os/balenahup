@@ -826,7 +826,7 @@ fi
 # Check OS variant and filter update availability based on that.
 log "VARIANT_ID: ${VARIANT_ID}"
 if [ -n "$VARIANT_ID" ] && [ ! "$VARIANT_ID" == "prod" ]; then
-    log ERROR "Only updating production devices..."
+    log WARN "Updating a non-production device..."
 fi
 
 # Check host OS version
