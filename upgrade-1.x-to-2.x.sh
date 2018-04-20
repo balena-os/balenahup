@@ -341,6 +341,16 @@ function check_btrfs_umount() {
     log "Btrfs partition successfully umounted..."
 }
 
+# Create full device partition path from parts, e.g:
+# "/dev/mmcblk0" "p" "3" -> "/dev/mmcblk0p3"
+# "/dev/sda" "" "2" -> "/dev/sda2"
+function compose_device() {
+    local _root_dev=$1
+    local _delimiter=$2
+    local _partition_num=$3
+    echo "${_root_dev}${_delimiter}${_partition_num}"
+}
+
 ###
 # Script start
 ###
@@ -430,6 +440,11 @@ case $SLUG in
         DEVICE=beaglebone-black
         BINARY_TYPE=arm
         ;;
+    intel-nuc)
+        MIN_TARGET_VERSION=2.2.0+rev1
+        DEVICE=$SLUG
+        BINARY_TYPE=x86
+        ;;
     raspberry*)
         MIN_TARGET_VERSION=2.2.0+rev1
         DEVICE=$SLUG
@@ -487,10 +502,15 @@ fi
 # Check we are using the first root filesystem
 root_part=$(findmnt -n --raw --evaluate --output=source /)
 case $root_part in
-    *p2)
+    *mmcblk*p[1-9]) root_dev=${root_part%p[1-9]} ; part=${root_part#${root_dev}p} ; delimiter="p" ;;
+      *nvme*p[1-9]) root_dev=${root_part%p[1-9]} ; part=${root_part#${root_dev}p} ; delimiter="p" ;;
+                *) root_dev=${root_part%[0-9]}  ; part=${root_part#${root_dev}}  ; delimiter=""  ;;
+esac
+case $part in
+    2)
         log "Current root partition is first root partition."
         ;;
-    *p3)
+    3)
         log "Current root partition $root_part is the second root partition. Copying existing OS to first partition..."
         progress 10 "Switching partitions"
         stop_all
@@ -498,14 +518,16 @@ case $root_part in
         log "Forcing remount of file systems in read-only mode..."
         echo u > /proc/sysrq-trigger
         log "Copying current root partition to the unused partiton..."
-        root_dev=${root_part%p3}
-        dd if=${root_dev}p3 of=${root_dev}p2 bs=4M
+        dd if="$(compose_device "${root_dev}" "${delimiter}" "3")" of="$(compose_device "${root_dev}" "${delimiter}" "2")" bs=4M
         log "Remounting boot partition as rw for the next step..."
         mount -o remount,rw "${boot_path}"
         log "Updating bootloader to point to first partition..."
         case $SLUG in
             beaglebone*)
                 sed -i -e 's/bootpart=1:3/bootpart=1:2/' "${boot_path}/uEnv.txt"
+                ;;
+            intel-nuc)
+                sed -i -e "s,root=$(compose_device "${root_dev}" "${delimiter}" "3"),root=$(compose_device "${root_dev}" "${delimiter}" "2")," /mnt/boot/EFI/BOOT/grub.cfg
                 ;;
             raspberry*)
                 sed -i -e 's/mmcblk0p3/mmcblk0p2/' "${boot_path}/cmdline.txt"
@@ -521,7 +543,6 @@ case $root_part in
         log ERROR "Current root partition $root_part is not first or second root partition, aborting."
         ;;
 esac
-root_dev=${root_part%p2}
 
 progress 25 "Preparing OS update"
 
@@ -533,7 +554,7 @@ if ! version_gt $VERSION $PREFERRED_HOSTOS_VERSION && ! [ "$VERSION" == $PREFERR
     mkdir -p $tools_path
     export PATH=$tools_path:$PATH
     case $BINARY_TYPE in
-        arm)
+        arm|x86)
             download_uri=https://github.com/resin-os/resinhup/raw/master/upgrade-binaries/$BINARY_TYPE
             for binary in $tools_binaries; do
                 log "Installing $binary..."
@@ -584,17 +605,17 @@ systemctl restart connman
 
 # Save /resin-data to rootB
 log "Making backup filesystem..."
-mkfs.ext4 -F ${root_dev}p3
+mkfs.ext4 -F "$(compose_device "${root_dev}" "${delimiter}" "3")"
 mkdir -p /tmp/backup
-mount ${root_dev}p3 /tmp/backup
+mount "$(compose_device "${root_dev}" "${delimiter}" "3")" /tmp/backup
 log "Backing up resin-data..."
 (cd /mnt/data; tar -zcf /tmp/backup/resin-data.tar.gz resin-data || log ERROR "Could not back up resin-data...")
 
 # Unmount p6
 log "Unmounting filesystems..."
-umount /mnt/data
-umount /var/lib/docker
-umount /resin-data
+systemctl stop "mnt-data.mount"
+systemctl stop "var-lib-docker.mount"
+systemctl stop "resin\x2ddata.mount"
 
 check_btrfs_umount
 
@@ -644,13 +665,13 @@ parted -s $root_dev mkpart logical ext4 696MiB 100%
 
 log "Creating new state and data filesystems..."
 # Create resin-state filesystem
-mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0 -i 8192 -L resin-state ${root_dev}p5
+mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0 -i 8192 -L resin-state "$(compose_device "${root_dev}" "${delimiter}" "5")"
 
 # Create resin-data filesystem
-mkfs.btrfs -f -L resin-data ${root_dev}p6
+mkfs.btrfs -f -L resin-data "$(compose_device "${root_dev}" "${delimiter}" "6")"
 
 # Remount data partition
-mount ${root_dev}p6 /mnt/data
+mount "$(compose_device "${root_dev}" "${delimiter}" "6")" /mnt/data
 
 # Copy backup of resin-data
 cp /tmp/backup/resin-data.tar.gz /mnt/data
@@ -673,13 +694,13 @@ parted -s $root_dev mkpart primary ext4 356MiB 668MiB
 
 log "Creating new root filesystems..."
 # Resize first root partition
-resize2fs ${root_dev}p2
+resize2fs "$(compose_device "${root_dev}" "${delimiter}" "2")"
 
 # Create second root filesystem (for backup, this will be reformatted later)
-mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0 -i 8192 -L resin-rootB ${root_dev}p3
+mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0 -i 8192 -L resin-rootB "$(compose_device "${root_dev}" "${delimiter}" "3")"
 
 # Relabel first root filesystem
-e2label ${root_dev}p2 resin-rootA
+e2label "$(compose_device "${root_dev}" "${delimiter}" "2")" resin-rootA
 
 # Rescan partition labels
 udevadm trigger
@@ -689,7 +710,7 @@ log "Creating resin-state partition based on existing config..."
 
 # Mount state partition
 mkdir -p /mnt/state
-mount ${root_dev}p5 /mnt/state
+mount "$(compose_device "${root_dev}" "${delimiter}" "5")" /mnt/state
 
 # Touch reset file
 touch /mnt/state/remove_me_to_reset
@@ -738,7 +759,7 @@ mkdir -p /mnt/state/root-overlay/var/volatile/lib/systemd
 cp -a /var/lib/systemd/* /mnt/state/root-overlay/var/lib/systemd
 
 # Ensure that the boot partition is mounted
-mount ${root_dev}p1 "${boot_path}"
+mount "$(compose_device "${root_dev}" "${delimiter}" "1")" "${boot_path}"
 
 # Make /root/.docker
 mkdir -p /mnt/state/root-overlay/home/root/.docker
@@ -751,7 +772,7 @@ log "Restarting docker..."
 systemctl start docker
 
 # Remount backup dir
-mount ${root_dev}p3 /tmp/backup
+mount "$(compose_device "${root_dev}" "${delimiter}" "3")" /tmp/backup
 
 IMAGE="${RESINOS_REPO}:${RESINOS_TAG}"
 log "Using resinOS image: ${IMAGE}"
@@ -794,10 +815,10 @@ progress 75 "Running OS update"
 
 # Make ext4 data partition
 log "Creating new ext4 resin-data filesystem..."
-mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0 -i 8192 -L resin-data ${root_dev}p6
+mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0 -i 8192 -L resin-data "$(compose_device "${root_dev}" "${delimiter}" "6")"
 
 # Mount it
-mount ${root_dev}p6 /mnt/data
+mount "$(compose_device "${root_dev}" "${delimiter}" "6")" /mnt/data
 
 # Copy resin-data backup and new OS to data partition
 log "Restoring resin-data backup..."
@@ -809,11 +830,11 @@ umount /tmp/backup
 
 # Make new fs for rootB
 log "Creating new root filesystem for new OS..."
-mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0 -i 8192 -L resin-rootB ${root_dev}p3
+mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0 -i 8192 -L resin-rootB "$(compose_device "${root_dev}" "${delimiter}" "3")"
 
 # Mount rootB partition
 mkdir -p /tmp/rootB
-mount ${root_dev}p3 /tmp/rootB
+mount "$(compose_device "${root_dev}" "${delimiter}" "3")" /tmp/rootB
 
 # Extract rootfs to rootB
 log "Extracting new rootfs..."
@@ -893,6 +914,9 @@ case $SLUG in
     beaglebone*)
         echo 'resin_root_part=3' >"${boot_path}/resinOS_uEnv.txt"
         sed -i -e '/mmcdev=.*/d' -e '/bootpart=.*/d' "${boot_path}/uEnv.txt"
+        ;;
+    intel-nuc)
+        sed -i -e "s,root=$(compose_device "${root_dev}" "${delimiter}" "2"),root=$(compose_device "${root_dev}" "${delimiter}" "3")," /mnt/boot/EFI/BOOT/grub.cfg
         ;;
     raspberry*)
         sed -i -e 's/mmcblk0p2/mmcblk0p3/' "${boot_path}/cmdline.txt"
