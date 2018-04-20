@@ -760,19 +760,7 @@ progress 25 "Preparing OS update"
 
 # Check board support
 case $SLUG in
-    artik710)
-        binary_type=arm
-        ;;
-    beaglebone*)
-        binary_type=arm
-        ;;
-    raspberry*)
-        binary_type=arm
-        ;;
-    jetson-tx2|skx2)
-        binary_type=arm
-        ;;
-    ts4900)
+    artik710|beaglebone*|jetson-tx2|raspberry*|skx2|ts4900)
         binary_type=arm
         ;;
     intel-edison|intel-nuc|iot2000|up-board|qemux86*)
