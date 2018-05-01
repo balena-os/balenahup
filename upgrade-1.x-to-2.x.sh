@@ -331,9 +331,10 @@ function fix_supervisor_bootstrap {
 function check_btrfs_umount() {
     # Check whether /data has been correctly umounted, which is the only btrfs
     # partition;  if not, then bail out before anything's destroyed
-    local timeout_seconds=$((SECONDS+30));
+    # Timeout is 30s (=150*0.2s)
+    local timeout_iterations=0
     while pidof btrfs-worker > /dev/null; do
-        if [ $SECONDS -gt ${timeout_seconds} ]; then
+        if [ $((timeout_iterations)) -ge 150 ]; then
             log ERROR "Timing out waiting for btrfs file system to be umounted..."
         fi
         sleep 0.2
