@@ -613,9 +613,9 @@ log "Backing up resin-data..."
 
 # Unmount p6
 log "Unmounting filesystems..."
-systemctl stop "mnt-data.mount"
-systemctl stop "var-lib-docker.mount"
-systemctl stop "resin\x2ddata.mount"
+umount /mnt/data || true
+umount /resin-data || true
+umount /var/lib/docker || true
 
 check_btrfs_umount
 
@@ -627,9 +627,7 @@ if [ -f "/mnt/conf/config.json" ]; then
 fi
 
 # Unmount p5 if mounted
-if mount | grep /mnt/conf; then
-    umount /mnt/conf
-fi
+umount /mnt/conf || true
 
 # Unmount p1
 umount "${boot_path}"
@@ -806,8 +804,9 @@ log "Stopping docker"
 systemctl stop docker
 
 # Unmount data partition
-umount /mnt/data
-umount /var/lib/docker
+umount /mnt/data || true
+umount /resin-data || true
+umount /var/lib/docker || true
 
 check_btrfs_umount
 
