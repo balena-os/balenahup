@@ -405,7 +405,7 @@ function in_container_hostapp_update {
       --privileged \
       "${volumes_args[@]}" \
       "${update_package}" \
-      /bin/bash -c 'storage_driver=$(cat /boot/storage-driver) ; DOCKER_TMPDIR=/mnt/data/resinhup/tmp/ '"${target_dockerd}"' --storage-driver=$storage_driver --data-root='"${inactive}"'/'"${target_docker_cmd}"' --host=unix:///var/run/'"${target_docker_cmd}"'-host.sock --pidfile=/var/run/'"${target_docker_cmd}"'-host.pid --exec-root=/var/run/'"${target_docker_cmd}"'-host --bip=10.114.201.1/24 --fixed-cidr=10.114.201.128/25 --iptables=false & timeout_seconds=$((SECONDS+30)); until DOCKER_HOST="unix:///var/run/'"${target_docker_cmd}"'-host.sock" '"${target_docker_cmd}"' ps &> /dev/null; do sleep 0.2; if [ $SECONDS -gt $timeout_seconds ]; then echo "'"${target_docker_cmd}"'-host did not come up before check timed out..."; exit 1; fi; done; echo "Starting hostapp-update"; hostapp-update -f /resinos-image.docker '"${hostapp_update_extra_args}"'' \
+      /bin/bash -c 'storage_driver=$(cat /boot/storage-driver) ; DOCKER_TMPDIR=/mnt/data/resinhup/tmp/ '"${target_dockerd}"' --storage-driver=$storage_driver --data-root='"${inactive}"'/'"${target_docker_cmd}"' --host=unix:///var/run/'"${target_docker_cmd}"'-host.sock --pidfile=/var/run/'"${target_docker_cmd}"'-host.pid --exec-root=/var/run/'"${target_docker_cmd}"'-host --bip=10.114.201.1/24 --fixed-cidr=10.114.201.128/25 --iptables=false & timeout_iterations=0; until DOCKER_HOST="unix:///var/run/'"${target_docker_cmd}"'-host.sock" '"${target_docker_cmd}"' ps &> /dev/null; do sleep 0.2; if [ $((timeout_iterations++)) -ge 150 ]; then echo "'"${target_docker_cmd}"'-host did not come up before check timed out..."; exit 1; fi; done; echo "Starting hostapp-update"; hostapp-update -f /resinos-image.docker '"${hostapp_update_extra_args}"'' \
     || log ERROR "Update based on hostapp-update has failed..."
 }
 
@@ -460,8 +460,8 @@ function hostapp_based_update {
             storage_driver=$(cat /boot/storage-driver)
             log "Starting ${DOCKER_CMD}-host with ${storage_driver} storage driver"
             ${DOCKERD} --log-driver=journald --storage-driver="${storage_driver}" --data-root="${inactive}/${DOCKER_CMD}" --host="unix:///var/run/${DOCKER_CMD}-host.sock" --pidfile="/var/run/${DOCKER_CMD}-host.pid" --exec-root="/var/run/${DOCKER_CMD}-host" --bip=10.114.101.1/24 --fixed-cidr=10.114.101.128/25 --iptables=false &
-            local timeout_seconds=$((SECONDS+30));
-            until DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} ps &> /dev/null; do sleep 0.2; if [ $SECONDS -gt $timeout_seconds ]; then log ERROR "${DOCKER_CMD}-host did not come up before check timed out..."; fi; done
+            local timeout_iterations=0
+            until DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} ps &> /dev/null; do sleep 0.2; if [ $((timeout_iterations++)) -ge 150 ]; then log ERROR "${DOCKER_CMD}-host did not come up before check timed out..."; fi; done
         fi
     else
         if [ -f "$inactive/resinos.fingerprint" ]; then
@@ -473,8 +473,8 @@ function hostapp_based_update {
             log "Clean inactive partition"
             rm -rf "${inactive:?}/"*
             systemctl start "${DOCKER_CMD}-host"
-            local timeout_seconds=$((SECONDS+30));
-            until DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} ps &> /dev/null; do sleep 0.2; if [ $SECONDS -gt $timeout_seconds ]; then log ERROR "${DOCKER_CMD}-host did not come up before check timed out..."; fi; done
+            local timeout_iterations=0
+            until DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} ps &> /dev/null; do sleep 0.2; if [ $((timeout_iterations++)) -ge 150 ]; then log ERROR "${DOCKER_CMD}-host did not come up before check timed out..."; fi; done
         fi
         if [ "${DOCKER_CMD}" = "balena" ] &&
             [ -d "$inactive/docker" ]; then
