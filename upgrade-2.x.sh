@@ -763,7 +763,7 @@ progress 25 "Preparing OS update"
 
 # Check board support
 case $SLUG in
-    artik710|beaglebone*|fincm3|jetson-tx1|jetson-tx2|odroid-c1|odroid-xu4|orangepi-plus2|raspberry*|skx2|ts4900)
+    artik710|bananapi-m1-plus|beaglebone*|fincm3|imx6ul-var-dart|jetson-tx1|jetson-tx2|odroid-c1|odroid-xu4|orangepi-plus2|raspberry*|skx2|ts4900)
         binary_type=arm
         ;;
     intel-edison|intel-nuc|iot2000|up-board|qemux86*)
