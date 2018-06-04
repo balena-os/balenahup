@@ -408,8 +408,6 @@ function in_container_hostapp_update {
       /bin/bash -c 'storage_driver=$(cat /boot/storage-driver) ; DOCKER_TMPDIR=/mnt/data/resinhup/tmp/ '"${target_dockerd}"' --storage-driver=$storage_driver --data-root='"${inactive}"'/'"${target_docker_cmd}"' --host=unix:///var/run/'"${target_docker_cmd}"'-host.sock --pidfile=/var/run/'"${target_docker_cmd}"'-host.pid --exec-root=/var/run/'"${target_docker_cmd}"'-host --bip=10.114.201.1/24 --fixed-cidr=10.114.201.128/25 --iptables=false & timeout_iterations=0; until DOCKER_HOST="unix:///var/run/'"${target_docker_cmd}"'-host.sock" '"${target_docker_cmd}"' ps &> /dev/null; do sleep 0.2; if [ $((timeout_iterations++)) -ge 150 ]; then echo "'"${target_docker_cmd}"'-host did not come up before check timed out..."; exit 1; fi; done; echo "Starting hostapp-update"; hostapp-update -f /resinos-image.docker '"${hostapp_update_extra_args}"'' \
     || log ERROR "Update based on hostapp-update has failed..."
 
-    # Clean up after the update
-    ${DOCKER_CMD} rmi -f "${update_package}" || true
 }
 
 #######################################
@@ -623,7 +621,25 @@ function find_partitions {
     log "Update partition: ${update_part}"
 }
 
+#######################################
+# Finish up the update process
+# Clean up the update package (if needed), and reboot the device (if needed)
+# Globals:
+#   DOCKER_CMD
+#   NOREBOOT
+# Arguments:
+#   update_package: the docker image to use for the update
+# Returns:
+#   None
+#######################################
 function finish_up() {
+    update_package=$1
+    # Clean up after the update
+    if [ -n "${update_package}" ] ; then
+        log "Cleaning up update package."
+        ${DOCKER_CMD} rmi -f "${update_package}" || true
+    fi
+
     sync
     if [ "${NOREBOOT}" == "no" ]; then
         # Reboot into new OS
@@ -948,11 +964,11 @@ if version_gt "${VERSION_ID}" "${minimum_hostapp_target_version}" ||
 
     if [ "${LEGACY_UPDATE}" = "yes" ]; then
         upgrade_supervisor "${image}" no_docker_host
+        finish_up "${image}"
     else
         upgrade_supervisor "${image}"
+        finish_up
     fi
-
-    finish_up
 
 elif version_gt "${target_version}" "${minimum_hostapp_target_version}" ||
      [ "${target_version}" == "${minimum_hostapp_target_version}" ]; then
@@ -961,8 +977,7 @@ elif version_gt "${target_version}" "${minimum_hostapp_target_version}" ||
     non_hostapp_to_hostapp_update "${image}"
 
     upgrade_supervisor "${image}" no_docker_host
-
-    finish_up
+    finish_up "${image}"
 fi
 
 ### Below here is the regular, non-hostapp resinOS host update
@@ -1049,4 +1064,4 @@ case $SLUG in
         ;;
 esac
 
-finish_up
+finish_up "${image}"
