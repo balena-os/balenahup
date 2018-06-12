@@ -613,9 +613,12 @@ log "Backing up resin-data..."
 (cd /mnt/data; tar -zcf /tmp/backup/resin-data.tar.gz resin-data || log ERROR "Could not back up resin-data...")
 
 # Unmount p6
-log "Unmounting filesystems..."
+log "Stopping relevant mount services and unmounting filesystems..."
+systemctl stop mnt-data.mount
 umount /mnt/data || true
+systemctl stop "resin\x2ddata.mount"
 umount /resin-data || true
+systemctl stop var-lib-docker.mount
 umount /var/lib/docker || true
 
 check_btrfs_umount
@@ -627,11 +630,11 @@ if [ -f "/mnt/conf/config.json" ]; then
     cp "/mnt/conf/config.json" "${boot_path}/config.json"
 fi
 
-# Unmount p5 if mounted
+# Unmount conf partition if mounted
 umount /mnt/conf || true
 
-# Unmount p1
-umount "${boot_path}"
+# Unmount boot partition
+umount "${boot_path}" || true
 
 log "Creating new partition table stage 1..."
 # Delete partitions 4-6
