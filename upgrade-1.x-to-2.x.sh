@@ -519,7 +519,7 @@ case $part in
         log "Forcing remount of file systems in read-only mode..."
         echo u > /proc/sysrq-trigger
         log "Copying current root partition to the unused partiton..."
-        dd if="$(compose_device "${root_dev}" "${delimiter}" "3")" of="$(compose_device "${root_dev}" "${delimiter}" "2")" bs=4M
+        dd if="$(compose_device "${root_dev}" "${delimiter}" "3")" of="$(compose_device "${root_dev}" "${delimiter}" "2")" bs=4M conv=fsync
         log "Remounting boot partition as rw for the next step..."
         mount -o remount,rw "${boot_path}"
         log "Updating bootloader to point to first partition..."
