@@ -328,6 +328,17 @@ function fix_supervisor_bootstrap {
     fi
 }
 
+# Some 2.x devices have docker version that cannot run multilayer downloads from Docker Hub anymore
+# Force docker (in the new system) to not use any concurrency in downloads to work around that.
+function fix_docker_daemon {
+    log "Target needs adjustments to the docker daemon command line"
+    local service_file="/tmp/rootB/lib/systemd/system/docker.service"
+    if [ -f "${service_file}" ]; then
+        log "Modifying: ${service_file}"
+        sed -i 's/^ExecStart=\/usr\/bin\/docker.*/& --max-concurrent-downloads 1/g' "$service_file"
+    fi
+}
+
 function check_btrfs_umount() {
     # Check whether /data has been correctly umounted, which is the only btrfs
     # partition;  if not, then bail out before anything's destroyed
@@ -854,6 +865,12 @@ rm -rf /tmp/quirks
 # https://github.com/resin-os/meta-resin/pull/877
 if version_gt "$TARGET_VERSION" "2.4.2" && version_gt "2.7.3" "$TARGET_VERSION"; then
     fix_supervisor_bootstrap
+fi
+
+# Fix docker daemon flags to allow Raspberry Pi 1 resinOS < 2.6.0 to continue
+# pulling from Docker Hub
+if [ "$SLUG" = "raspberry-pi" ] && version_gt "2.6.0" "$TARGET_VERSION"; then
+    fix_docker_daemon
 fi
 
 # Unmount rootB partition
