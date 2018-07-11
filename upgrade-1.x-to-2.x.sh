@@ -530,7 +530,14 @@ case $part in
         log "Forcing remount of file systems in read-only mode..."
         echo u > /proc/sysrq-trigger
         log "Copying current root partition to the unused partiton..."
-        dd if="$(compose_device "${root_dev}" "${delimiter}" "3")" of="$(compose_device "${root_dev}" "${delimiter}" "2")" bs=4M conv=fsync
+        copy_source_device="$(compose_device "${root_dev}" "${delimiter}" "3")"
+        copy_target_device="$(compose_device "${root_dev}" "${delimiter}" "2")"
+        dd if="${copy_source_device}" of="${copy_target_device}" bs=4M conv=fsync
+        if cmp "${copy_source_device}" "${copy_target_device}" ; then
+            log "Reading back copy checks out..."
+        else
+            log ERROR "Copy on ${copy_target_device} is not the same as source at ${copy_source_device}, aborting..."
+        fi
         log "Remounting boot partition as rw for the next step..."
         mount -o remount,rw "${boot_path}"
         log "Updating bootloader to point to first partition..."
