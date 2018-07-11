@@ -954,6 +954,27 @@ elif ! [ -f "/mnt/state/root-overlay/etc/systemd/timesyncd.conf" ] && version_gt
     log "timesyncd.conf migrated to the state partition"
 fi
 
+# Raspberry Pi 1 and certain docker versions (in resinOS <2.5.0) cannot run multilayer
+# docker pulls from Docker Hub. Workaround is limiting concurrent downloads
+if [ "$SLUG" = "raspberry-pi" ] &&
+    version_gt "2.5.1" "$VERSION_ID"; then
+        if [ -f "/etc/systemd/system/docker.service.d/docker.conf" ]; then
+            # development device have this config
+            service_file="/etc/systemd/system/docker.service.d/docker.conf"
+        else
+            service_file="/lib/systemd/system/docker.service"
+        fi
+        if ! grep -q "^ExecStart=.*--max-concurrent-downloads.*" "${service_file}"; then
+            log "Docker fix is needed for correct multilayer pulls..."
+            tmp_service_file="/tmp/$(basename $service_file)"
+            cp "${service_file}" "${tmp_service_file}"
+            sed -i 's/^ExecStart=\/usr\/bin\/docker.*/& --max-concurrent-downloads 1/g' "${tmp_service_file}"
+            mount -o bind "${tmp_service_file}" "${service_file}"
+            systemctl daemon-reload && systemctl stop docker  && systemctl start docker
+            log "Docker service file updated and docker restarted."
+        fi
+fi
+
 ### hostapp-update based updater
 
 if version_gt "${VERSION_ID}" "${minimum_hostapp_target_version}" ||
