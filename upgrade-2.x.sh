@@ -918,7 +918,7 @@ fi
 
 # Fix for issue: https://github.com/resin-os/meta-resin/pull/864
 # Also includes change from: https://github.com/resin-os/meta-resin/pull/882
-if version_gt "$VERSION_ID" "2.0.8" &&
+if version_gt "$VERSION_ID" "2.0.7" &&
     version_gt "2.7.0" "$VERSION_ID"; then
         log "Fixing supervisor updater..."
         if curl --fail --silent -o "/tmp/update-resin-supervisor" https://raw.githubusercontent.com/resin-os/meta-resin/40d5a174da6b52d530c978e0cae22aa61f65d203/meta-resin-common/recipes-containers/docker-disk/docker-resin-supervisor-disk/update-resin-supervisor ; then
