@@ -942,14 +942,18 @@ if version_gt "$VERSION_ID" "2.9.7" &&
           mount -o bind /tmp/fixed-update-resin-supervisor /usr/bin/update-resin-supervisor
 fi
 
-# The timesyncd.conf lives on the state partition starting from resinOS 2.1.0
+# The timesyncd.conf lives on the state partition starting from resinOS 2.1.0 up to 2.13.1
 # For devices that were updated before this fix came to effect, fix things up, otherwise migrate when updating
-if [ -d "/mnt/state/root-overlay/etc/systemd/timesyncd.conf" ]; then
+if [ -d "/mnt/state/root-overlay/etc/systemd/timesyncd.conf" ] \
+   && [ -f "/etc/systemd/timesyncd.conf" ]; then
     rm -rf "/mnt/state/root-overlay/etc/systemd/timesyncd.conf"
     cp "/etc/systemd/timesyncd.conf" "/mnt/state/root-overlay/etc/systemd/timesyncd.conf"
     systemctl restart etc-systemd-timesyncd.conf.mount
     log "timesyncd.conf mount service fixed up"
-elif ! [ -f "/mnt/state/root-overlay/etc/systemd/timesyncd.conf" ] && version_gt "$target_version" "2.1.0"; then
+elif [ ! -f "/mnt/state/root-overlay/etc/systemd/timesyncd.conf" ] \
+   && [ -f "/etc/systemd/timesyncd.conf" ] \
+   && version_gt "$target_version" "2.1.0" \
+   && version_gt "2.13.1" "$target_version"; then
     cp "/etc/systemd/timesyncd.conf" "/mnt/state/root-overlay/etc/systemd/timesyncd.conf"
     log "timesyncd.conf migrated to the state partition"
 fi
