@@ -218,7 +218,7 @@ function upgrade_supervisor() {
                     curl -s "${API_ENDPOINT}/v2/device($DEVICEID)?apikey=$APIKEY" -X PATCH -H 'Content-Type: application/json;charset=UTF-8' --data-binary "{\"supervisor_release\": \"$UPDATER_SUPERVISOR_ID\"}" > /dev/null 2>&1
                     log "Running supervisor updater..."
                     progress 90 "Running supervisor update"
-                    update-resin-supervisor
+                    update-resin-supervisor || log WARN "Supervisor couldn't be updated, continuing anyways"
                     stop_services
                     if version_gt "6.5.9" "${target_supervisor_version}" ; then
                         remove_containers
@@ -960,7 +960,10 @@ fi
 
 # Raspberry Pi 1 and certain docker versions (in resinOS <2.5.0) cannot run multilayer
 # docker pulls from Docker Hub. Workaround is limiting concurrent downloads
-if [ "$SLUG" = "raspberry-pi" ] &&
+# Apply this fix only to resinOS version >=2.0.7, though, as docker in earlier
+# versions does not have that flag, and would not run properly
+if [ "$SLUG" = "raspberry-pi" ] && \
+    version_gt "$VERSION_ID" "2.0.7" && \
     version_gt "2.5.1" "$VERSION_ID"; then
         if [ -f "/etc/systemd/system/docker.service.d/docker.conf" ]; then
             # development device have this config
