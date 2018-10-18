@@ -111,16 +111,6 @@ function upgradeSupervisor() {
     # the tools shipped with the hostOS.
     log "Supervisor update start..."
 
-    if version_gt "$TARGET_VERSION" "2.4.0+rev0" &&
-        version_gt "2.7.3+rev1" "$TARGET_VERSION" &&
-        [ -z "$TARGET_SUPERVISOR_VERSION" ] ; then
-        # Fixing up supervisor version https://github.com/resin-io/resin-supervisor/issues/495
-        # by selecting the first fixed supervisor after the issues
-        # Needs to apply to version 2.4.2+rev1 <= version < 2.7.3+rev1;
-        # only if no explicit sypervisor is set
-        TARGET_SUPERVISOR_VERSION="6.3.6_logstream"
-    fi
-
     if [ -z "$TARGET_SUPERVISOR_VERSION" ]; then
         log "No explicit supervisor version was provided, update to default version in target resinOS..."
         if [ "$STAGING" = "yes" ]; then
@@ -880,11 +870,21 @@ if [ "$SLUG" = "raspberry-pi" ] && version_gt "2.6.0" "$TARGET_VERSION"; then
     fix_docker_daemon
 fi
 
+# Supervisor version fix as needed
+if version_gt "$TARGET_VERSION" "2.4.0+rev0" &&
+    version_gt "2.7.3+rev1" "$TARGET_VERSION" &&
+    [ -z "$TARGET_SUPERVISOR_VERSION" ] ; then
+    # Fixing up supervisor version https://github.com/resin-io/resin-supervisor/issues/495
+    # by selecting the first fixed supervisor after the issues
+    # Needs to apply to version 2.4.2+rev1 <= version < 2.7.3+rev1;
+    # only if no explicit sypervisor is set
+    TARGET_SUPERVISOR_VERSION="6.3.6_logstream"
+fi
 # Load supervisor version from the new OS version directly
 if [ -z "$TARGET_SUPERVISOR_VERSION" ]; then
   TARGET_SUPERVISOR_VERSION=$(cat /tmp/rootB/etc/resin-supervisor/supervisor.conf | sed -rn 's/SUPERVISOR_TAG=v(.*)/\1/p')
-  log "Loaded target supervisor version: $TARGET_SUPERVISOR_VERSION"
 fi
+log "Loaded target supervisor version: $TARGET_SUPERVISOR_VERSION"
 
 # Unmount rootB partition
 umount /tmp/rootB
