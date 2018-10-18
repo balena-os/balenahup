@@ -118,7 +118,7 @@ function upgradeSupervisor() {
         # by selecting the first fixed supervisor after the issues
         # Needs to apply to version 2.4.2+rev1 <= version < 2.7.3+rev1;
         # only if no explicit sypervisor is set
-        TARGET_SUPERVISOR_VERSION="6.3.5"
+        TARGET_SUPERVISOR_VERSION="6.3.6_logstream"
     fi
 
     if [ -z "$TARGET_SUPERVISOR_VERSION" ]; then
@@ -878,6 +878,12 @@ fi
 # pulling from Docker Hub
 if [ "$SLUG" = "raspberry-pi" ] && version_gt "2.6.0" "$TARGET_VERSION"; then
     fix_docker_daemon
+fi
+
+# Load supervisor version from the new OS version directly
+if [ -z "$TARGET_SUPERVISOR_VERSION" ]; then
+  TARGET_SUPERVISOR_VERSION=$(cat /tmp/rootB/etc/resin-supervisor/supervisor.conf | sed -rn 's/SUPERVISOR_TAG=v(.*)/\1/p')
+  log "Loaded target supervisor version: $TARGET_SUPERVISOR_VERSION"
 fi
 
 # Unmount rootB partition
