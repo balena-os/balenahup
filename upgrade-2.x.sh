@@ -358,6 +358,7 @@ function in_container_hostapp_update {
     local target_docker_cmd
     local target_dockerd
     local volumes_args=()
+    local retrycount=0
 
     stop_services
     if [ "${STOP_ALL}" == "yes" ]; then
@@ -377,7 +378,15 @@ function in_container_hostapp_update {
         target_dockerd="dockerd"
     fi
 
-    ${DOCKER_CMD} pull "${update_package}" || log ERROR "Couldn't pull docker image..."
+    while true ; do
+        ${DOCKER_CMD} pull "${update_package}" && break || log WARN "Couldn't pull docker image, was try #${retrycount}..."
+        retrycount=$[$retrycount+1]
+        if [ $retrycount -ge 10 ]; then
+            log ERROR "Couldn't pull docker image, giving up..."
+        else
+            sleep 10
+        fi
+    done
     mkfifo /tmp/resinos-image.docker
     ${DOCKER_CMD} save "${update_package}" > /tmp/resinos-image.docker &
     mkdir -p /mnt/data/resinhup/tmp
