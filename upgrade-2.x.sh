@@ -497,10 +497,11 @@ function hostapp_based_update {
             # Migrating to balena and hostapp-update hooks run inside the target container
             log "Balena migration"
             systemctl stop docker-host || true
-            if [ -d "/mnt/sysroot/inactive/docker" ] &&
-                [ ! -d "/mnt/sysroot/inactive/balena" ] ; then
+            if  [ -d "${inactive}/docker" ] &&
+                [ ! -L "${inactive}/docker" ] ; then
                     log "Need to move docker folder on the inactive partition"
-                    mv /mnt/sysroot/inactive/{docker,balena} && ln -s /mnt/sysroot/inactive/{balena,docker}
+                    rm -rf "${inactive}/balena" || true
+                    mv "${inactive}/"{docker,balena} && ln -s "${inactive}/"{balena,docker}
             fi
 
             in_container_hostapp_update "${update_package}" "${inactive}"
