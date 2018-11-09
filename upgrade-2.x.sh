@@ -644,10 +644,13 @@ function find_partitions {
 #######################################
 function finish_up() {
     update_package=$1
-    # Clean up after the update
-    if [ -n "${update_package}" ] ; then
-        log "Cleaning up update package."
-        ${DOCKER_CMD} rmi -f "${update_package}" || true
+    # Clean up after the update if needed
+    if [ -n "${update_package}" ] &&
+        ${DOCKER_CMD} inspect "${update_package}" > /dev/null 2>&1 ; then
+            log "Cleaning up update package: ${update_package}"
+            ${DOCKER_CMD} rmi -f "${update_package}" || true
+    else
+        log "No update package cleanup done"
     fi
 
     sync
@@ -1005,7 +1008,7 @@ if version_gt "${VERSION_ID}" "${minimum_hostapp_target_version}" ||
         finish_up "${image}"
     else
         upgrade_supervisor "${image}"
-        finish_up
+        finish_up "${image}"
     fi
 
 elif version_gt "${target_version}" "${minimum_hostapp_target_version}" ||
