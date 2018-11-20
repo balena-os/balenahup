@@ -350,8 +350,9 @@ function getSupervisorVersionFromRelease() {
     DEFAULT_SUPERVISOR_VERSION_URL="${DEFAULT_SUPERVISOR_VERSION_URL_BASE}images/${SLUG}/${HOSTOS_VERSION}/VERSION"
 
     # Get supervisor version for target resinOS release, it is in format of "a.b.c-shortsha", e.g. "4.1.2-f566dc4dd241",
+    # or newer "logstream" supervisor, where the VERSION is "a.b.c-logstream", which is translated into "a.b.c_logstream",
     # and tag new version for the device if it's newer than the current version, from the API
-    DEFAULT_SUPERVISOR_VERSION=$(curl -s "$DEFAULT_SUPERVISOR_VERSION_URL" | sed 's/-.*//')
+    DEFAULT_SUPERVISOR_VERSION=$(curl -s "$DEFAULT_SUPERVISOR_VERSION_URL" | sed 's/-logstream/_logstream/; s/-.*//')
     if [ -z "$DEFAULT_SUPERVISOR_VERSION" ] || [ -z "${DEFAULT_SUPERVISOR_VERSION##*xml*}" ]; then
         log ERROR "Could not get the default supervisor version for this resinOS release, bailing out."
     else
