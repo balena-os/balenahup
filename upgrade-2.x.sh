@@ -151,7 +151,7 @@ function stop_services() {
     log "Stopping supervisor and related services..."
     systemctl stop update-resin-supervisor.timer > /dev/null 2>&1
     systemctl stop resin-supervisor > /dev/null 2>&1
-    ${DOCKER_CMD} stop resin_supervisor > /dev/null 2>&1 || true
+    ${DOCKER_CMD} rm -f resin_supervisor > /dev/null 2>&1 || true
 }
 
 function remove_containers() {
