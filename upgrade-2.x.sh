@@ -440,6 +440,10 @@ function hostapp_based_update {
     local storage_driver
     local inactive="/mnt/sysroot/inactive"
     local balena_migration=no
+    local inactive_used
+    local hostapp_image_count
+    local storage_driver
+    storage_driver=$(cat /boot/storage-driver)
 
     case ${SLUG} in
         raspberry*)
@@ -466,8 +470,6 @@ function hostapp_based_update {
         log "Clean inactive partition"
         rm -rf "${inactive:?}/"*
         if [ "$balena_migration" = "no" ]; then
-            local storage_driver
-            storage_driver=$(cat /boot/storage-driver)
             log "Starting ${DOCKER_CMD}-host with ${storage_driver} storage driver"
             ${DOCKERD} --log-driver=journald --storage-driver="${storage_driver}" --data-root="${inactive}/${DOCKER_CMD}" --host="unix:///var/run/${DOCKER_CMD}-host.sock" --pidfile="/var/run/${DOCKER_CMD}-host.pid" --exec-root="/var/run/${DOCKER_CMD}-host" --bip=10.114.101.1/24 --fixed-cidr=10.114.101.128/25 --iptables=false &
             local timeout_iterations=0
@@ -490,6 +492,20 @@ function hostapp_based_update {
             [ -d "$inactive/docker" ]; then
                 log "Removing leftover docker folder on a balena device"
                 rm -rf "$inactive/docker"
+        fi
+
+        # Check leftover data on the Inactive partition, and clean up when found
+        inactive_used=$(df "${inactive}" | grep "${inactive}" | awk '{ print $3}')
+        # The empty/default storage space use is about 2200kb, so if more than that is in use, trigger cleanup
+        if [ "$inactive_used" -gt "5000" ]; then
+            hostapp_image_count=$(DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} images -q | wc -l)
+            if [ "$hostapp_image_count" -eq "0" ]; then
+                # There are no hostapp images, but space is still taken up
+                local target_folder="${inactive}/${DOCKER_CMD}/${storage_driver}/diff"
+                log "Found potential leftover data, cleaning ${target_folder}"
+                find "$target_folder" -mindepth 1 -maxdepth 1 -exec rm -r "{}" \; || true
+                log "Inactive partition usage after cleanup: $(df -h "${inactive}" | grep "${inactive}" | awk '{ print $3}')"
+            fi
         fi
     fi
 
