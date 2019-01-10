@@ -756,11 +756,11 @@ sed -i -e 's/@TARGET_TAG@/v2.8.3/' /mnt/state/root-overlay/etc/resin-supervisor/
 
 # Copy docker config
 mkdir -p /mnt/state/root-overlay/etc/docker
-cp -a /etc/docker/* /mnt/state/root-overlay/docker
+cp -a /etc/docker/* /mnt/state/root-overlay/etc/docker/
 
 # Copy dropbear config
 mkdir -p /mnt/state/root-overlay/etc/dropbear
-cp -a /etc/dropbear/* /mnt/state/root-overlay/dropbear
+cp -a /etc/dropbear/* /mnt/state/root-overlay/etc/dropbear/
 
 # Create some /var dirs
 mkdir -p /mnt/state/root-overlay/var/lib/systemd
