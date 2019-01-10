@@ -519,6 +519,7 @@ case $part in
         sync
         log "Forcing remount of file systems in read-only mode..."
         echo u > /proc/sysrq-trigger
+        sync
         log "Copying current root partition to the unused partiton..."
         copy_source_device="$(compose_device "${root_dev}" "${delimiter}" "3")"
         copy_target_device="$(compose_device "${root_dev}" "${delimiter}" "2")"
