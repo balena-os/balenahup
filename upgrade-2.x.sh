@@ -501,10 +501,14 @@ function hostapp_based_update {
             hostapp_image_count=$(DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} images -q | wc -l)
             if [ "$hostapp_image_count" -eq "0" ]; then
                 # There are no hostapp images, but space is still taken up
-                local target_folder="${inactive}/${DOCKER_CMD}/${storage_driver}/diff"
+                local target_folder="${inactive}/${DOCKER_CMD}/${storage_driver}/"
                 log "Found potential leftover data, cleaning ${target_folder}"
+                systemctl stop "${DOCKER_CMD}-host"
                 find "$target_folder" -mindepth 1 -maxdepth 1 -exec rm -r "{}" \; || true
                 log "Inactive partition usage after cleanup: $(df -h "${inactive}" | grep "${inactive}" | awk '{ print $3}')"
+                systemctl start "${DOCKER_CMD}-host"
+                local timeout_iterations=0
+                until DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} ps &> /dev/null; do sleep 0.2; if [ $((timeout_iterations++)) -ge 150 ]; then log ERROR "${DOCKER_CMD}-host did not come up before check timed out..."; fi; done
             fi
         fi
     fi
