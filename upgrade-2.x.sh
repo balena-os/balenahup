@@ -204,7 +204,7 @@ function upgrade_supervisor() {
         fi
     fi
 
-    if CURRENT_SUPERVISOR_VERSION=$(curl -s "${API_ENDPOINT}/v2/device(${DEVICEID})?\$select=supervisor_version&apikey=${APIKEY}" | jq -r '.d[0].supervisor_version'); then
+    if CURRENT_SUPERVISOR_VERSION=$(curl --retry 10 -s "${API_ENDPOINT}/v2/device(${DEVICEID})?\$select=supervisor_version&apikey=${APIKEY}" | jq -r '.d[0].supervisor_version'); then
         if [ -z "$CURRENT_SUPERVISOR_VERSION" ]; then
             log ERROR "Could not get current supervisor version from the API..."
         else
@@ -212,10 +212,10 @@ function upgrade_supervisor() {
                 log "Supervisor update: will be upgrading from v${CURRENT_SUPERVISOR_VERSION} to v${target_supervisor_version}"
                 UPDATER_SUPERVISOR_TAG="v${target_supervisor_version}"
                 # Get the supervisor id
-                if UPDATER_SUPERVISOR_ID=$(curl -s "${API_ENDPOINT}/v2/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'$UPDATER_SUPERVISOR_TAG'))&apikey=${APIKEY}" | jq -e -r '.d[0].id'); then
+                if UPDATER_SUPERVISOR_ID=$(curl --retry 10 -s "${API_ENDPOINT}/v2/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'$UPDATER_SUPERVISOR_TAG'))&apikey=${APIKEY}" | jq -e -r '.d[0].id'); then
                     log "Extracted supervisor vars: ID: $UPDATER_SUPERVISOR_ID"
                     log "Setting supervisor version in the API..."
-                    curl -s "${API_ENDPOINT}/v2/device($DEVICEID)?apikey=$APIKEY" -X PATCH -H 'Content-Type: application/json;charset=UTF-8' --data-binary "{\"supervisor_release\": \"$UPDATER_SUPERVISOR_ID\"}" > /dev/null 2>&1
+                    curl --retry 10 -s "${API_ENDPOINT}/v2/device($DEVICEID)?apikey=$APIKEY" -X PATCH -H 'Content-Type: application/json;charset=UTF-8' --data-binary "{\"supervisor_release\": \"$UPDATER_SUPERVISOR_ID\"}" > /dev/null 2>&1
                     log "Running supervisor updater..."
                     progress 90 "Running supervisor update"
                     update-resin-supervisor || log WARN "Supervisor couldn't be updated, continuing anyways"
@@ -258,7 +258,7 @@ function image_exsits() {
     local response
 
     # Check
-    response=$(curl --write-out "%{http_code}" --silent --output /dev/null "${MANIFEST}")
+    response=$(curl --retry 10 --write-out "%{http_code}" --silent --output /dev/null "${MANIFEST}")
     if [ "$response" = 401 ]; then
         # 401 is "Unauthorized", have to grab the access tokens from the provided endpoint
         local auth_header
@@ -267,7 +267,7 @@ function image_exsits() {
         local scope
         local token
         local response_auth
-        auth_header=$(curl -I --silent "${MANIFEST}" |grep -i www-authenticate)
+        auth_header=$(curl --retry 10 -I --silent "${MANIFEST}" |grep -i www-authenticate)
         # The auth_header looks as
         # Www-Authenticate: Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:resin/resinos:pull"
         # shellcheck disable=SC2001
@@ -277,8 +277,8 @@ function image_exsits() {
         # shellcheck disable=SC2001
         scope=$(echo "$auth_header" | sed 's/.*,scope="\([^,]*\)".*/\1/' )
         # Grab the token from the appropriate address, and retry the manifest query with that
-        token=$(curl --silent "${realm}?service=${service}&scope=${scope}" | jq -r '.access_token // .token')
-        response_auth=$(curl --write-out "%{http_code}" --silent --output /dev/null -H "Authorization: Bearer ${token}" "${MANIFEST}")
+        token=$(curl --retry 10 --silent "${realm}?service=${service}&scope=${scope}" | jq -r '.access_token // .token')
+        response_auth=$(curl --retry 10 --write-out "%{http_code}" --silent --output /dev/null -H "Authorization: Bearer ${token}" "${MANIFEST}")
         if [ "$response_auth" = 200 ]; then
             exists=yes
         fi
@@ -332,7 +332,7 @@ function pre_update_fix_bootfiles_hook {
     log "Applying bootfiles hostapp-hook fix"
     local bootfiles_temp
     bootfiles_temp=$(mktemp)
-    curl -f -s -L -o "$bootfiles_temp" https://raw.githubusercontent.com/resin-os/resinhup/77401f3ecdeddaac843b26827f0a44d3b044efdd/upgrade-patches/0-bootfiles || log ERROR "Couldn't download fixed '0-bootfiles', aborting."
+    curl --retry 10 -f -s -L -o "$bootfiles_temp" https://raw.githubusercontent.com/resin-os/resinhup/77401f3ecdeddaac843b26827f0a44d3b044efdd/upgrade-patches/0-bootfiles || log ERROR "Couldn't download fixed '0-bootfiles', aborting."
     chmod 755 "$bootfiles_temp"
     mount --bind "$bootfiles_temp"  /etc/hostapp-update-hooks.d/0-bootfiles
 }
@@ -921,7 +921,7 @@ if ! version_gt "$VERSION" "$preferred_hostos_version" &&
             download_uri=https://github.com/resin-os/resinhup/raw/master/upgrade-binaries/$binary_type
             for binary in $tools_binaries; do
                 log "Installing $binary..."
-                curl -f -s -L -o $tools_path/$binary $download_uri/$binary || log ERROR "Couldn't download tool from $download_uri/$binary, aborting."
+                curl --retry 10 -f -s -L -o $tools_path/$binary $download_uri/$binary || log ERROR "Couldn't download tool from $download_uri/$binary, aborting."
                 chmod 755 $tools_path/$binary
             done
             ;;
@@ -943,7 +943,7 @@ if version_gt "$VERSION_ID" "2.0.6" &&
         mkdir -p $tools_path
         export PATH=$tools_path:$PATH
         download_url=https://raw.githubusercontent.com/resin-os/meta-resin/v2.3.0/meta-resin-common/recipes-support/resin-device-progress/resin-device-progress/resin-device-progress
-        curl -f -s -L -o $tools_path/resin-device-progress $download_url || log WARN "Couldn't download tool from $download_url, progress bar won't work, but not aborting..."
+        curl --retry 10 -f -s -L -o $tools_path/resin-device-progress $download_url || log WARN "Couldn't download tool from $download_url, progress bar won't work, but not aborting..."
         chmod 755 $tools_path/resin-device-progress
 else
     log "No resin-device-progress fix is required..."
@@ -954,7 +954,7 @@ fi
 if version_gt "$VERSION_ID" "2.0.7" &&
     version_gt "2.7.0" "$VERSION_ID"; then
         log "Fixing supervisor updater..."
-        if curl --fail --silent -o "/tmp/update-resin-supervisor" https://raw.githubusercontent.com/resin-os/meta-resin/40d5a174da6b52d530c978e0cae22aa61f65d203/meta-resin-common/recipes-containers/docker-disk/docker-resin-supervisor-disk/update-resin-supervisor ; then
+        if curl --retry 10 --fail --silent -o "/tmp/update-resin-supervisor" https://raw.githubusercontent.com/resin-os/meta-resin/40d5a174da6b52d530c978e0cae22aa61f65d203/meta-resin-common/recipes-containers/docker-disk/docker-resin-supervisor-disk/update-resin-supervisor ; then
             chmod 755 "/tmp/update-resin-supervisor"
             PATH="/tmp:$PATH"
             log "Added temporary supervisor updater replaced with fixed version..."
