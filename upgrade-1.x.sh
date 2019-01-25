@@ -215,8 +215,8 @@ function runPreHacks {
         if ! [ -e $script_path ]; then
             log "Curl hack: Missing $script_path, aborting."
         fi
-        sed --in-place "s|curl --silent --header \"User-Agent:\" --compressed|wget -qO-|" $script_path
-        sed --in-place "s|curl -s --compressed|wget -qO-|" $script_path
+        sed --in-place "s|curl --retry 10 --silent --header \"User-Agent:\" --compressed|wget -qO-|" $script_path
+        sed --in-place "s|curl --retry 10 -s --compressed|wget -qO-|" $script_path
     fi
 
     # Earlier BeagleBone releases might fail to update due to memory pressure.
@@ -352,11 +352,11 @@ function getSupervisorVersionFromRelease() {
     # Get supervisor version for target resinOS release, it is in format of "a.b.c-shortsha", e.g. "4.1.2-f566dc4dd241",
     # or newer "logstream" supervisor, where the VERSION is "a.b.c-logstream", which is translated into "a.b.c_logstream",
     # and tag new version for the device if it's newer than the current version, from the API
-    DEFAULT_SUPERVISOR_VERSION=$(curl -s "$DEFAULT_SUPERVISOR_VERSION_URL" | sed 's/-logstream/_logstream/; s/-.*//')
+    DEFAULT_SUPERVISOR_VERSION=$(curl --retry 10 -s "$DEFAULT_SUPERVISOR_VERSION_URL" | sed 's/-logstream/_logstream/; s/-.*//')
     if [ -z "$DEFAULT_SUPERVISOR_VERSION" ] || [ -z "${DEFAULT_SUPERVISOR_VERSION##*xml*}" ]; then
         log ERROR "Could not get the default supervisor version for this resinOS release, bailing out."
     else
-        CURRENT_SUPERVISOR_VERSION=$(curl -s "${API_ENDPOINT}/v2/device(${DEVICEID})?\$select=supervisor_version&apikey=${APIKEY}" | jq -r '.d[0].supervisor_version')
+        CURRENT_SUPERVISOR_VERSION=$(curl --retry 10 -s "${API_ENDPOINT}/v2/device(${DEVICEID})?\$select=supervisor_version&apikey=${APIKEY}" | jq -r '.d[0].supervisor_version')
         if [ -z "$CURRENT_SUPERVISOR_VERSION" ]; then
             log ERROR "Could not get current supervisor version from the API, bailing out."
         else
@@ -364,7 +364,7 @@ function getSupervisorVersionFromRelease() {
                 log "Supervisor update: will be upgrading from v${CURRENT_SUPERVISOR_VERSION} to v${DEFAULT_SUPERVISOR_VERSION}"
                 UPDATER_SUPERVISOR_TAG="v${DEFAULT_SUPERVISOR_VERSION}"
                 # Get the supervisor id and image name
-                if data=$(curl -s "${API_ENDPOINT}/v2/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'$UPDATER_SUPERVISOR_TAG'))&apikey=${APIKEY}" | jq -e -r '.d[0].id,.d[0].image_name'); then
+                if data=$(curl --retry 10 -s "${API_ENDPOINT}/v2/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'$UPDATER_SUPERVISOR_TAG'))&apikey=${APIKEY}" | jq -e -r '.d[0].id,.d[0].image_name'); then
                     read UPDATER_SUPERVISOR_ID UPDATER_SUPERVISOR_IMAGE_NAME <<<$data
                     log "Extracted supervisor vars: ID: $UPDATER_SUPERVISOR_ID; Image Name: $UPDATER_SUPERVISOR_IMAGE_NAME"
                 fi
@@ -461,9 +461,9 @@ function updateSupervisor() {
 
     log "Setting supervisor version in the API"
     if [ -z "$UPDATER_SUPERVISOR_ID" ]; then
-        UPDATER_SUPERVISOR_ID=$(curl -s "${API_ENDPOINT}/v2/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'$UPDATER_SUPERVISOR_TAG'))&apikey=${APIKEY}" | jq -e -r '.d[0].id')
+        UPDATER_SUPERVISOR_ID=$(curl --retry 10 -s "${API_ENDPOINT}/v2/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'$UPDATER_SUPERVISOR_TAG'))&apikey=${APIKEY}" | jq -e -r '.d[0].id')
     fi
-    curl -s "${API_ENDPOINT}/v2/device($DEVICEID)?apikey=$APIKEY" -X PATCH -H 'Content-Type: application/json;charset=UTF-8' --data-binary "{\"supervisor_release\": \"$UPDATER_SUPERVISOR_ID\"}" > /dev/null 2>&1
+    curl --retry 10 -s "${API_ENDPOINT}/v2/device($DEVICEID)?apikey=$APIKEY" -X PATCH -H 'Content-Type: application/json;charset=UTF-8' --data-binary "{\"supervisor_release\": \"$UPDATER_SUPERVISOR_ID\"}" > /dev/null 2>&1
 }
 
 #
