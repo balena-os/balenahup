@@ -793,6 +793,15 @@ FSARCHIVE=/mnt/data/newos.tar.gz
 
 log "Getting new OS image..."
 progress 50 "Downloading OS update"
+RETRIES=5
+r=1
+while ! docker pull "${IMAGE}" ; do
+    if [ $r -ge "$RETRIES" ] ; then
+        log ERROR "Failed to pull target update image..."
+    fi
+    sleep $((r*5));
+    r=$((r+1));
+done
 # Create container for new version
 CONTAINER=$(docker create ${IMAGE} echo export)
 if [ -z "$CONTAINER" ]; then
