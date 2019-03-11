@@ -600,7 +600,7 @@ stop_all
 # Switch connman to use bind mounted state dir
 log "Switching connman to bind mounted state dir..."
 mkdir -p /tmp/connman
-cp -a /var/lib/connman/* /tmp/connman/
+cp -a /var/lib/connman/* /tmp/connman/ && sync
 # Versions before 1.20 need this to prevent dropping VPN
 if grep -q 'NetworkInterfaceBlacklist=.*resin-vpn.*'  /etc/connman/main.conf ; then
     log "resin-vpn is already blacklisted in connman configuration"
@@ -637,7 +637,7 @@ check_btrfs_umount
 if [ -f "/mnt/conf/config.json" ]; then
     # the boot partition might be mounted ro on some systems, remount
     mount -o remount,rw "${boot_path}"
-    cp "/mnt/conf/config.json" "${boot_path}/config.json"
+    cp "/mnt/conf/config.json" "${boot_path}/config.json" && sync
 fi
 
 # Unmount conf partition if mounted
@@ -687,7 +687,7 @@ mkfs.btrfs -f -L resin-data "$(compose_device "${root_dev}" "${delimiter}" "6")"
 mount "$(compose_device "${root_dev}" "${delimiter}" "6")" /mnt/data
 
 # Copy backup of resin-data
-cp /tmp/backup/resin-data.tar.gz /mnt/data
+cp /tmp/backup/resin-data.tar.gz /mnt/data && sync
 
 # Unmount backup
 umount /tmp/backup
@@ -733,10 +733,10 @@ touch /mnt/state/remove_me_to_reset
 mkdir -p /mnt/state/root-overlay/etc
 
 # Copy machine-id
-cp -a /etc/machine-id /mnt/state/
+cp -a /etc/machine-id /mnt/state/ && sync
 
 # Copy hostname
-cp -a /etc/hostname /mnt/state/root-overlay/etc
+cp -a /etc/hostname /mnt/state/root-overlay/etc && sync
 
 # Create some config dirs
 mkdir -p /mnt/state/root-overlay/etc/systemd/system/resin.target.wants
@@ -751,7 +751,7 @@ ln -s /lib/systemd/system/resin-supervisor.service $wants_dir
 ln -s /lib/systemd/system/update-resin-supervisor.timer $wants_dir
 
 # Copy resin-supervisor config
-cp -a /etc/supervisor.conf /mnt/state/root-overlay/etc/resin-supervisor
+cp -a /etc/supervisor.conf /mnt/state/root-overlay/etc/resin-supervisor && sync
 
 supervisor_conf_path="/mnt/state/root-overlay/etc/resin-supervisor/supervisor.conf"
 # resinOS 1.22 and 1.23 can have bad supervisor tags
@@ -759,18 +759,18 @@ sed -i -e 's/@TARGET_TAG@/v2.8.3/' /mnt/state/root-overlay/etc/resin-supervisor/
 
 # Copy docker config
 mkdir -p /mnt/state/root-overlay/etc/docker
-cp -a /etc/docker/* /mnt/state/root-overlay/etc/docker/
+cp -a /etc/docker/* /mnt/state/root-overlay/etc/docker/ && sync
 
 # Copy dropbear config
 mkdir -p /mnt/state/root-overlay/etc/dropbear
-cp -a /etc/dropbear/* /mnt/state/root-overlay/etc/dropbear/
+cp -a /etc/dropbear/* /mnt/state/root-overlay/etc/dropbear/ && sync
 
 # Create some /var dirs
 mkdir -p /mnt/state/root-overlay/var/lib/systemd
 mkdir -p /mnt/state/root-overlay/var/volatile/lib/systemd
 
 # Copy systemd var files
-cp -a /var/lib/systemd/* /mnt/state/root-overlay/var/lib/systemd
+cp -a /var/lib/systemd/* /mnt/state/root-overlay/var/lib/systemd && sync
 
 # Ensure that the boot partition is mounted
 mount "$(compose_device "${root_dev}" "${delimiter}" "1")" "${boot_path}"
@@ -822,7 +822,7 @@ docker rm ${CONTAINER}
 
 # Copy resin-data to backup partition before we wipe data
 log "Copy resin-data to backup partition"
-cp /mnt/data/resin-data.tar.gz /tmp/backup/
+cp /mnt/data/resin-data.tar.gz /tmp/backup/ && sync
 
 # Stop docker
 log "Stopping docker"
@@ -847,7 +847,7 @@ mount "$(compose_device "${root_dev}" "${delimiter}" "6")" /mnt/data
 # Copy resin-data backup and new OS to data partition
 log "Restoring resin-data backup..."
 (cd /mnt/data; tar xvf /tmp/backup/resin-data.tar.gz)
-cp ${BACKUPARCHIVE} ${FSARCHIVE}
+cp ${BACKUPARCHIVE} ${FSARCHIVE} && sync
 
 # Unmount backup dir
 umount /tmp/backup
@@ -869,7 +869,7 @@ tar -x -X /tmp/root-exclude -C /tmp/rootB -f ${FSARCHIVE}
 
 # Extract quirks
 tar -x -C /tmp -f ${FSARCHIVE} quirks
-cp -a /tmp/quirks/* /tmp/rootB/
+cp -a /tmp/quirks/* /tmp/rootB/ && sync
 rm -rf /tmp/quirks
 
 # Fix supervisor bootstrap issue between 2.4.2 and 2.7.3 versions
@@ -913,7 +913,7 @@ echo resin-boot/EFI/BOOT/grub.cfg >>/tmp/boot-exclude
 # 2.x adds a default config.json, we should avoid clobbering the existing one
 echo resin-boot/config.json >>/tmp/boot-exclude
 tar -x -X /tmp/boot-exclude -C /tmp -f ${FSARCHIVE} resin-boot
-cp -av /tmp/resin-boot/* "${boot_path}"
+cp -av /tmp/resin-boot/* "${boot_path}" && sync
 
 # Remove OS image
 rm ${FSARCHIVE}
