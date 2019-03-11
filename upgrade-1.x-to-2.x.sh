@@ -615,6 +615,7 @@ systemctl restart connman
 
 # Save /resin-data to rootB
 log "Making backup filesystem..."
+dd if="/dev/zero" of="$(compose_device "${root_dev}" "${delimiter}" "3")" bs=4M conv=fsync || true
 mkfs.ext4 -F "$(compose_device "${root_dev}" "${delimiter}" "3")"
 mkdir -p /tmp/backup
 mount "$(compose_device "${root_dev}" "${delimiter}" "3")" /tmp/backup
@@ -676,6 +677,7 @@ parted -s $root_dev mkpart logical ext4 696MiB 100%
 
 log "Creating new state and data filesystems..."
 # Create resin-state filesystem
+dd if="/dev/zero" of="$(compose_device "${root_dev}" "${delimiter}" "5")" bs=4M conv=fsync || true
 mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0 -i 8192 -L resin-state "$(compose_device "${root_dev}" "${delimiter}" "5")"
 
 # Create resin-data filesystem
@@ -708,6 +710,7 @@ log "Creating new root filesystems..."
 resize2fs "$(compose_device "${root_dev}" "${delimiter}" "2")"
 
 # Create second root filesystem (for backup, this will be reformatted later)
+dd if="/dev/zero" of="$(compose_device "${root_dev}" "${delimiter}" "3")" bs=4M conv=fsync || true
 mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0 -i 8192 -L resin-rootB "$(compose_device "${root_dev}" "${delimiter}" "3")"
 
 # Relabel first root filesystem
@@ -851,6 +854,7 @@ umount /tmp/backup
 
 # Make new fs for rootB
 log "Creating new root filesystem for new OS..."
+dd if="/dev/zero" of="$(compose_device "${root_dev}" "${delimiter}" "3")" bs=4M conv=fsync || true
 mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0 -i 8192 -L resin-rootB "$(compose_device "${root_dev}" "${delimiter}" "3")"
 
 # Mount rootB partition
