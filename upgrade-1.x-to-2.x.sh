@@ -643,9 +643,6 @@ fi
 # Unmount conf partition if mounted
 umount /mnt/conf || true
 
-# Unmount boot partition
-umount "${boot_path}" || true
-
 log "Creating new partition table stage 1..."
 # Delete partitions 4-6
 parted -s $root_dev rm 6
@@ -771,9 +768,6 @@ mkdir -p /mnt/state/root-overlay/var/volatile/lib/systemd
 
 # Copy systemd var files
 cp -a /var/lib/systemd/* /mnt/state/root-overlay/var/lib/systemd && sync
-
-# Ensure that the boot partition is mounted
-mount "$(compose_device "${root_dev}" "${delimiter}" "1")" "${boot_path}"
 
 # Make /root/.docker
 mkdir -p /mnt/state/root-overlay/home/root/.docker
