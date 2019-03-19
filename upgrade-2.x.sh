@@ -563,8 +563,9 @@ function non_hostapp_to_hostapp_update {
     find_partitions
     umount "${update_part}" || true
     mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0 -i 8192 -L "${update_label}" "${update_part}"
-    tmp_inactive=$(mktemp -d)
-    mount "${update_part}" "${tmp_inactive}" || log ERROR "Cannot mount inactive partition ${update_part} to ${tmp_inactive}..."
+    tmp_inactive=$(mktemp -d "/tmp/hupinactive.XXXXXXXX")
+    log "Mounting inactive partition ${update_part} to ${tmp_inactive}..."
+    mount "${update_part}" "${tmp_inactive}" || log ERROR "Cannot mount inactive partition..."
 
     case "${SLUG}" in
         raspberry*)
