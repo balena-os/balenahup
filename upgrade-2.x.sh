@@ -359,6 +359,7 @@ function in_container_hostapp_update {
     local target_dockerd
     local volumes_args=()
     local retrycount=0
+    local tmp_image
 
     stop_services
     if [ "${STOP_ALL}" == "yes" ]; then
@@ -387,8 +388,11 @@ function in_container_hostapp_update {
             sleep 10
         fi
     done
-    mkfifo /tmp/resinos-image.docker
-    ${DOCKER_CMD} save "${update_package}" > /tmp/resinos-image.docker &
+
+    tmp_image=$(mktemp -u "/tmp/hupfile.XXXXXXXX")
+    log "Using ${tmp_image} for update image transfer into container"
+    mkfifo "${tmp_image}"
+    ${DOCKER_CMD} save "${update_package}" > "${tmp_image}" &
     mkdir -p /mnt/data/resinhup/tmp
 
     # The setting up the required volumes
@@ -401,7 +405,7 @@ function in_container_hostapp_update {
         volumes_args+=("-v" "/:/mnt/sysroot/active")
     fi
     volumes_args+=("-v" "${tmp_inactive}:${inactive}")
-    volumes_args+=("-v" "/tmp/resinos-image.docker:/resinos-image.docker")
+    volumes_args+=("-v" "${tmp_image}:/resinos-image.docker")
 
     log "Starting hostapp-update within a container"
     # Note that the following docker daemon is started with a different --bip and --fixed-cidr
