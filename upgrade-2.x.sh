@@ -461,6 +461,8 @@ function hostapp_based_update {
             log "No device-specific pre-update fix for ${SLUG}"
     esac
 
+    log "Triggering mounting the inactive root partition..."
+    systemctl start mnt-sysroot-inactive.mount  || log ERROR "Mounting /mnt/sysroot/inactive has failed..."
 
     if [ "${DOCKER_CMD}" = "docker" ] &&
         version_gt "${target_version}" "${minimum_balena_target_version}" ; then
