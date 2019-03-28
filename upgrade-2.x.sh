@@ -110,10 +110,10 @@ Options:
         Use with extreme caution!
 
   --assume-supported
-        Assuming supported device, and disabling the relevant check.
-        Only enabled for updates that use update hooks, otherwise the updater
-        wouldn't know how to switch partitions, so only available for resinOS ${minimum_hostapp_target_version}.
-        You probably want to supply your own '--resinos-tag' as well in this case.
+        This is now deprecated. Assuming supported device, and disabling the relevant check.
+        Only enabled for updates that does not use update hooks, otherwise the updater
+        wouldn't know how to switch partitions, so only available for resinOS
+        below ${minimum_hostapp_target_version}.
 EOF
 }
 
@@ -778,7 +778,7 @@ while [[ $# -gt 0 ]]; do
             STOP_ALL="yes"
             ;;
         --assume-supported)
-            SUPPORTED="yes"
+            log WARN "The --assume-supported flag is deprecated, and has no effect."
             ;;
         *)
             log WARN "Unrecognized option $1."
@@ -815,22 +815,19 @@ fi
 
 progress 25 "Preparing OS update"
 
-# Check board support
-case $SLUG in
-    artik53*|artik710|asus-tinker-board*|bananapi-m1-plus|beaglebone*|cl-som-imx8|fincm3|hummingboard|imx*-var-dart|jetson-tx1|jetson-tx2|odroid-c1|odroid-xu4|orangepi-plus2|orbitty-tx2|raspberry*|revpi-core-3|skx2|ts4900)
-        binary_type=arm
-        ;;
-    intel-edison|intel-nuc|iot2000|up-board|qemux86*)
-        binary_type=x86
-        ;;
-    *)
-        if { version_gt "$target_version" "$minimum_hostapp_target_version" || [ "$target_version" == "$minimum_hostapp_target_version" ]; } &&
-            [ -n "${SUPPORTED}" ]; then
-                log WARN "Assuming supported device (with extracted slug of ${SLUG})."
-        else
+if version_gt "${target_version}" "${minimum_hostapp_target_version}" || [ "${target_version}" == "${minimum_hostapp_target_version}" ]; then
+    log "Target version supports hostapps, no device type support check required."
+else
+    case $SLUG in
+        # Check board support for device types that might have 2.x-2.x non-hostapp updates
+        # The same device types listed as below in the "Switching root partition..." section
+        artik710|beaglebone*|raspberry*|intel-nuc|up-board)
+            log "Device type root partition switch is known, proceeding"
+            ;;
+        *)
             log ERROR "Unsupported board type $SLUG."
-        fi
-esac
+    esac
+fi
 
 log "Loading info from config.json"
 if [ -f /mnt/boot/config.json ]; then
@@ -917,10 +914,25 @@ fi
 if ! version_gt "$VERSION" "$preferred_hostos_version" &&
     ! [ "$VERSION" == "$preferred_hostos_version" ]; then
     log "Host OS version $VERSION is less than $preferred_hostos_version, installing tools..."
+
     tools_path=/tmp/upgrade_tools
     tools_binaries="tar"
     mkdir -p $tools_path
     export PATH=$tools_path:$PATH
+
+    architecture=$(uname -m)
+    case ${architecture} in
+        arm*|aarch64)
+            binary_type="arm"
+            ;;
+        i*86|x86_64)
+            binary_type="x86"
+            ;;
+        *)
+            log WARN "Not explicitly known architecture: ${architecture}"
+            binary_type=""
+    esac
+
     case $binary_type in
         arm|x86)
             download_uri=https://github.com/resin-os/resinhup/raw/master/upgrade-binaries/$binary_type
