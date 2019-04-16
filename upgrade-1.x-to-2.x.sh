@@ -133,7 +133,7 @@ function upgradeSupervisor() {
         fi
     fi
 
-    if CURRENT_SUPERVISOR_VERSION=$(curl --retry 10 -s "${API_ENDPOINT}/v2/device(${DEVICEID})?\$select=supervisor_version&apikey=${APIKEY}" | jq -r '.d[0].supervisor_version'); then
+    if CURRENT_SUPERVISOR_VERSION=$(curl --retry 10 --silent --header "Authorization: Bearer ${APIKEY}" "${API_ENDPOINT}/v5/device(${DEVICEID})?\$select=supervisor_version" | jq -r '.d[0].supervisor_version'); then
         if [ -z "$CURRENT_SUPERVISOR_VERSION" ]; then
             log ERROR "Could not get current supervisor version from the API..."
         else
@@ -141,10 +141,10 @@ function upgradeSupervisor() {
                 log "Supervisor update: will be upgrading from v${CURRENT_SUPERVISOR_VERSION} to ${TARGET_SUPERVISOR_VERSION}"
                 UPDATER_SUPERVISOR_TAG="v${TARGET_SUPERVISOR_VERSION}"
                 # Get the supervisor id, which is the unique numerical key of the supervisor version for the given device type
-                if UPDATER_SUPERVISOR_ID=$(curl --retry 10 -s "${API_ENDPOINT}/v2/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'$UPDATER_SUPERVISOR_TAG'))&apikey=${APIKEY}" | jq -e -r '.d[0].id'); then
+                if UPDATER_SUPERVISOR_ID=$(curl --retry 10 --silent "${API_ENDPOINT}/v5/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'${UPDATER_SUPERVISOR_TAG}'))" | jq -e -r '.d[0].id'); then
                     log "Extracted supervisor vars: ID: $UPDATER_SUPERVISOR_ID"
                     log "Setting supervisor version in the API..."
-                    curl --retry 10 -s "${API_ENDPOINT}/v2/device($DEVICEID)?apikey=$APIKEY" -X PATCH -H 'Content-Type: application/json;charset=UTF-8' --data-binary "{\"supervisor_release\": \"$UPDATER_SUPERVISOR_ID\"}" > /dev/null 2>&1
+                    curl --retry 10 --silent --request PATCH --header "Authorization: Bearer ${APIKEY}" --header 'Content-Type: application/json' "${API_ENDPOINT}/v5/device(${DEVICEID})" --data-binary "{\"should_be_managed_by__supervisor_release\": \"${UPDATER_SUPERVISOR_ID}\"}" > /dev/null 2>&1
                     log "Updating local configuration at ${supervisor_conf_path}..."
                     if grep -q "SUPERVISOR_TAG" "${supervisor_conf_path}"; then
                         # Update supervisor tag
@@ -592,7 +592,7 @@ APIKEY=$(jq -r .apiKey $CONFIGJSON)
 DEVICEID=$(jq -r .deviceId $CONFIGJSON)
 API_ENDPOINT=$(jq -r .apiEndpoint $CONFIGJSON)
 # Get App ID from the API to get the current value, since the device might have been moved from the originally provisioned application
-APP_ID=$(curl --retry 10 -s "${API_ENDPOINT}/v2/application?\$filter=device/id%20eq%20${DEVICEID}&apikey=${APIKEY}" -H "Content-Type: application/json" | jq .d[0].id)
+APP_ID=$(curl --retry 10 --silent --header "Authorization: Bearer ${APIKEY}" --header "Content-Type: application/json" "${API_ENDPOINT}/v5/device?\$filter=id%20eq%20${DEVICEID}&\$select=belongs_to__application" | jq -r '.d[0].belongs_to__application.__id')
 
 # Stop docker containers
 stop_all
