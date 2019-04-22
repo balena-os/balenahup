@@ -55,6 +55,8 @@ def main():
                       help = "Use this version to update the device to.")
     parser.add_argument('-r', '--remote', action = 'store', dest = 'remote', default = '',
                       help = "Remote to be used when searching for update bundles. Overwrites the value in configuration file.")
+    parser.add_argument('-g', '--registryv1', action = 'store', dest = 'registryv1', default = 'registry.resinstaging.io',
+                      help = "The v1 Docker registry to use if needed.")
 
     args = parser.parse_args()
 
@@ -69,6 +71,8 @@ def main():
         args.force = True
     if os.getenv('ALLOW_DOWNGRADES'):
         args.allow_downgrades = True
+    if os.getenv('REGISTRYV1'):
+        args.registryv1 = os.getenv('REGISTRYV1')
 
     # Logger
     log = logging.getLogger()
@@ -185,6 +189,11 @@ def main():
     else:
         if not setConfigurationItem(args.conf, "config.json", "type", "production"):
             return False
+
+    # v1 Registry
+    log.info("Configure v1 registry address (if needed for device) as " + args.registryv1)
+    if not setConfigurationItem(args.conf, "fetcher", "registryv1", args.registryv1):
+        return False
 
     # Handle old boot partitions
     r = Repartitioner(args.conf)
