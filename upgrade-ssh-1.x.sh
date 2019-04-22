@@ -83,6 +83,9 @@ Options:
 
   --allow-downgrades
         Run run-resinhup.sh with --allow-downgrades . See run-resinhup.sh help for more details.
+
+  --registryv1 <REGISTRY>
+        Run updater with --registryv1 flag. See updater help for more details.
 EOF
 }
 
@@ -310,6 +313,11 @@ while [[ $# -gt 0 ]]; do
             ;;
         --allow-downgrades)
             RESINHUP_ARGS="$RESINHUP_ARGS --allow-downgrades"
+            ;;
+        --registryv1)
+            REGISTRYV1=$2
+            RESINHUP_ARGS="$RESINHUP_ARGS --registryv1 $REGISTRYV1"
+            shift
             ;;
         *)
             log ERROR "Unrecognized option $1."

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Default values
-TAG=v1.2.1
+TAG=v2.5.0
 FORCE=no
 ALLOW_DOWNGRADES=no
 STAGING=no
@@ -13,6 +13,7 @@ MAXRETRIES=5
 SCRIPTNAME=run-resinhup.sh
 DEFAULT_CURRENT_HOSTOS_VERSION=1.0.0
 SUPERVISOR_RELEASE_UPDATE=yes
+REGISTRYV1="registry.resinstaging.io"
 
 # Don't run anything before this source as it sets PATH here
 source /etc/profile
@@ -96,6 +97,11 @@ Options:
 
   --allow-downgrades
         Allow updating to the same version or to an older one.
+
+  --registryv1 <REGISTRY>
+        The domain name of the v1 Docker registry to pull images from if the device
+        is not capable using v2 registries. It also sets `--supervisor-registry` if
+        not overridden with later flags.
 EOF
 }
 
@@ -242,7 +248,7 @@ function dockerCleanRepo {
 function runPostHacks {
     log "Cleanup docker images..."
     dockerCleanRepo "$RESINHUP_REGISTRY"
-    dockerCleanRepo "registry.resinstaging.io/resin/resinos"
+    dockerCleanRepo "${REGISTRYV1}/resin/resinos"
     dockerCleanRepo "resin/resinos"
 
     # This is just an optimization so next time docker starts it won't have to index everything
@@ -252,7 +258,7 @@ function runPostHacks {
     if version_gt $HOSTOS_VERSION "1.1.5" || [ "$HOSTOS_VERSION" == "1.1.5" ]; then
         if [ "$DOCKER" == "rce" ]; then
             log "Running engine migrator 1.10... please wait..."
-            DOCKER_MIGRATOR="registry.resinstaging.io/resinhup/$arch-v1.10-migrator"
+            DOCKER_MIGRATOR="${REGISTRYV1}/resinhup/$arch-v1.10-migrator"
             cachedpull "$DOCKER_MIGRATOR"
             $DOCKER run --rm -v /var/lib/rce:/var/lib/docker $DOCKER_MIGRATOR -s btrfs
             if [ $? -eq 0 ]; then
@@ -554,6 +560,14 @@ while [[ $# -gt 0 ]]; do
         --allow-downgrades)
             ALLOW_DOWNGRADES=yes
             ;;
+        --registryv1)
+            if [ -z "$2" ]; then
+                log ERROR "\"$1\" argument needs a value."
+            fi
+            REGISTRYV1=$2
+            SUPERVISOR_REGISTRY=$REGISTRYV1
+            shift
+            ;;
         *)
             log ERROR "Unrecognized option $1."
             ;;
@@ -692,8 +706,8 @@ fi
 
 # Pull resinhup - rce can only pull from v1 (resin staging registry)
 if [ "$DOCKER" == "rce" ]; then
-    RESINHUP_REGISTRY="registry.resinstaging.io/resin/resinhup"
-    RESINOS_REGISTRY="registry.resinstaging.io/resin/resinos"
+    RESINHUP_REGISTRY="${REGISTRYV1}/resin/resinhup"
+    RESINOS_REGISTRY="${REGISTRYV1}/resin/resinos"
 else
     RESINHUP_REGISTRY="resin/resinhup-test"
     RESINOS_REGISTRY="resin/resinos"
@@ -725,6 +739,7 @@ if [ "$ALLOW_DOWNGRADES" == "yes" ]; then
     RESINHUP_ENV="$RESINHUP_ENV -e ALLOW_DOWNGRADES=yes"
 fi
 RESINHUP_ENV="$RESINHUP_ENV -e VERSION=$HOSTOS_VERSION"
+RESINHUP_ENV="$RESINHUP_ENV -e REGISTRYV1=$REGISTRYV1"
 
 $DOCKER rm -f resinhup > /dev/null 2>&1
 $DOCKER run --privileged --name resinhup --net=host $RESINHUP_ENV \
