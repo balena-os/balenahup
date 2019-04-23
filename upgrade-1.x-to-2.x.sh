@@ -329,6 +329,26 @@ function fix_docker_daemon {
     fi
 }
 
+#######################################
+# Umount all the different ways paths are mounted from the data partition.
+# Globals:
+#   None
+# Arguments:
+#   None
+# Returns:
+#   None
+#######################################
+function data_umount() {
+    systemctl stop mnt-data.mount
+    umount /mnt/data || true
+    systemctl stop "resin\x2ddata.mount"
+    umount /resin-data || true
+    systemctl stop var-lib-docker.mount
+    umount /var/lib/docker || true
+
+    check_btrfs_umount
+}
+
 function check_btrfs_umount() {
     # Check whether /data has been correctly umounted, which is the only btrfs
     # partition;  if not, then bail out before anything's destroyed
@@ -624,14 +644,7 @@ log "Backing up resin-data..."
 
 # Unmount p6
 log "Stopping relevant mount services and unmounting filesystems..."
-systemctl stop mnt-data.mount
-umount /mnt/data || true
-systemctl stop "resin\x2ddata.mount"
-umount /resin-data || true
-systemctl stop var-lib-docker.mount
-umount /var/lib/docker || true
-
-check_btrfs_umount
+data_umount
 
 # Save conf contents to /boot
 if [ -f "/mnt/conf/config.json" ]; then
@@ -671,6 +684,10 @@ parted -s $root_dev mkpart logical ext4 672MiB 692MiB
 # We're going to put btrfs on it initially but using type btrfs
 # corrupts the partition table.
 parted -s $root_dev mkpart logical ext4 696MiB 100%
+# This last step sometimes triggers a partition remount, but only
+# on some seemingly old SD cards. This would break mkfs in later steps
+# to ensure that things are umounted again, to be on the safe side.
+data_umount
 
 log "Creating new state and data filesystems..."
 # Create resin-state filesystem
@@ -823,11 +840,7 @@ log "Stopping docker"
 systemctl stop docker
 
 # Unmount data partition
-umount /mnt/data || true
-umount /resin-data || true
-umount /var/lib/docker || true
-
-check_btrfs_umount
+data_umount
 
 progress 75 "Running OS update"
 
