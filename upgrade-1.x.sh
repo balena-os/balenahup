@@ -405,7 +405,11 @@ function pullSupervisor() {
             UPDATER_SUPERVISOR_IMAGE="$SUPERVISOR_REGISTRY/resin/$arch-supervisor"
         fi
     else
-        UPDATER_SUPERVISOR_IMAGE=$UPDATER_SUPERVISOR_IMAGE_NAME
+        if [ -z "$SUPERVISOR_REGISTRY" ]; then
+            UPDATER_SUPERVISOR_IMAGE="$UPDATER_SUPERVISOR_IMAGE_NAME"
+        else
+            UPDATER_SUPERVISOR_IMAGE="$SUPERVISOR_REGISTRY/$UPDATER_SUPERVISOR_IMAGE_NAME"
+        fi
     fi
 
     log "Pulling supervisor $UPDATER_SUPERVISOR_IMAGE:$UPDATER_SUPERVISOR_TAG..."
