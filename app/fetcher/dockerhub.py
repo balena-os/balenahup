@@ -27,7 +27,9 @@ class dockerhubFetcher(tarFetcher):
 
         if StrictVersion(getCurrentHostOSVersion(conffile)) < StrictVersion(PRE_DOCKER_OS):
             log.warn("Updating a pre " + PRE_DOCKER_OS + " hostOS. We need to pull from resin registry v1. Tweaking remote registry.")
-            self.remote = "registry.resinstaging.io/" + self.remote
+            registryv1 = getConfigurationItem(conffile, "fetcher", "registryv1")
+            log.debug("Remote registry is at " + registryv1)
+            self.remote = registryv1 + "/" + self.remote
 
         self.remotefile = os.path.join(self.remote + ":" + version + "-" + machine)
 
