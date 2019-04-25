@@ -141,8 +141,11 @@ function upgradeSupervisor() {
                 log "Supervisor update: will be upgrading from v${CURRENT_SUPERVISOR_VERSION} to ${TARGET_SUPERVISOR_VERSION}"
                 UPDATER_SUPERVISOR_TAG="v${TARGET_SUPERVISOR_VERSION}"
                 # Get the supervisor id, which is the unique numerical key of the supervisor version for the given device type
-                if UPDATER_SUPERVISOR_ID=$(curl --retry 10 --silent "${API_ENDPOINT}/v5/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'${UPDATER_SUPERVISOR_TAG}'))" | jq -e -r '.d[0].id'); then
+                if supervisor_api_response=$(curl --retry 10 --silent "${API_ENDPOINT}/v5/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'${UPDATER_SUPERVISOR_TAG}'))"); then
+                    UPDATER_SUPERVISOR_ID=$(echo "$supervisor_api_response" | jq -e -r '.d[0].id')
                     log "Extracted supervisor vars: ID: $UPDATER_SUPERVISOR_ID"
+                    UPDATER_SUPERVISOR_IMAGE=$(echo "$supervisor_api_response" | jq -e -r '.d[0].image_name')
+                    log "Extracted supervisor vars: Image name: $UPDATER_SUPERVISOR_IMAGE_NAME"
                     log "Setting supervisor version in the API..."
                     curl --retry 10 --silent --request PATCH --header "Authorization: Bearer ${APIKEY}" --header 'Content-Type: application/json' "${API_ENDPOINT}/v5/device(${DEVICEID})" --data-binary "{\"should_be_managed_by__supervisor_release\": \"${UPDATER_SUPERVISOR_ID}\"}" > /dev/null 2>&1
                     log "Updating local configuration at ${supervisor_conf_path}..."
@@ -154,7 +157,7 @@ function upgradeSupervisor() {
                         echo "SUPERVISOR_TAG=${UPDATER_SUPERVISOR_TAG}" >> "${supervisor_conf_path}"
                     fi
                     # Remove staging registry from the config
-                    sed -i -e 's/SUPERVISOR_IMAGE=registry.resinstaging.io\//SUPERVISOR_IMAGE=/' "${supervisor_conf_path}"
+                    sed -i -e 's|SUPERVISOR_IMAGE=.*|SUPERVISOR_IMAGE='"${UPDATER_SUPERVISOR_IMAGE}"'|' "${supervisor_conf_path}"
                     log "Supervisor config update done."
                 else
                     log ERROR "Couldn't extract supervisor vars..."
