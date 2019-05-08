@@ -235,6 +235,9 @@ function upgrade_supervisor() {
     else
         log WARN "Could not parse current supervisor version from the API, skipping update..."
     fi
+
+    # Post supervisor update fixes
+    persistent_logging_config_var
 }
 
 function error_handler() {
@@ -335,6 +338,42 @@ function pre_update_fix_bootfiles_hook {
     curl --retry 10 -f -s -L -o "$bootfiles_temp" https://raw.githubusercontent.com/resin-os/resinhup/77401f3ecdeddaac843b26827f0a44d3b044efdd/upgrade-patches/0-bootfiles || log ERROR "Couldn't download fixed '0-bootfiles', aborting."
     chmod 755 "$bootfiles_temp"
     mount --bind "$bootfiles_temp"  /etc/hostapp-update-hooks.d/0-bootfiles
+}
+
+#######################################
+# Update problematic persistent logging env var
+# Earlier supervisors might have set it to "", and
+# that doesn't validate on newer supervisor versions.
+# Convert into proper false value.
+# Globals:
+#   API_ENDPOINT
+#   APIKEY
+#   CONFIGJSON
+#   DEVICEID
+# Returns:
+#   None
+#######################################
+function persistent_logging_config_var {
+    PROBLEMATIC_ENV_VAR=$(curl --retry 10 --silent -X GET "${API_ENDPOINT}/v5/device_config_variable?\$filter=device%20eq%20${DEVICEID}" -H "Content-Type: application/json" -H "Authorization: Bearer ${APIKEY}" | jq -r '.d[] | select((.name == "RESIN_SUPERVISOR_PERSISTENT_LOGGING") and (.value == "")) | .id')
+    if [ -n "${PROBLEMATIC_ENV_VAR}" ]; then
+        local tmpfile
+        log "Updating problematic RESIN_SUPERVISOR_PERSISTENT_LOGGING config variable"
+        curl --retry 10 --silent -X PATCH \
+            "${API_ENDPOINT}/v5/device_config_variable(${PROBLEMATIC_ENV_VAR})" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${APIKEY}" \
+            --data '{
+                "value": "false"
+            }' >> /dev/null
+        log "Updating config.json with sanitized '.persistentLogging' value."
+        tmpfile=$(mktemp -t configjson.XXXXXXXX)
+        jq '.persistentLogging="false"' < "${CONFIGJSON}" > "${tmpfile}"
+        # 2-step move for atomicity
+        cp "${tmpfile}" "$CONFIGJSON.temp" || log ERROR "Couldn't copy temporary config.json to final partition."
+        sync
+        mv "$CONFIGJSON.temp" "$CONFIGJSON" || log ERROR "Couldn't move updated config.json onto original."
+        sync
+    fi
 }
 
 #######################################
