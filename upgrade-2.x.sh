@@ -247,7 +247,7 @@ function error_handler() {
     exit 1
 }
 
-function image_exsits() {
+function image_exists() {
     # Try to fetch the manifest of a repo:tag combo, to check for the existence of that
     # repo and tag.
     # Currently only works with v2 registries
@@ -943,7 +943,7 @@ if [ -z "$RESINOS_TAG" ]; then
 fi
 image="${RESINOS_REGISTRY}/${RESINOS_REPO}:${RESINOS_TAG}"
 log "Checking for manifest of ${image}"
-if [ "$(image_exsits "$RESINOS_REGISTRY" "$RESINOS_REPO" "$RESINOS_TAG")" = "yes" ]; then
+if [ "$(image_exists "$RESINOS_REGISTRY" "$RESINOS_REPO" "$RESINOS_TAG")" = "yes" ]; then
     log "Manifest found, good to go..."
 else
     log ERROR "Cannot find manifest, target image might not exists. Bailing out..."
