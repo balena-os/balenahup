@@ -990,7 +990,16 @@ if [ "$NOREBOOT" == "no" ]; then
     # Reboot into new OS
     log "Rebooting into new OS in 5 seconds..."
     progress 100 "Update successful, rebooting"
-    nohup bash -c " /bin/sleep 5 ; /sbin/reboot " > /dev/null 2>&1 &
+    systemd-run --on-active=5 --unit=hup-reboot.service systemctl reboot
+    sleep 300
+    # If the previous reboot command has failed for any reason, let's try differently
+    nohup bash -c "reboot --force" > /dev/null 2>&1 &
+    sleep 300
+    # If the previous 2 reboot commands have failed for any reason, try the Magic SysRq
+    # enable it
+    echo 1 > /proc/sys/kernel/sysrq
+    # send reboot request
+    echo b > /proc/sysrq-trigger
 else
     log "Finished update, not rebooting as requested."
     log "NOTE: Supervisor and stopped services kept stopped!"
