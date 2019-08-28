@@ -778,9 +778,6 @@ while [[ $# -gt 0 ]]; do
                     target_version="${target_version%%.prod}"
                     log "Normalized target version: ${target_version}"
                     ;;
-                *.dev)
-                    log ERROR "Updating .dev versions is not supported..."
-                    ;;
             esac
             shift
             ;;
