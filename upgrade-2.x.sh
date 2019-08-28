@@ -134,10 +134,12 @@ function log {
             ;;
     esac
     endtime=$(date +%s)
-    printf "[%09d%s%s\n" "$((endtime - starttime))" "][$loglevel]" "$1"
     if [ "$loglevel" == "ERROR" ]; then
+        printf "[%09d%s%s\n" "$((endtime - starttime))" "][$loglevel]" "$1" >> /dev/stderr
         progress 100 "OS update failed"
         exit 1
+    else
+        printf "[%09d%s%s\n" "$((endtime - starttime))" "][$loglevel]" "$1"
     fi
 }
 
@@ -848,8 +850,9 @@ if [ "$LOG" == "yes" ]; then
     mkdir -p "$(dirname "$LOGFILE")"
     echo "================$SCRIPTNAME HEADER START====================" > "$LOGFILE"
     date >> "$LOGFILE"
-    # redirect all logs to the logfile
-    exec 1> "$LOGFILE" 2>&1
+    # redirect all logs to the logfile, but also stderr to console (proxy)
+    exec > >(cat >> "$LOGFILE")
+    exec 2> >(tee -a "$LOGFILE" >&2)
 fi
 
 progress 25 "Preparing OS update"
@@ -946,7 +949,7 @@ log "Checking for manifest of ${image}"
 if [ "$(image_exists "$RESINOS_REGISTRY" "$RESINOS_REPO" "$RESINOS_TAG")" = "yes" ]; then
     log "Manifest found, good to go..."
 else
-    log ERROR "Cannot find manifest, target image might not exists. Bailing out..."
+    log ERROR "Cannot find manifest, target image might not exist. Bailing out..."
 fi
 
 # Check if we need to install some more extra tools
