@@ -2,7 +2,6 @@
 
 # default configuration
 NOREBOOT=no
-LOG=yes
 IGNORE_SANITY_CHECKS=no
 RESINOS_REGISTRY="registry.hub.docker.com"
 RESINOS_REPO="resin/resinos"
@@ -741,6 +740,18 @@ if [ $# -eq 0 ]; then
     help
     exit 0
 fi
+# Log timer
+starttime=$(date +%s)
+
+# LOGFILE init and header
+LOGFILE="/mnt/data/resinhup/$SCRIPTNAME.$(date +"%Y%m%d_%H%M%S").log"
+mkdir -p "$(dirname "$LOGFILE")"
+echo "================$SCRIPTNAME HEADER START====================" > "$LOGFILE"
+date >> "$LOGFILE"
+# redirect all logs to the logfile, but also stderr to console (proxy)
+exec > >(cat >> "$LOGFILE")
+exec 2> >(tee -a "$LOGFILE" >&2)
+
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     arg="$1"
@@ -801,9 +812,6 @@ while [[ $# -gt 0 ]]; do
             target_supervisor_version=$2
             shift
             ;;
-        -n|--nolog)
-            LOG=no
-            ;;
         --no-reboot)
             NOREBOOT="yes"
             ;;
@@ -839,20 +847,6 @@ fi
 
 if [ -z "$target_version" ]; then
     log ERROR "--hostos-version is required."
-fi
-
-# Log timer
-starttime=$(date +%s)
-
-# LOGFILE init and header
-if [ "$LOG" == "yes" ]; then
-    LOGFILE="/mnt/data/resinhup/$SCRIPTNAME.$(date +"%Y%m%d_%H%M%S").log"
-    mkdir -p "$(dirname "$LOGFILE")"
-    echo "================$SCRIPTNAME HEADER START====================" > "$LOGFILE"
-    date >> "$LOGFILE"
-    # redirect all logs to the logfile, but also stderr to console (proxy)
-    exec > >(cat >> "$LOGFILE")
-    exec 2> >(tee -a "$LOGFILE" >&2)
 fi
 
 progress 25 "Preparing OS update"
