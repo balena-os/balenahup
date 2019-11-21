@@ -219,7 +219,7 @@ function upgrade_supervisor() {
                     curl --retry 10 --silent --request PATCH --header "Authorization: Bearer ${APIKEY}" --header 'Content-Type: application/json' "${API_ENDPOINT}/v5/device(${DEVICEID})" --data-binary "{\"should_be_managed_by__supervisor_release\": \"${UPDATER_SUPERVISOR_ID}\"}" > /dev/null 2>&1
                     log "Running supervisor updater..."
                     progress 90 "Running supervisor update"
-                    update-resin-supervisor || log WARN "Supervisor couldn't be updated, continuing anyways"
+                    update-resin-supervisor > /dev/null 2>&1 || log WARN "Supervisor couldn't be updated, continuing anyways"
                     stop_services
                     if version_gt "6.5.9" "${target_supervisor_version}" ; then
                         remove_containers
@@ -723,7 +723,7 @@ function finish_up() {
         # Reboot into new OS
         log "Rebooting into new OS in 5 seconds..."
         progress 100 "Update successful, rebooting"
-        systemd-run --on-active=5 --unit=hup-reboot.service systemctl reboot
+        systemd-run --on-active=5 --quiet --unit=hup-reboot.service systemctl reboot
         sleep 300
         # If the previous reboot command has failed for any reason, let's try differently
         nohup bash -c "reboot --force" > /dev/null 2>&1 &
