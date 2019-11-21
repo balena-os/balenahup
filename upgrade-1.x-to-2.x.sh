@@ -990,7 +990,7 @@ if [ "$NOREBOOT" == "no" ]; then
     # Reboot into new OS
     log "Rebooting into new OS in 5 seconds..."
     progress 100 "Update successful, rebooting"
-    systemd-run --on-active=5 --unit=hup-reboot.service systemctl reboot
+    systemd-run --on-active=5 --quiet --unit=hup-reboot.service systemctl reboot
     sleep 300
     # If the previous reboot command has failed for any reason, let's try differently
     nohup bash -c "reboot --force" > /dev/null 2>&1 &

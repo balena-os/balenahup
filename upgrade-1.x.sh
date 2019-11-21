@@ -786,7 +786,7 @@ if [ $RESINHUP_EXIT -eq 0 ] || [ $RESINHUP_EXIT -eq 2 ] || [ $RESINHUP_EXIT -eq 
     # Everything is fine - Reboot
     if [ "$NOREBOOT" == "no" ]; then
         log "Rebooting board in 5 seconds..."
-        systemd-run --on-active=5 --unit=hup-reboot.service systemctl reboot
+        systemd-run --on-active=5 --quiet --unit=hup-reboot.service systemctl reboot
         sleep 300
         # If the previous reboot command has failed for any reason, let's try differently
         nohup bash -c "reboot --force" > /dev/null 2>&1 &
