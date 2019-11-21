@@ -787,15 +787,11 @@ if [ $RESINHUP_EXIT -eq 0 ] || [ $RESINHUP_EXIT -eq 2 ] || [ $RESINHUP_EXIT -eq 
     if [ "$NOREBOOT" == "no" ]; then
         log "Rebooting board in 5 seconds..."
         systemd-run --on-active=5 --quiet --unit=hup-reboot.service systemctl reboot
-        sleep 300
         # If the previous reboot command has failed for any reason, let's try differently
-        nohup bash -c "reboot --force" > /dev/null 2>&1 &
-        sleep 300
+        (sleep 300 && nohup bash -c "reboot --force" > /dev/null 2>&1) &
         # If the previous 2 reboot commands have failed for any reason, try the Magic SysRq
-        # enable it
-        echo 1 > /proc/sys/kernel/sysrq
-        # send reboot request
-        echo b > /proc/sysrq-trigger
+        # enable and send reboot request
+        (sleep 600 && echo 1 > /proc/sys/kernel/sysrq && echo b > /proc/sysrq-trigger) &
     else
         log "'No-reboot' requested."
     fi
