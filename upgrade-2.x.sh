@@ -2,6 +2,7 @@
 
 # default configuration
 NOREBOOT=no
+DELTA_VERSION=3
 IGNORE_SANITY_CHECKS=no
 RESINOS_REGISTRY="registry.hub.docker.com"
 RESINOS_REPO="resin/resinos"
@@ -74,7 +75,7 @@ Options:
         If not defined, then the update will try to run for the HOSTOS_VERSION's
         original supervisor release.
 
-    -n, --nolog
+  -n, --nolog
         By default tool logs to stdout and file. This flag deactivates log to file.
 
   --no-reboot
@@ -420,8 +421,12 @@ function in_container_hostapp_update {
     fi
 
     while true ; do
-        ${DOCKER_CMD} pull "${update_package}" && break || log WARN "Couldn't pull docker image, was try #${retrycount}..."
-        retrycount=$[$retrycount+1]
+        if ${DOCKER_CMD} pull "${update_package}"; then
+            break
+        else
+            log WARN "Couldn't pull docker image, was try #${retrycount}..."
+        fi
+        retrycount+=1
         if [ $retrycount -ge 10 ]; then
             log ERROR "Couldn't pull docker image, giving up..."
         else
@@ -579,7 +584,7 @@ function hostapp_based_update {
             remove_containers
         fi
         log "Starting hostapp-update"
-        hostapp-update -i "${update_package}" || log ERROR "hostapp-update has failed..."-
+        hostapp-update -i "${update_package}"
     fi
 }
 
@@ -694,6 +699,85 @@ function find_partitions {
         log ERROR "Update partition detected as ${update_part} but it's not a block device."
     fi
     log "Update partition: ${update_part}"
+}
+
+#######################################
+# Query public apps for a matching image
+# Globals:
+#   APIKEY
+#   API_ENDPOINT
+#   SLUG
+#   VARIANT
+# Arguments:
+#   version: the OS version to look for
+# Returns:
+#   Registry URL for desired image
+#######################################
+function get_image_location() {
+    local version=$1
+    # TODO: could improve the quality of the API call here
+    curl --retry 10 --silent -X GET \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer ${APIKEY}" \
+        "${API_ENDPOINT}/v5/release?\$expand=release_tag,belongs_to__application,contains__image/image&\$filter=(belongs_to__application/any(a:a/device_type%20eq%20'${SLUG}'))%20and%20(release_tag/any(rt:(rt/tag_key%20eq%20'version')%20and%20(rt/value%20eq%20'${version}')))" \
+        | jq -r ".d[] | select(.release_tag[].value == (\"${VARIANT}\" | ascii_downcase)) | .contains__image[0].image[0] | [.is_stored_at__image_location, .content_hash] | \"\(.[0])@\(.[1])\""
+}
+
+#######################################
+# Get a delta token
+# Globals:
+#   APIKEY
+#   API_ENDPOINT
+#   REGISTRY_ENDPOINT
+#   UUID
+# Arguments:
+#   src: the source OS version location {registry}/{repo}:{hash}
+#   dst: the target OS version location {registry}/{repo}:{hash}
+# Returns:
+#   JWT scoped to access desired delta image
+#######################################
+function get_delta_token() {
+    src=$(echo "${1/${REGISTRY_ENDPOINT}\//}" | awk -F@ '{print $1}')
+    dst=$(echo "${2/${REGISTRY_ENDPOINT}\//}" | awk -F@ '{print $1}')
+    curl --retry 10 --silent -X GET \
+        -u "d_${UUID}:${APIKEY}" \
+        -H "Content-Type: application/json" \
+        "${API_ENDPOINT}/auth/v1/token?service=${REGISTRY_ENDPOINT}&scope=repository:${dst}:pull&scope=repository:${src}:pull" \
+        | jq -r '.token'
+}
+
+#######################################
+# Find a delta in the registry between two hostapp versions using the API
+# Globals:
+#   APIKEY
+#   DELTA_ENDPOINT
+#   DELTA_VERSION
+#   VERSION
+# Arguments:
+#   target_version: the desired OS target version
+# Returns:
+#   Location of delta image
+#######################################
+function find_delta() {
+    # we need to strip the target_version's variant tag to query the API properly
+    local target_version=${1/.dev/}
+    local src_image target_image
+    # shellcheck disable=SC2153
+    src_image=$(get_image_location "${VERSION}")
+    target_image=$(get_image_location "${target_version}")
+    if [ -z "${src_image}" ] || [ -z "${target_image}" ]; then
+        return
+    else
+        # TODO: should we retry this more extensively? deltas may take a while to generate..
+        delta_token=$(get_delta_token "${src_image}" "${target_image}")
+        delta=$(curl --retry 10 --silent -X GET \
+            "${DELTA_ENDPOINT}/api/v${DELTA_VERSION}/delta?src=${src_image}&dest=${target_image}" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${delta_token}" | jq -r '.name')
+        if [ -n "${delta}" ]; then
+            echo "${delta}"
+        fi
+    fi
 }
 
 #######################################
@@ -884,7 +968,10 @@ fi
 # If the user api key exists we use it instead of the deviceApiKey as it means we haven't done the key exchange yet
 APIKEY=$(jq -r '.apiKey // .deviceApiKey' $CONFIGJSON)
 DEVICEID=$(jq -r '.deviceId' $CONFIGJSON)
+UUID=$(jq -r '.uuid' $CONFIGJSON)
 API_ENDPOINT=$(jq -r '.apiEndpoint' $CONFIGJSON)
+DELTA_ENDPOINT=$(jq -r '.deltaEndpoint' $CONFIGJSON)
+REGISTRY_ENDPOINT=$(jq -r '.registryEndpoint' $CONFIGJSON)
 
 ## Sanity checks
 device_type_check=$(device_type_match)
@@ -933,6 +1020,19 @@ case $VERSION in
         ;;
 esac
 
+# starting with the balena engine, we can use native deltas
+if version_gt "${VERSION_ID}" "${minimum_balena_target_version}"; then
+    log "Attempting host OS update using deltas"
+    delta_image=$(find_delta "${target_version}")
+else
+    log "Device not delta capable"
+fi
+if [ -n "${delta_image}" ]; then
+    log "Found delta image: ${delta_image}"
+else
+    log "No delta found, falling back to regular pull"
+fi
+
 # Translate version to one docker will accept as part of an image name
 target_version=$(echo "$target_version" | tr + _)
 
@@ -945,7 +1045,9 @@ log "Checking for manifest of ${image}"
 if [ "$(image_exists "$RESINOS_REGISTRY" "$RESINOS_REPO" "$RESINOS_TAG")" = "yes" ]; then
     log "Manifest found, good to go..."
 else
-    log ERROR "Cannot find manifest, target image might not exist. Bailing out..."
+    # TODO: as of deltas, it's not _strictly necessary_ to reach the upstream Docker Hub registry, but can remove this
+    # later
+    log ERROR "Cannot find manifest, target image might not exist in ${RESINOS_REGISTRY} or may be unreachable. Bailing out..."
 fi
 
 # Check if we need to install some more extra tools
@@ -1076,7 +1178,13 @@ if version_gt "${VERSION_ID}" "${minimum_hostapp_target_version}" ||
     [ "${VERSION_ID}" == "${minimum_hostapp_target_version}" ]; then
     log "hostapp-update command exists, use that for update"
     progress 50 "Running OS update"
-    hostapp_based_update "${image}"
+    if [ -n "${delta_image}" ] && hostapp_based_update "${delta_image}"; then
+        # overriding this for the later supervisor version inspection, since we've updated successfully
+        image=${delta_image}
+    else
+        log "Delta failed or not found, falling back to regular pull"
+        hostapp_based_update "${image}" || log ERROR "hostapp-update has failed..."
+    fi
 
     if [ "${LEGACY_UPDATE}" = "yes" ]; then
         upgrade_supervisor "${image}" no_docker_host
