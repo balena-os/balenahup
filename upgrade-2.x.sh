@@ -714,7 +714,8 @@ function find_partitions {
 #   Registry URL for desired image
 #######################################
 function get_image_location() {
-    local version=$1
+    # we need to strip the target_version's variant tag to query the API properly
+    local version=${1/.dev/}
     # TODO: could improve the quality of the API call here
     curl --retry 10 --silent -X GET \
         -H "Content-Type: application/json" \
@@ -759,8 +760,7 @@ function get_delta_token() {
 #   Location of delta image
 #######################################
 function find_delta() {
-    # we need to strip the target_version's variant tag to query the API properly
-    local target_version=${1/.dev/}
+    local target_version=${1}
     local src_image target_image
     # shellcheck disable=SC2153
     src_image=$(get_image_location "${VERSION}")
@@ -1040,14 +1040,9 @@ target_version=$(echo "$target_version" | tr + _)
 if [ -z "$RESINOS_TAG" ]; then
     RESINOS_TAG=${target_version}-${SLUG}
 fi
-image="${RESINOS_REGISTRY}/${RESINOS_REPO}:${RESINOS_TAG}"
-log "Checking for manifest of ${image}"
+log "Checking for manifest of ${RESINOS_REGISTRY}/${RESINOS_REPO}:${RESINOS_TAG}"
 if [ "$(image_exists "$RESINOS_REGISTRY" "$RESINOS_REPO" "$RESINOS_TAG")" = "yes" ]; then
-    log "Manifest found, good to go..."
-else
-    # TODO: as of deltas, it's not _strictly necessary_ to reach the upstream Docker Hub registry, but can remove this
-    # later
-    log ERROR "Cannot find manifest, target image might not exist in ${RESINOS_REGISTRY} or may be unreachable. Bailing out..."
+    upstream_image="${RESINOS_REGISTRY}/${RESINOS_REPO}:${RESINOS_TAG}"
 fi
 
 # Check if we need to install some more extra tools
@@ -1178,12 +1173,22 @@ if version_gt "${VERSION_ID}" "${minimum_hostapp_target_version}" ||
     [ "${VERSION_ID}" == "${minimum_hostapp_target_version}" ]; then
     log "hostapp-update command exists, use that for update"
     progress 50 "Running OS update"
-    if [ -n "${delta_image}" ] && hostapp_based_update "${delta_image}"; then
-        # overriding this for the later supervisor version inspection, since we've updated successfully
-        image=${delta_image}
-    else
-        log "Delta failed or not found, falling back to regular pull"
-        hostapp_based_update "${image}" || log ERROR "hostapp-update has failed..."
+    images=("${delta_image}" "$(get_image_location "${target_version/_/+}")" "${upstream_image}")
+    # record the "source" of each image in the array above for clarity during fallback
+    image_types=("delta" "balena_registry" "upstream_registry")
+    update_failed=0
+    for img in "${images[@]}"; do
+        if [ -n "${img}" ] && hostapp_based_update "${img}"; then
+            # once we've updated successfully, set our canonical image
+            image=${img}
+            break
+        else
+            log "Image type ${image_types[${update_failed}]}, location '${img}' failed or not found, trying another source"
+            update_failed=$(( update_failed + 1 ))
+        fi
+    done
+    if [ -z "${image}" ]; then
+        log ERROR "all hostapp-update attempts have failed..."
     fi
 
     if [ "${LEGACY_UPDATE}" = "yes" ]; then
