@@ -46,6 +46,11 @@ _prepare_locking()  { eval "exec $LOCKFD>\"$LOCKFILE\""; trap _no_more_locking E
 # Public functions
 exlock_now()        { _lock xn; }  # obtain an exclusive lock immediately or fail
 
+# workaround for self-signed certs, waiting for https://github.com/balena-os/meta-balena/issues/1398
+TMPCRT=$(mktemp)
+jq -r '.balenaRootCA' < /mnt/boot/config.json | base64 -d > "${TMPCRT}"
+cat /etc/ssl/certs/ca-certificates.crt >> "${TMPCRT}"
+
 # Dashboard progress helper
 function progress {
     percentage=$1
@@ -206,7 +211,7 @@ function upgrade_supervisor() {
         fi
     fi
 
-    if CURRENT_SUPERVISOR_VERSION=$(curl --retry 10 --silent --header "Authorization: Bearer ${APIKEY}" "${API_ENDPOINT}/v5/device(${DEVICEID})?\$select=supervisor_version" | jq -r '.d[0].supervisor_version'); then
+    if CURRENT_SUPERVISOR_VERSION=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent --header "Authorization: Bearer ${APIKEY}" "${API_ENDPOINT}/v5/device(${DEVICEID})?\$select=supervisor_version" | jq -r '.d[0].supervisor_version'); then
         if [ -z "$CURRENT_SUPERVISOR_VERSION" ]; then
             log ERROR "Could not get current supervisor version from the API..."
         else
@@ -214,10 +219,10 @@ function upgrade_supervisor() {
                 log "Supervisor update: will be upgrading from v${CURRENT_SUPERVISOR_VERSION} to v${target_supervisor_version}"
                 UPDATER_SUPERVISOR_TAG="v${target_supervisor_version}"
                 # Get the supervisor id
-                if UPDATER_SUPERVISOR_ID=$(curl --retry 10 --silent "${API_ENDPOINT}/v5/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'${UPDATER_SUPERVISOR_TAG}'))" | jq -e -r '.d[0].id'); then
+                if UPDATER_SUPERVISOR_ID=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent "${API_ENDPOINT}/v5/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'${UPDATER_SUPERVISOR_TAG}'))" | jq -e -r '.d[0].id'); then
                     log "Extracted supervisor vars: ID: $UPDATER_SUPERVISOR_ID"
                     log "Setting supervisor version in the API..."
-                    curl --retry 10 --silent --request PATCH --header "Authorization: Bearer ${APIKEY}" --header 'Content-Type: application/json' "${API_ENDPOINT}/v5/device(${DEVICEID})" --data-binary "{\"should_be_managed_by__supervisor_release\": \"${UPDATER_SUPERVISOR_ID}\"}" > /dev/null 2>&1
+                    CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent --request PATCH --header "Authorization: Bearer ${APIKEY}" --header 'Content-Type: application/json' "${API_ENDPOINT}/v5/device(${DEVICEID})" --data-binary "{\"should_be_managed_by__supervisor_release\": \"${UPDATER_SUPERVISOR_ID}\"}" > /dev/null 2>&1
                     log "Running supervisor updater..."
                     progress 90 "Running supervisor update"
                     update-resin-supervisor > /dev/null 2>&1 || log WARN "Supervisor couldn't be updated, continuing anyways"
@@ -263,7 +268,7 @@ function image_exists() {
     local response
 
     # Check
-    response=$(curl --retry 10 --write-out "%{http_code}" --silent --output /dev/null "${MANIFEST}")
+    response=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --write-out "%{http_code}" --silent --output /dev/null "${MANIFEST}")
     if [ "$response" = 401 ]; then
         # 401 is "Unauthorized", have to grab the access tokens from the provided endpoint
         local auth_header
@@ -272,7 +277,7 @@ function image_exists() {
         local scope
         local token
         local response_auth
-        auth_header=$(curl --retry 10 -I --silent "${MANIFEST}" |grep -i www-authenticate)
+        auth_header=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 -I --silent "${MANIFEST}" |grep -i www-authenticate)
         # The auth_header looks as
         # Www-Authenticate: Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:resin/resinos:pull"
         # shellcheck disable=SC2001
@@ -282,8 +287,8 @@ function image_exists() {
         # shellcheck disable=SC2001
         scope=$(echo "$auth_header" | sed 's/.*,scope="\([^,]*\)".*/\1/' )
         # Grab the token from the appropriate address, and retry the manifest query with that
-        token=$(curl --retry 10 --silent "${realm}?service=${service}&scope=${scope}" | jq -r '.access_token // .token')
-        response_auth=$(curl --retry 10 --write-out "%{http_code}" --silent --output /dev/null -H "Authorization: Bearer ${token}" "${MANIFEST}")
+        token=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent "${realm}?service=${service}&scope=${scope}" | jq -r '.access_token // .token')
+        response_auth=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --write-out "%{http_code}" --silent --output /dev/null -H "Authorization: Bearer ${token}" "${MANIFEST}")
         if [ "$response_auth" = 200 ]; then
             exists=yes
         fi
@@ -337,7 +342,7 @@ function pre_update_fix_bootfiles_hook {
     log "Applying bootfiles hostapp-hook fix"
     local bootfiles_temp
     bootfiles_temp=$(mktemp)
-    curl --retry 10 -f -s -L -o "$bootfiles_temp" https://raw.githubusercontent.com/resin-os/resinhup/77401f3ecdeddaac843b26827f0a44d3b044efdd/upgrade-patches/0-bootfiles || log ERROR "Couldn't download fixed '0-bootfiles', aborting."
+    CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 -f -s -L -o "$bootfiles_temp" https://raw.githubusercontent.com/resin-os/resinhup/77401f3ecdeddaac843b26827f0a44d3b044efdd/upgrade-patches/0-bootfiles || log ERROR "Couldn't download fixed '0-bootfiles', aborting."
     chmod 755 "$bootfiles_temp"
     mount --bind "$bootfiles_temp"  /etc/hostapp-update-hooks.d/0-bootfiles
 }
@@ -356,11 +361,11 @@ function pre_update_fix_bootfiles_hook {
 #   None
 #######################################
 function persistent_logging_config_var {
-    PROBLEMATIC_ENV_VAR=$(curl --retry 10 --silent -X GET "${API_ENDPOINT}/v5/device_config_variable?\$filter=device%20eq%20${DEVICEID}" -H "Content-Type: application/json" -H "Authorization: Bearer ${APIKEY}" | jq -r '.d[] | select((.name == "RESIN_SUPERVISOR_PERSISTENT_LOGGING") and (.value == "")) | .id')
+    PROBLEMATIC_ENV_VAR=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent -X GET "${API_ENDPOINT}/v5/device_config_variable?\$filter=device%20eq%20${DEVICEID}" -H "Content-Type: application/json" -H "Authorization: Bearer ${APIKEY}" | jq -r '.d[] | select((.name == "RESIN_SUPERVISOR_PERSISTENT_LOGGING") and (.value == "")) | .id')
     if [ -n "${PROBLEMATIC_ENV_VAR}" ]; then
         local tmpfile
         log "Updating problematic RESIN_SUPERVISOR_PERSISTENT_LOGGING config variable"
-        curl --retry 10 --silent -X PATCH \
+        CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent -X PATCH \
             "${API_ENDPOINT}/v5/device_config_variable(${PROBLEMATIC_ENV_VAR})" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${APIKEY}" \
@@ -717,7 +722,7 @@ function get_image_location() {
     # we need to strip the target_version's variant tag to query the API properly
     local version=${1/.dev/}
     # TODO: could improve the quality of the API call here
-    curl --retry 10 --silent -X GET \
+    CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent -X GET \
         -H "Content-Type: application/json" \
         -H "Authorization: Bearer ${APIKEY}" \
         "${API_ENDPOINT}/v5/release?\$expand=release_tag,belongs_to__application,contains__image/image&\$filter=(belongs_to__application/any(a:a/device_type%20eq%20'${SLUG}'))%20and%20(release_tag/any(rt:(rt/tag_key%20eq%20'version')%20and%20(rt/value%20eq%20'${version}')))" \
@@ -740,7 +745,7 @@ function get_image_location() {
 function get_delta_token() {
     src=$(echo "${1/${REGISTRY_ENDPOINT}\//}" | awk -F@ '{print $1}')
     dst=$(echo "${2/${REGISTRY_ENDPOINT}\//}" | awk -F@ '{print $1}')
-    curl --retry 10 --silent -X GET \
+    CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent -X GET \
         -u "d_${UUID}:${APIKEY}" \
         -H "Content-Type: application/json" \
         "${API_ENDPOINT}/auth/v1/token?service=${REGISTRY_ENDPOINT}&scope=repository:${dst}:pull&scope=repository:${src}:pull" \
@@ -770,7 +775,7 @@ function find_delta() {
     else
         # TODO: should we retry this more extensively? deltas may take a while to generate..
         delta_token=$(get_delta_token "${src_image}" "${target_image}")
-        delta=$(curl --retry 10 --silent -X GET \
+        delta=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent -X GET \
             "${DELTA_ENDPOINT}/api/v${DELTA_VERSION}/delta?src=${src_image}&dest=${target_image}" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${delta_token}" | jq -r '.name')
@@ -817,6 +822,7 @@ function finish_up() {
         log "Finished update, not rebooting as requested."
         progress 100 "Update successful"
     fi
+    rm -f "${TMPCRT}" > /dev/null 2>&1
     exit 0
 }
 
@@ -1073,7 +1079,7 @@ if ! version_gt "$VERSION" "$preferred_hostos_version" &&
             download_uri=https://github.com/resin-os/resinhup/raw/master/upgrade-binaries/$binary_type
             for binary in $tools_binaries; do
                 log "Installing $binary..."
-                curl --retry 10 -f -s -L -o $tools_path/$binary $download_uri/$binary || log ERROR "Couldn't download tool from $download_uri/$binary, aborting."
+                CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 -f -s -L -o $tools_path/$binary $download_uri/$binary || log ERROR "Couldn't download tool from $download_uri/$binary, aborting."
                 chmod 755 $tools_path/$binary
             done
             ;;
@@ -1095,7 +1101,7 @@ if version_gt "$VERSION_ID" "2.0.6" &&
         mkdir -p $tools_path
         export PATH=$tools_path:$PATH
         download_url=https://raw.githubusercontent.com/resin-os/meta-resin/v2.3.0/meta-resin-common/recipes-support/resin-device-progress/resin-device-progress/resin-device-progress
-        curl --retry 10 -f -s -L -o $tools_path/resin-device-progress $download_url || log WARN "Couldn't download tool from $download_url, progress bar won't work, but not aborting..."
+        CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 -f -s -L -o $tools_path/resin-device-progress $download_url || log WARN "Couldn't download tool from $download_url, progress bar won't work, but not aborting..."
         chmod 755 $tools_path/resin-device-progress
 else
     log "No resin-device-progress fix is required..."
@@ -1106,7 +1112,7 @@ fi
 if version_gt "$VERSION_ID" "2.0.7" &&
     version_gt "2.7.0" "$VERSION_ID"; then
         log "Fixing supervisor updater..."
-        if curl --retry 10 --fail --silent -o "/tmp/update-resin-supervisor" https://raw.githubusercontent.com/resin-os/meta-resin/40d5a174da6b52d530c978e0cae22aa61f65d203/meta-resin-common/recipes-containers/docker-disk/docker-resin-supervisor-disk/update-resin-supervisor ; then
+        if CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --fail --silent -o "/tmp/update-resin-supervisor" https://raw.githubusercontent.com/resin-os/meta-resin/40d5a174da6b52d530c978e0cae22aa61f65d203/meta-resin-common/recipes-containers/docker-disk/docker-resin-supervisor-disk/update-resin-supervisor ; then
             chmod 755 "/tmp/update-resin-supervisor"
             PATH="/tmp:$PATH"
             log "Added temporary supervisor updater replaced with fixed version..."
