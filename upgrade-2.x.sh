@@ -1034,7 +1034,11 @@ else
     log "Device not delta capable"
 fi
 if [ -n "${delta_image}" ]; then
-    log "Found delta image: ${delta_image}"
+    delta_size=$(CURL_CA_BUNDLE=${TMPCRT} curl -H "Authorization: Bearer ${APIKEY}" --silent --retry 10 --fail \
+    "${API_ENDPOINT}/v5/delta?\$filter=((status%20eq%20'success')%20and%20(version%20eq%20'${DELTA_VERSION}')%20and%20(is_stored_at__location%20eq%20'${delta_image}'))" \
+    | jq -r '.d[0].size|tonumber / (1024.0 * 1024.0) | round')
+    log "Found delta image: ${delta_image}, size: ${delta_size:-unknown} MB"
+
 else
     log "No delta found, falling back to regular pull"
 fi
