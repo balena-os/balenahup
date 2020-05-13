@@ -58,7 +58,7 @@ function progress {
 
 function help {
     cat << EOF
-Helper to run hostOS updates on resinOS 2.x devices
+Helper to run hostOS updates on balenaOS 2.x devices
 
 Options:
   -h, --help
@@ -84,13 +84,13 @@ Options:
   --no-reboot
         Do not reboot if update is successful. This is useful when debugging.
 
-  --resinos-registry
+  --balenaos-registry
         No op
 
-  --resinos-repo
+  --balenaos-repo
         No op
 
-  --resinos-tag
+  --balenaos-tag
         No op
 
   --staging
@@ -110,7 +110,7 @@ Options:
   --assume-supported
         This is now deprecated. Assuming supported device, and disabling the relevant check.
         Only enabled for updates that does not use update hooks, otherwise the updater
-        wouldn't know how to switch partitions, so only available for resinOS
+        wouldn't know how to switch partitions, so only available for balenaOS
         below ${minimum_hostapp_target_version}.
 EOF
 }
@@ -187,7 +187,7 @@ function upgrade_supervisor() {
     log "Supervisor update start..."
 
     if [ -z "$target_supervisor_version" ]; then
-        log "No explicit supervisor version was provided, update to default version in target resinOS..."
+        log "No explicit supervisor version was provided, update to default version in target balenaOS..."
         local DEFAULT_SUPERVISOR_VERSION
         versioncheck_cmd=("run" "--rm" "${image}" "bash" "-c" "cat /etc/resin-supervisor/supervisor.conf | sed -rn 's/SUPERVISOR_TAG=v(.*)/\\1/p'")
         if [ -z "$no_docker_host" ]; then
@@ -196,7 +196,7 @@ function upgrade_supervisor() {
             DEFAULT_SUPERVISOR_VERSION=$(${DOCKER_CMD} "${versioncheck_cmd[@]}")
         fi
         if [ -z "$DEFAULT_SUPERVISOR_VERSION" ]; then
-            log ERROR "Could not get the default supervisor version for this resinOS release, bailing out."
+            log ERROR "Could not get the default supervisor version for this balenaOS release, bailing out."
         else
             log "Extracted default version is v$DEFAULT_SUPERVISOR_VERSION..."
             target_supervisor_version="$DEFAULT_SUPERVISOR_VERSION"
@@ -291,7 +291,7 @@ function pre_update_fix_bootfiles_hook {
     log "Applying bootfiles hostapp-hook fix"
     local bootfiles_temp
     bootfiles_temp=$(mktemp)
-    CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 -f -s -L -o "$bootfiles_temp" https://raw.githubusercontent.com/resin-os/resinhup/77401f3ecdeddaac843b26827f0a44d3b044efdd/upgrade-patches/0-bootfiles || log ERROR "Couldn't download fixed '0-bootfiles', aborting."
+    CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 -f -s -L -o "$bootfiles_temp" https://raw.githubusercontent.com/balena-os/balenahup/77401f3ecdeddaac843b26827f0a44d3b044efdd/upgrade-patches/0-bootfiles || log ERROR "Couldn't download fixed '0-bootfiles', aborting."
     chmod 755 "$bootfiles_temp"
     mount --bind "$bootfiles_temp"  /etc/hostapp-update-hooks.d/0-bootfiles
 }
@@ -392,32 +392,32 @@ function in_container_hostapp_update {
     log "Using ${tmp_image} for update image transfer into container"
     mkfifo "${tmp_image}"
     ${DOCKER_CMD} save "${update_package}" > "${tmp_image}" &
-    mkdir -p /mnt/data/resinhup/tmp
+    mkdir -p /mnt/data/balenahup/tmp
 
     # The setting up the required volumes
     volumes_args+=("-v" "/dev/disk:/dev/disk")
     volumes_args+=("-v" "/mnt/boot:/mnt/boot")
-    volumes_args+=("-v" "/mnt/data/resinhup/tmp:/mnt/data/resinhup/tmp")
+    volumes_args+=("-v" "/mnt/data/balenahup/tmp:/mnt/data/balenahup/tmp")
     if mountpoint "/mnt/sysroot/active"; then
         volumes_args+=("-v" "/mnt/sysroot/active:/mnt/sysroot/active")
     else
         volumes_args+=("-v" "/:/mnt/sysroot/active")
     fi
     volumes_args+=("-v" "${tmp_inactive}:${inactive}")
-    volumes_args+=("-v" "${tmp_image}:/resinos-image.docker")
+    volumes_args+=("-v" "${tmp_image}:/balenaos-image.docker")
 
     log "Starting hostapp-update within a container"
     # Note that the following docker daemon is started with a different --bip and --fixed-cidr
-    # setting, otherwise it is clashing with the system docker on resinOS >=2.3.0 || <2.5.1
+    # setting, otherwise it is clashing with the system docker on balenaOS >=2.3.0 || <2.5.1
     # and then docker pull would not succeed
     # shellcheck disable=SC2016
     ${DOCKER_CMD} run \
       --rm \
-      --name resinhup \
+      --name balenahup \
       --privileged \
       "${volumes_args[@]}" \
       "${update_package}" \
-      /bin/bash -c 'storage_driver=$(cat /boot/storage-driver) ; DOCKER_TMPDIR=/mnt/data/resinhup/tmp/ '"${target_dockerd}"' --storage-driver=$storage_driver --data-root='"${inactive}"'/'"${target_docker_cmd}"' --host=unix:///var/run/'"${target_docker_cmd}"'-host.sock --pidfile=/var/run/'"${target_docker_cmd}"'-host.pid --exec-root=/var/run/'"${target_docker_cmd}"'-host --bip=10.114.201.1/24 --fixed-cidr=10.114.201.128/25 --iptables=false & timeout_iterations=0; until DOCKER_HOST="unix:///var/run/'"${target_docker_cmd}"'-host.sock" '"${target_docker_cmd}"' ps &> /dev/null; do sleep 0.2; if [ $((timeout_iterations++)) -ge 1500 ]; then echo "'"${target_docker_cmd}"'-host did not come up before check timed out..."; exit 1; fi; done; echo "Starting hostapp-update"; hostapp-update -f /resinos-image.docker '"${hostapp_update_extra_args}"'' \
+      /bin/bash -c 'storage_driver=$(cat /boot/storage-driver) ; DOCKER_TMPDIR=/mnt/data/balenahup/tmp/ '"${target_dockerd}"' --storage-driver=$storage_driver --data-root='"${inactive}"'/'"${target_docker_cmd}"' --host=unix:///var/run/'"${target_docker_cmd}"'-host.sock --pidfile=/var/run/'"${target_docker_cmd}"'-host.pid --exec-root=/var/run/'"${target_docker_cmd}"'-host --bip=10.114.201.1/24 --fixed-cidr=10.114.201.128/25 --iptables=false & timeout_iterations=0; until DOCKER_HOST="unix:///var/run/'"${target_docker_cmd}"'-host.sock" '"${target_docker_cmd}"' ps &> /dev/null; do sleep 0.2; if [ $((timeout_iterations++)) -ge 1500 ]; then echo "'"${target_docker_cmd}"'-host did not come up before check timed out..."; exit 1; fi; done; echo "Starting hostapp-update"; hostapp-update -f /balenaos-image.docker '"${hostapp_update_extra_args}"'' \
     || log ERROR "Update based on hostapp-update has failed..."
 
 }
@@ -467,7 +467,7 @@ function hostapp_based_update {
     fi
 
     if ! [ -S "/var/run/${DOCKER_CMD}-host.sock" ]; then
-        ## Happens on devices booting after a regular HUP update onto a hostapps enabled resinOS
+        ## Happens on devices booting after a regular HUP update onto a hostapps enabled balenaOS
         log "Do not have ${DOCKER_CMD}-host running; legacy mode"
         LEGACY_UPDATE=yes
         log "Clean inactive partition"
@@ -480,7 +480,7 @@ function hostapp_based_update {
         fi
     else
         if [ -f "$inactive/resinos.fingerprint" ]; then
-            # Happens on a device, which has HUP'd from a non-hostapp resinOS to
+            # Happens on a device, which has HUP'd from a non-hostapp balenaOS to
             # a hostapp version. The previous "active", partition now inactive,
             # and still has leftover data
             log "Have ${DOCKER_CMD}-host running, with dirty inactive partition"
@@ -543,7 +543,7 @@ function hostapp_based_update {
 }
 
 #######################################
-# Upgrade from a non-hostapp (<2.7.0) to a hostapp-enabled resinOS version
+# Upgrade from a non-hostapp (<2.7.0) to a hostapp-enabled balenaOS version
 # Handles both pre-balena and balena updates
 # Globals:
 #   SLUG
@@ -787,8 +787,12 @@ fi
 # Log timer
 starttime=$(date +%s)
 
+# For compatibility purposes
+if [ -d "/mnt/data/resinhup" ]; then
+    ln -s "/mnt/data/resinhup" "/mnt/data/balenahup"
+fi
 # LOGFILE init and header
-LOGFILE="/mnt/data/resinhup/$SCRIPTNAME.$(date +"%Y%m%d_%H%M%S").log"
+LOGFILE="/mnt/data/balenahup/$SCRIPTNAME.$(date +"%Y%m%d_%H%M%S").log"
 mkdir -p "$(dirname "$LOGFILE")"
 echo "================$SCRIPTNAME HEADER START====================" > "$LOGFILE"
 date >> "$LOGFILE"
@@ -825,15 +829,15 @@ while [[ $# -gt 0 ]]; do
             esac
             shift
             ;;
-        --resinos-registry)
+        --resinos-registry | --balenaos-registry)
             # no op
             shift
             ;;
-        --resinos-repo)
+        --resinos-repo | --balenaos-repo)
             # no op
             shift
             ;;
-        --resinos-tag)
+        --resinos-tag | --balenaos-tag)
             # no op
             shift
             ;;
@@ -1002,7 +1006,7 @@ if ! version_gt "$VERSION" "$preferred_hostos_version" &&
 
     case $binary_type in
         arm|x86)
-            download_uri=https://github.com/resin-os/resinhup/raw/master/upgrade-binaries/$binary_type
+            download_uri=https://github.com/balena-os/balenahup/raw/master/upgrade-binaries/$binary_type
             for binary in $tools_binaries; do
                 log "Installing $binary..."
                 CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 -f -s -L -o $tools_path/$binary $download_uri/$binary || log ERROR "Couldn't download tool from $download_uri/$binary, aborting."
@@ -1026,19 +1030,19 @@ if version_gt "$VERSION_ID" "2.0.6" &&
         tools_path=/tmp/upgrade_tools_extra
         mkdir -p $tools_path
         export PATH=$tools_path:$PATH
-        download_url=https://raw.githubusercontent.com/resin-os/meta-resin/v2.3.0/meta-resin-common/recipes-support/resin-device-progress/resin-device-progress/resin-device-progress
+        download_url=https://raw.githubusercontent.com/balena-os/meta-balena/v2.3.0/meta-resin-common/recipes-support/resin-device-progress/resin-device-progress/resin-device-progress
         CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 -f -s -L -o $tools_path/resin-device-progress $download_url || log WARN "Couldn't download tool from $download_url, progress bar won't work, but not aborting..."
         chmod 755 $tools_path/resin-device-progress
 else
     log "No resin-device-progress fix is required..."
 fi
 
-# Fix for issue: https://github.com/resin-os/meta-resin/pull/864
-# Also includes change from: https://github.com/resin-os/meta-resin/pull/882
+# Fix for issue: https://github.com/balena-os/meta-balena/pull/864
+# Also includes change from: https://github.com/balena-os/meta-balena/pull/882
 if version_gt "$VERSION_ID" "2.0.7" &&
     version_gt "2.7.0" "$VERSION_ID"; then
         log "Fixing supervisor updater..."
-        if CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --fail --silent -o "/tmp/update-resin-supervisor" https://raw.githubusercontent.com/resin-os/meta-resin/40d5a174da6b52d530c978e0cae22aa61f65d203/meta-resin-common/recipes-containers/docker-disk/docker-resin-supervisor-disk/update-resin-supervisor ; then
+        if CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --fail --silent -o "/tmp/update-resin-supervisor" https://raw.githubusercontent.com/balena-os/meta-balena/40d5a174da6b52d530c978e0cae22aa61f65d203/meta-resin-common/recipes-containers/docker-disk/docker-resin-supervisor-disk/update-resin-supervisor ; then
             chmod 755 "/tmp/update-resin-supervisor"
             PATH="/tmp:$PATH"
             log "Added temporary supervisor updater replaced with fixed version..."
@@ -1049,7 +1053,7 @@ else
     log "No supervisor updater fix is required..."
 fi
 
-# Fix issue with `read` on 2.10.x/2.11.0 resinOS versions
+# Fix issue with `read` on 2.10.x/2.11.0 balenaOS versions
 if version_gt "$VERSION_ID" "2.9.7" &&
     version_gt "2.11.1" "$VERSION_ID"; then
         log "Fixing supervisor updater if needed..."
@@ -1059,7 +1063,7 @@ if version_gt "$VERSION_ID" "2.9.7" &&
           mount -o bind /tmp/fixed-update-resin-supervisor /usr/bin/update-resin-supervisor
 fi
 
-# The timesyncd.conf lives on the state partition starting from resinOS 2.1.0 up to 2.13.1
+# The timesyncd.conf lives on the state partition starting from balenaOS 2.1.0 up to 2.13.1
 # For devices that were updated before this fix came to effect, fix things up, otherwise migrate when updating
 if [ -d "/mnt/state/root-overlay/etc/systemd/timesyncd.conf" ] \
    && [ -f "/etc/systemd/timesyncd.conf" ]; then
@@ -1075,9 +1079,9 @@ elif [ ! -f "/mnt/state/root-overlay/etc/systemd/timesyncd.conf" ] \
     log "timesyncd.conf migrated to the state partition"
 fi
 
-# Raspberry Pi 1 and certain docker versions (in resinOS <2.5.0) cannot run multilayer
+# Raspberry Pi 1 and certain docker versions (in balenaOS <2.5.0) cannot run multilayer
 # docker pulls from Docker Hub. Workaround is limiting concurrent downloads
-# Apply this fix only to resinOS version >=2.0.7, though, as docker in earlier
+# Apply this fix only to balenaOS version >=2.0.7, though, as docker in earlier
 # versions does not have that flag, and would not run properly
 if [ "$SLUG" = "raspberry-pi" ] && \
     version_gt "$VERSION_ID" "2.0.7" && \
@@ -1141,7 +1145,7 @@ elif version_gt "${target_version}" "${minimum_hostapp_target_version}" ||
     finish_up "${image}"
 fi
 
-### Below here is the regular, non-hostapp resinOS host update
+### Below here is the regular, non-hostapp balenaOS host update
 
 # Find partition information
 find_partitions
@@ -1205,7 +1209,7 @@ ${DOCKER_CMD} rm "$container"
 # Updating supervisor
 upgrade_supervisor "$image" no_docker_host
 
-# REmove resin-sample to plug security hole
+# Remove resin-sample to plug security hole
 remove_sample_wifi "/mnt/boot/system-connections/resin-sample"
 remove_sample_wifi "/mnt/state/root-overlay/etc/NetworkManager/system-connections/resin-sample"
 
