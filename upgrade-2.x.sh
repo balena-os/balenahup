@@ -4,8 +4,6 @@
 NOREBOOT=no
 DELTA_VERSION=3
 IGNORE_SANITY_CHECKS=no
-RESINOS_REGISTRY="registry.hub.docker.com"
-RESINOS_REPO="resin/resinos"
 SCRIPTNAME=upgrade-2.x.sh
 LEGACY_UPDATE=no
 STOP_ALL=no
@@ -86,22 +84,17 @@ Options:
   --no-reboot
         Do not reboot if update is successful. This is useful when debugging.
 
-  --resinos-registry <REGISTRY>
-        The docker registry where to look for the resinOS image. If not defined,
-        it will default to Docker Hub (registry.hub.docker.com)
+  --resinos-registry
+        No op
 
-  --resinos-repo <REPOSITORY>
-        The docker repository where to pull the resinOS image from. Defaults to
-        'resin/resinos'.
+  --resinos-repo
+        No op
 
-  --resinos-tag <TAG>
-        This flag overrides the default tag, which is based on host OS version
-        and slug, when looking for the resinOS image to use for the update.
+  --resinos-tag
+        No op
 
   --staging
-        This is deprecated, use --resinos-repo <REPOSITORY>
-        For backwards compatibility, this flag acts the same as
-        --resinos-repo resin/resinos-staging
+        No op
 
   --stop-all
         Request the updater to stop all containers (including user application)
@@ -252,50 +245,6 @@ function error_handler() {
     systemctl start resin-supervisor
     systemctl start update-resin-supervisor.timer
     exit 1
-}
-
-function image_exists() {
-    # Try to fetch the manifest of a repo:tag combo, to check for the existence of that
-    # repo and tag.
-    # Currently only works with v2 registries
-    # The return value is "no" if can't access that manifest, and "yes" if we can find it
-    local REGISTRY=$1
-    local REPO=$2
-    local TAG=$3
-    local exists=no
-    local REGISTRY_URL="https://${REGISTRY}/v2"
-    local MANIFEST="${REGISTRY_URL}/${REPO}/manifests/${TAG}"
-    local response
-
-    # Check
-    response=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --write-out "%{http_code}" --silent --output /dev/null "${MANIFEST}")
-    if [ "$response" = 401 ]; then
-        # 401 is "Unauthorized", have to grab the access tokens from the provided endpoint
-        local auth_header
-        local realm
-        local service
-        local scope
-        local token
-        local response_auth
-        auth_header=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 -I --silent "${MANIFEST}" |grep -i www-authenticate)
-        # The auth_header looks as
-        # Www-Authenticate: Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:resin/resinos:pull"
-        # shellcheck disable=SC2001
-        realm=$(echo "$auth_header" | sed 's/.*realm="\([^,]*\)",.*/\1/' )
-        # shellcheck disable=SC2001
-        service=$(echo "$auth_header" | sed 's/.*,service="\([^,]*\)",.*/\1/' )
-        # shellcheck disable=SC2001
-        scope=$(echo "$auth_header" | sed 's/.*,scope="\([^,]*\)".*/\1/' )
-        # Grab the token from the appropriate address, and retry the manifest query with that
-        token=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent "${realm}?service=${service}&scope=${scope}" | jq -r '.access_token // .token')
-        response_auth=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --write-out "%{http_code}" --silent --output /dev/null -H "Authorization: Bearer ${token}" "${MANIFEST}")
-        if [ "$response_auth" = 200 ]; then
-            exists=yes
-        fi
-    elif [ "$response" = 200 ]; then
-        exists=yes
-    fi
-    echo "${exists}"
 }
 
 function remove_sample_wifi {
@@ -877,24 +826,15 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --resinos-registry)
-            if [ -z "$2" ]; then
-                log ERROR "\"$1\" argument needs a value."
-            fi
-            RESINOS_REGISTRY=$2
+            # no op
             shift
             ;;
         --resinos-repo)
-            if [ -z "$2" ]; then
-                log ERROR "\"$1\" argument needs a value."
-            fi
-            RESINOS_REPO=$2
+            # no op
             shift
             ;;
         --resinos-tag)
-            if [ -z "$2" ]; then
-                log ERROR "\"$1\" argument needs a value."
-            fi
-            RESINOS_TAG=$2
+            # no op
             shift
             ;;
         --supervisor-version)
@@ -911,9 +851,7 @@ while [[ $# -gt 0 ]]; do
             IGNORE_SANITY_CHECKS="yes"
             ;;
         --staging)
-            log WARN "The --staging flag is deprecated for this script, use --resinos-repo <REPOSITORY>"
-            log WARN "For backwards compatibility, this flag acts the same as --resinos-repo resin/resinos-staging, and overrides that flag if set"
-            RESINOS_REPO_STAGING="resin/resinos-staging"
+            # no op
             ;;
         --stop-all)
             STOP_ALL="yes"
@@ -932,10 +870,6 @@ done
 _prepare_locking
 # Try to get lock, and exit if cannot, meaning another instance is running already
 exlock_now || exit 9
-
-if [ -n "$RESINOS_REPO_STAGING" ]; then
-    RESINOS_REPO="${RESINOS_REPO_STAGING}"
-fi
 
 if [ -z "$target_version" ]; then
     log ERROR "--hostos-version is required."
@@ -1041,18 +975,6 @@ if [ -n "${delta_image}" ]; then
 
 else
     log "No delta found, falling back to regular pull"
-fi
-
-# Translate version to one docker will accept as part of an image name
-target_version=$(echo "$target_version" | tr + _)
-
-# Checking whether the target version is available to download
-if [ -z "$RESINOS_TAG" ]; then
-    RESINOS_TAG=${target_version}-${SLUG}
-fi
-log "Checking for manifest of ${RESINOS_REGISTRY}/${RESINOS_REPO}:${RESINOS_TAG}"
-if [ "$(image_exists "$RESINOS_REGISTRY" "$RESINOS_REPO" "$RESINOS_TAG")" = "yes" ]; then
-    upstream_image="${RESINOS_REGISTRY}/${RESINOS_REPO}:${RESINOS_TAG}"
 fi
 
 # Check if we need to install some more extra tools
@@ -1183,9 +1105,9 @@ if version_gt "${VERSION_ID}" "${minimum_hostapp_target_version}" ||
     [ "${VERSION_ID}" == "${minimum_hostapp_target_version}" ]; then
     log "hostapp-update command exists, use that for update"
     progress 50 "Running OS update"
-    images=("${delta_image}" "$(get_image_location "${target_version/_/+}")" "${upstream_image}")
+    images=("${delta_image}" "$(get_image_location "${target_version}")")
     # record the "source" of each image in the array above for clarity during fallback
-    image_types=("delta" "balena_registry" "upstream_registry")
+    image_types=("delta" "balena_registry")
     update_failed=0
     for img in "${images[@]}"; do
         if [ -n "${img}" ] && hostapp_based_update "${img}"; then
