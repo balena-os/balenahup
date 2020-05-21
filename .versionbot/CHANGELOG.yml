@@ -1,0 +1,12 @@
+- commits:
+    - subject: 'meta: add versionbot scaffolding for nested changelogs'
+      hash: 3ac2b53ab25c99c3d9c4f1f85e2c0c937e1e1684
+      body: ''
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.12.2
+  date: 2020-05-21T13:32:37.640Z
