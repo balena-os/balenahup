@@ -788,7 +788,7 @@ fi
 starttime=$(date +%s)
 
 # For compatibility purposes
-if [ -d "/mnt/data/resinhup" ]; then
+if [ -d "/mnt/data/resinhup" ] && [ ! -e "/mnt/data/balenahup" ]; then
     ln -s "/mnt/data/resinhup" "/mnt/data/balenahup"
 fi
 # LOGFILE init and header
