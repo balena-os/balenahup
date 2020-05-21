@@ -1,4 +1,18 @@
 - commits:
+    - subject: 'rename: check for balenahup folders existence before symlinking'
+      hash: 705cf1189ac75820f7ae84161dd143962a3b6b87
+      body: ''
+      footer:
+        Connects-to: '#266'
+        connects-to: '#266'
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.12.4
+  date: 2020-05-21T19:34:22.500Z
+- commits:
     - subject: 'meta: properly generate nested changelog'
       hash: 6442ded09ce5283886c8c0136183055aa44d6897
       body: ''
