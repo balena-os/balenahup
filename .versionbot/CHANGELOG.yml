@@ -1,4 +1,20 @@
 - commits:
+    - subject: error gracefully if number of target releases != 1
+      hash: 06c487a5c49d2a7cb86dd945e27a27915fc2f50a
+      body: >
+        since we removed the DockerHub fallback, if there are not one target
+        hostapps, just bail and surface the error
+      footer:
+        Connects-to: '#273'
+        connects-to: '#273'
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.12.5
+  date: 2020-05-28T19:28:37.006Z
+- commits:
     - subject: 'rename: check for balenahup folders existence before symlinking'
       hash: 705cf1189ac75820f7ae84161dd143962a3b6b87
       body: ''
