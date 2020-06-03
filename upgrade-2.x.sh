@@ -698,8 +698,8 @@ function get_image_location() {
 #   JWT scoped to access desired delta image
 #######################################
 function get_delta_token() {
-    src=$(echo "${1/${REGISTRY_ENDPOINT}\//}" | awk -F@ '{print $1}')
-    dst=$(echo "${2/${REGISTRY_ENDPOINT}\//}" | awk -F@ '{print $1}')
+    src=$(echo "${1}" | awk -F@ '{print $1}' | sed -e 's/.*\/v2/v2/g')
+    dst=$(echo "${2}" | awk -F@ '{print $1}' | sed -e 's/.*\/v2/v2/g')
     CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent -X GET \
         -u "d_${UUID}:${APIKEY}" \
         -H "Content-Type: application/json" \
