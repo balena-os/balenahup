@@ -1,4 +1,18 @@
 - commits:
+    - subject: 'deltas: fix up service substitution to properly request deltas'
+      hash: 0fe35daadd6abd74c2239f5501310046f388b9ff
+      body: ''
+      footer:
+        Connects-to: '#275'
+        connects-to: '#275'
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.12.6
+  date: 2020-06-03T15:34:51.472Z
+- commits:
     - subject: error gracefully if number of target releases != 1
       hash: 06c487a5c49d2a7cb86dd945e27a27915fc2f50a
       body: >
