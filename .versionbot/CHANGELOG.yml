@@ -1,4 +1,16 @@
 - commits:
+    - subject: 'private dts: enable HUP for access-restricted device types'
+      hash: bd7f482c18544231b3f82e676823db481694b6fc
+      body: ''
+      footer:
+        Change-type: minor
+        change-type: minor
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.13.0
+  date: 2020-06-05T14:00:19.152Z
+- commits:
     - subject: 'deltas: fix up service substitution to properly request deltas'
       hash: 0fe35daadd6abd74c2239f5501310046f388b9ff
       body: ''
