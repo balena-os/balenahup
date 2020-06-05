@@ -1,4 +1,16 @@
 - commits:
+    - subject: 'legacy HUP: image -> target_image for balena registry compat'
+      hash: 53341773d547e6fe737398ebcf950d241aa2540f
+      body: ''
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.13.1
+  date: 2020-06-05T15:30:06.184Z
+- commits:
     - subject: 'private dts: enable HUP for access-restricted device types'
       hash: bd7f482c18544231b3f82e676823db481694b6fc
       body: ''
