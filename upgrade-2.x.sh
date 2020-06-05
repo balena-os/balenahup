@@ -1175,7 +1175,7 @@ trap 'error_handler' ERR
 log "Getting new OS image..."
 progress 50 "Downloading OS update"
 # Create container for new version
-container=$(${DOCKER_CMD} create "$image" echo export)
+container=$(${DOCKER_CMD} create "${target_image}" echo export)
 
 progress 75 "Running OS update"
 
@@ -1221,7 +1221,7 @@ cp -a /tmp/resin-boot/* /mnt/boot/
 ${DOCKER_CMD} rm "$container"
 
 # Updating supervisor
-upgrade_supervisor "$image" no_docker_host
+upgrade_supervisor "${target_image}" no_docker_host
 
 # Remove resin-sample to plug security hole
 remove_sample_wifi "/mnt/boot/system-connections/resin-sample"
@@ -1243,4 +1243,4 @@ case $SLUG in
         ;;
 esac
 
-finish_up "${image}"
+finish_up "${target_image}"
