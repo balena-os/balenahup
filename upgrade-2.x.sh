@@ -1151,6 +1151,7 @@ if version_gt "${VERSION_ID}" "${minimum_hostapp_target_version}" ||
 
 elif version_gt "${target_version}" "${minimum_hostapp_target_version}" ||
      [ "${target_version}" == "${minimum_hostapp_target_version}" ]; then
+    image="${target_image}"
     log "Running update from a non-hostapp-update enabled version to a hostapp-update enabled version..."
     progress 50 "Running OS update"
     non_hostapp_to_hostapp_update "${image}"
