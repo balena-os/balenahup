@@ -1,4 +1,16 @@
 - commits:
+    - subject: 'fix: backfill missing image variable for legacy upgrades'
+      hash: 7d860e5a194b03482c6e490eee36b61543292a56
+      body: ''
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.13.2
+  date: 2020-06-05T16:56:22.755Z
+- commits:
     - subject: 'legacy HUP: image -> target_image for balena registry compat'
       hash: 53341773d547e6fe737398ebcf950d241aa2540f
       body: ''
