@@ -1,4 +1,18 @@
 - commits:
+    - subject: use device uuid not numeric id
+      hash: 379fdef58de3bc6c3a3158ae983d48db8af5750e
+      body: ''
+      footer:
+        HQ: 'https://github.com/balena-io/balena-io/issues/2227'
+        hq: 'https://github.com/balena-io/balena-io/issues/2227'
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.13.4
+  date: 2020-06-23T19:07:32.085Z
+- commits:
     - subject: remove ascii_downcase function to support old host OSes
       hash: f46a5b995d97ac121545e1cf8416c8910c20791f
       body: ''
