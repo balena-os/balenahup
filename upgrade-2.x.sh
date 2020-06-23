@@ -172,7 +172,7 @@ function remove_containers() {
 # Globals:
 #   API_ENDPOINT
 #   APIKEY
-#   DEVICEID
+#   UUID
 #   SLUG
 #   target_supervisor_version
 # Arguments:
@@ -204,7 +204,7 @@ function upgrade_supervisor() {
         fi
     fi
 
-    if CURRENT_SUPERVISOR_VERSION=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent --header "Authorization: Bearer ${APIKEY}" "${API_ENDPOINT}/v5/device(${DEVICEID})?\$select=supervisor_version" | jq -r '.d[0].supervisor_version'); then
+    if CURRENT_SUPERVISOR_VERSION=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent --header "Authorization: Bearer ${APIKEY}" "${API_ENDPOINT}/v5/device?\$filter=uuid%20eq%20'${UUID}'&\$select=supervisor_version" | jq -r '.d[0].supervisor_version'); then
         if [ -z "$CURRENT_SUPERVISOR_VERSION" ]; then
             log ERROR "Could not get current supervisor version from the API..."
         else
@@ -215,7 +215,7 @@ function upgrade_supervisor() {
                 if UPDATER_SUPERVISOR_ID=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent "${API_ENDPOINT}/v5/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'${UPDATER_SUPERVISOR_TAG}'))" | jq -e -r '.d[0].id'); then
                     log "Extracted supervisor vars: ID: $UPDATER_SUPERVISOR_ID"
                     log "Setting supervisor version in the API..."
-                    CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent --request PATCH --header "Authorization: Bearer ${APIKEY}" --header 'Content-Type: application/json' "${API_ENDPOINT}/v5/device(${DEVICEID})" --data-binary "{\"should_be_managed_by__supervisor_release\": \"${UPDATER_SUPERVISOR_ID}\"}" > /dev/null 2>&1
+                    CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent --request PATCH --header "Authorization: Bearer ${APIKEY}" --header 'Content-Type: application/json' "${API_ENDPOINT}/v5/device?\$filter=uuid%20eq%20'${UUID}')" --data-binary "{\"should_be_managed_by__supervisor_release\": \"${UPDATER_SUPERVISOR_ID}\"}" > /dev/null 2>&1
                     log "Running supervisor updater..."
                     progress 90 "Running supervisor update"
                     update-resin-supervisor > /dev/null 2>&1 || log WARN "Supervisor couldn't be updated, continuing anyways"
@@ -305,12 +305,12 @@ function pre_update_fix_bootfiles_hook {
 #   API_ENDPOINT
 #   APIKEY
 #   CONFIGJSON
-#   DEVICEID
+#   UUID
 # Returns:
 #   None
 #######################################
 function persistent_logging_config_var {
-    PROBLEMATIC_ENV_VAR=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent -X GET "${API_ENDPOINT}/v5/device_config_variable?\$filter=device%20eq%20${DEVICEID}" -H "Content-Type: application/json" -H "Authorization: Bearer ${APIKEY}" | jq -r '.d[] | select((.name == "RESIN_SUPERVISOR_PERSISTENT_LOGGING") and (.value == "")) | .id')
+    PROBLEMATIC_ENV_VAR=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent -X GET "${API_ENDPOINT}/v5/device_config_variable?\$filter=device/uuid%20eq%20'${UUID}'" -H "Content-Type: application/json" -H "Authorization: Bearer ${APIKEY}" | jq -r '.d[] | select((.name == "RESIN_SUPERVISOR_PERSISTENT_LOGGING") and (.value == "")) | .id')
     if [ -n "${PROBLEMATIC_ENV_VAR}" ]; then
         local tmpfile
         log "Updating problematic RESIN_SUPERVISOR_PERSISTENT_LOGGING config variable"
@@ -917,7 +917,6 @@ else
 fi
 # If the user api key exists we use it instead of the deviceApiKey as it means we haven't done the key exchange yet
 APIKEY=$(jq -r '.apiKey // .deviceApiKey' $CONFIGJSON)
-DEVICEID=$(jq -r '.deviceId' $CONFIGJSON)
 UUID=$(jq -r '.uuid' $CONFIGJSON)
 API_ENDPOINT=$(jq -r '.apiEndpoint' $CONFIGJSON)
 DELTA_ENDPOINT=$(jq -r '.deltaEndpoint' $CONFIGJSON)
