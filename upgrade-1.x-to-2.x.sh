@@ -133,7 +133,7 @@ function upgradeSupervisor() {
         fi
     fi
 
-    if CURRENT_SUPERVISOR_VERSION=$(curl --retry 10 --silent --header "Authorization: Bearer ${APIKEY}" "${API_ENDPOINT}/v5/device(${DEVICEID})?\$select=supervisor_version" | jq -r '.d[0].supervisor_version'); then
+    if CURRENT_SUPERVISOR_VERSION=$(curl --retry 10 --silent --header "Authorization: Bearer ${APIKEY}" "${API_ENDPOINT}/v5/device?\$filter=uuid%20eq%20'${UUID}'&\$select=supervisor_version" | jq -r '.d[0].supervisor_version'); then
         if [ -z "$CURRENT_SUPERVISOR_VERSION" ]; then
             log ERROR "Could not get current supervisor version from the API..."
         else
@@ -147,7 +147,7 @@ function upgradeSupervisor() {
                     UPDATER_SUPERVISOR_IMAGE=$(echo "$supervisor_api_response" | jq -e -r '.d[0].image_name')
                     log "Extracted supervisor vars: Image name: $UPDATER_SUPERVISOR_IMAGE_NAME"
                     log "Setting supervisor version in the API..."
-                    curl --retry 10 --silent --request PATCH --header "Authorization: Bearer ${APIKEY}" --header 'Content-Type: application/json' "${API_ENDPOINT}/v5/device(${DEVICEID})" --data-binary "{\"should_be_managed_by__supervisor_release\": \"${UPDATER_SUPERVISOR_ID}\"}" > /dev/null 2>&1
+                    curl --retry 10 --silent --request PATCH --header "Authorization: Bearer ${APIKEY}" --header 'Content-Type: application/json' "${API_ENDPOINT}/v5/device?\$filter=uuid%20eq%20'${UUID}'" --data-binary "{\"should_be_managed_by__supervisor_release\": \"${UPDATER_SUPERVISOR_ID}\"}" > /dev/null 2>&1
                     log "Updating local configuration at ${supervisor_conf_path}..."
                     if grep -q "SUPERVISOR_TAG" "${supervisor_conf_path}"; then
                         # Update supervisor tag
@@ -612,10 +612,10 @@ else
     log ERROR "Don't know where config.json is."
 fi
 APIKEY=$(jq -r .apiKey $CONFIGJSON)
-DEVICEID=$(jq -r .deviceId $CONFIGJSON)
+UUID=$(jq -r .uuid $CONFIGJSON)
 API_ENDPOINT=$(jq -r .apiEndpoint $CONFIGJSON)
 # Get App ID from the API to get the current value, since the device might have been moved from the originally provisioned application
-APP_ID=$(curl --retry 10 --silent --header "Authorization: Bearer ${APIKEY}" --header "Content-Type: application/json" "${API_ENDPOINT}/v5/device?\$filter=id%20eq%20${DEVICEID}&\$select=belongs_to__application" | jq -r '.d[0].belongs_to__application.__id')
+APP_ID=$(curl --retry 10 --silent --header "Authorization: Bearer ${APIKEY}" --header "Content-Type: application/json" "${API_ENDPOINT}/v5/device?\$filter=uuid%20eq%20'${UUID}'&\$select=belongs_to__application" | jq -r '.d[0].belongs_to__application.__id')
 
 # Stop docker containers
 stop_all

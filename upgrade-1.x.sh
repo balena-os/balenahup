@@ -362,7 +362,7 @@ function getSupervisorVersionFromRelease() {
     if [ -z "$DEFAULT_SUPERVISOR_VERSION" ] || [ -z "${DEFAULT_SUPERVISOR_VERSION##*xml*}" ]; then
         log ERROR "Could not get the default supervisor version for this resinOS release, bailing out."
     else
-        CURRENT_SUPERVISOR_VERSION=$(curl --retry 10 -s "${API_ENDPOINT}/v2/device(${DEVICEID})?\$select=supervisor_version&apikey=${APIKEY}" | jq -r '.d[0].supervisor_version')
+        CURRENT_SUPERVISOR_VERSION=$(curl --retry 10 -s "${API_ENDPOINT}/v2/device?\$filter=uuid%20eq%20'${UUID}'&\$select=supervisor_version&apikey=${APIKEY}" | jq -r '.d[0].supervisor_version')
         if [ -z "$CURRENT_SUPERVISOR_VERSION" ]; then
             log ERROR "Could not get current supervisor version from the API, bailing out."
         else
@@ -473,7 +473,7 @@ function updateSupervisor() {
     if [ -z "$UPDATER_SUPERVISOR_ID" ]; then
         UPDATER_SUPERVISOR_ID=$(curl --retry 10 -s "${API_ENDPOINT}/v2/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'$UPDATER_SUPERVISOR_TAG'))&apikey=${APIKEY}" | jq -e -r '.d[0].id')
     fi
-    curl --retry 10 -s "${API_ENDPOINT}/v2/device($DEVICEID)?apikey=$APIKEY" -X PATCH -H 'Content-Type: application/json;charset=UTF-8' --data-binary "{\"supervisor_release\": \"$UPDATER_SUPERVISOR_ID\"}" > /dev/null 2>&1
+    curl --retry 10 -s "${API_ENDPOINT}/v2/device?\$filter=uuid%20eq%20'${UUID}'&apikey=$APIKEY" -X PATCH -H 'Content-Type: application/json;charset=UTF-8' --data-binary "{\"supervisor_release\": \"$UPDATER_SUPERVISOR_ID\"}" > /dev/null 2>&1
 }
 
 #
@@ -640,7 +640,7 @@ else
 fi
 SLUG=$(jq -r .deviceType $CONFIGJSON)
 APIKEY=$(jq -r .apiKey $CONFIGJSON)
-DEVICEID=$(jq -r .deviceId $CONFIGJSON)
+UUID=$(jq -r .uuid $CONFIGJSON)
 API_ENDPOINT=$(jq -r .apiEndpoint $CONFIGJSON)
 
 if [ -z $SLUG ]; then
