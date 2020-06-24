@@ -1,4 +1,18 @@
 - commits:
+    - subject: use device uuid not numeric id in legacy scripts
+      hash: 6bca7ad9a4836842e4f3b133d251e683be8b4420
+      body: ''
+      footer:
+        HQ: 'https://github.com/balena-io/balena-io/issues/2227'
+        hq: 'https://github.com/balena-io/balena-io/issues/2227'
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.13.5
+  date: 2020-06-24T12:57:47.189Z
+- commits:
     - subject: use device uuid not numeric id
       hash: 379fdef58de3bc6c3a3158ae983d48db8af5750e
       body: ''
