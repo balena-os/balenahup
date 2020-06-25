@@ -1,4 +1,16 @@
 - commits:
+    - subject: 'variants: remove warning about non-prod'
+      hash: a2042857398a9935c863a7bf9c234e037154b81c
+      body: ''
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.13.6
+  date: 2020-06-25T15:51:24.194Z
+- commits:
     - subject: use device uuid not numeric id in legacy scripts
       hash: 6bca7ad9a4836842e4f3b133d251e683be8b4420
       body: ''
