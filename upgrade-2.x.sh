@@ -953,11 +953,7 @@ else
     log ERROR "No target OS version specified."
 fi
 
-# Check OS variant and filter update availability based on that.
-log "VARIANT_ID: ${VARIANT_ID}"
-if [ -n "$VARIANT_ID" ] && [ ! "$VARIANT_ID" == "prod" ]; then
-    log WARN "Updating a non-production device..."
-fi
+log "OS variant: ${VARIANT_ID}"
 
 # Check host OS version
 case $VERSION in
