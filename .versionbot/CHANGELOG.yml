@@ -1,4 +1,16 @@
 - commits:
+    - subject: 'supervisor update: fix bad curl command'
+      hash: 87c74c81a45ab2cb29536a68a0efce5e8bcd87f0
+      body: ''
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.13.7
+  date: 2020-06-30T15:16:46.566Z
+- commits:
     - subject: 'variants: remove warning about non-prod'
       hash: a2042857398a9935c863a7bf9c234e037154b81c
       body: ''
