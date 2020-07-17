@@ -1,4 +1,23 @@
 - commits:
+    - subject: 'non-hostapp: fix up retry count non-integer issue'
+      hash: 8e5b4f2e958cd3d6f8e13575930cc04a965239e0
+      body: |
+        since the variable is not set as an integer, we are simply appending to
+        the string rather than incrementing the value:
+
+        ```
+        [000000009][WARNING]Couldn't pull docker image, was try #0...
+        [000000019][WARNING]Couldn't pull docker image, was try #01...
+        ```
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.13.8
+  date: 2020-07-17T12:33:06.547Z
+- commits:
     - subject: 'supervisor update: fix bad curl command'
       hash: 87c74c81a45ab2cb29536a68a0efce5e8bcd87f0
       body: ''
