@@ -353,7 +353,7 @@ function in_container_hostapp_update {
     local target_docker_cmd
     local target_dockerd
     local volumes_args=()
-    local retrycount=0
+    local -i retrycount=0
     local tmp_image
 
     stop_services
