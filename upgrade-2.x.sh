@@ -15,6 +15,7 @@ preferred_hostos_version=2.0.7
 minimum_target_version=2.0.7
 minimum_hostapp_target_version=2.5.1
 minimum_balena_target_version=2.9.0
+minimum_supervisor_stop=2.53.10
 
 # This will set VERSION, SLUG, and VARIANT_ID
 . /etc/os-release
@@ -218,8 +219,13 @@ function upgrade_supervisor() {
                     CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent --request PATCH --header "Authorization: Bearer ${APIKEY}" --header 'Content-Type: application/json' "${API_ENDPOINT}/v6/device(uuid='${UUID}')" --data-binary "{\"should_be_managed_by__supervisor_release\": \"${UPDATER_SUPERVISOR_ID}\"}" > /dev/null 2>&1
                     log "Running supervisor updater..."
                     progress 90 "Running supervisor update"
-                    update-resin-supervisor > /dev/null 2>&1 || log WARN "Supervisor couldn't be updated, continuing anyways"
                     stop_services
+                    # use a transient unit in order to namespace-collide with a potential API-initiated update
+                    supervisor_update='systemd-run --unit run-update-supervisor update-resin-supervisor'
+                    if version_gt "${VERSION_ID}" "${minimum_supervisor_stop}"; then
+                        supervisor_update+=' -n'
+                    fi
+                    eval "${supervisor_update}" || log WARN "Supervisor couldn't be updated, continuing anyways"
                     if version_gt "6.5.9" "${target_supervisor_version}" ; then
                         remove_containers
                         log "Removing supervisor database for migration"
