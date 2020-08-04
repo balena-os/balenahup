@@ -1,4 +1,16 @@
 - commits:
+    - subject: Use a named key when querying for device by uuid
+      hash: ec5bf5c26d15c89e4a6afa34a4df905d84bf4081
+      body: ''
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.13.9
+  date: 2020-07-30T20:20:56.913Z
+- commits:
     - subject: 'non-hostapp: fix up retry count non-integer issue'
       hash: 8e5b4f2e958cd3d6f8e13575930cc04a965239e0
       body: |
