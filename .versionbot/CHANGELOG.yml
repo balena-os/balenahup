@@ -1,4 +1,16 @@
 - commits:
+    - subject: log out from the correct REGISTRY_ENDPOINT
+      hash: f42bee901c1ff6788e78b9aa94b9b9911d19941d
+      body: ''
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.13.10
+  date: 2020-08-05T16:01:40.499Z
+- commits:
     - subject: Use a named key when querying for device by uuid
       hash: ec5bf5c26d15c89e4a6afa34a4df905d84bf4081
       body: ''
