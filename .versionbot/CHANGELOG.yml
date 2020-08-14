@@ -1,4 +1,18 @@
 - commits:
+    - subject: 'registry: use provided arg for FQDN rather than local source'
+      hash: a19be907175838afb125678541a2f176634467de
+      body: ''
+      footer:
+        Connects-to: 'https://github.com/balena-os/balenahup/issues/296'
+        connects-to: 'https://github.com/balena-os/balenahup/issues/296'
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.13.11
+  date: 2020-08-05T18:26:40.867Z
+- commits:
     - subject: log out from the correct REGISTRY_ENDPOINT
       hash: f42bee901c1ff6788e78b9aa94b9b9911d19941d
       body: ''
