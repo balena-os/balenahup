@@ -85,7 +85,7 @@ Options:
         Do not reboot if update is successful. This is useful when debugging.
 
   --balenaos-registry
-        No op
+        Upstream registry to use for host OS applications.
 
   --balenaos-repo
         No op
@@ -836,7 +836,10 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --resinos-registry | --balenaos-registry)
-            # no op
+            if [ -z "$2" ]; then
+                log ERROR "\"$1\" argument needs a value."
+            fi
+            REGISTRY_ENDPOINT=$2
             shift
             ;;
         --resinos-repo | --balenaos-repo)
@@ -885,6 +888,10 @@ if [ -z "$target_version" ]; then
     log ERROR "--hostos-version is required."
 fi
 
+if [ -z "${REGISTRY_ENDPOINT}" ]; then
+    log ERROR "--balenaos-registry is required."
+fi
+
 progress 25 "Preparing OS update"
 
 if version_gt "${target_version}" "${minimum_hostapp_target_version}" || [ "${target_version}" == "${minimum_hostapp_target_version}" ]; then
@@ -920,7 +927,6 @@ APIKEY=$(jq -r '.apiKey // .deviceApiKey' $CONFIGJSON)
 UUID=$(jq -r '.uuid' $CONFIGJSON)
 API_ENDPOINT=$(jq -r '.apiEndpoint' $CONFIGJSON)
 DELTA_ENDPOINT=$(jq -r '.deltaEndpoint' $CONFIGJSON)
-REGISTRY_ENDPOINT=$(jq -r '.registryEndpoint' $CONFIGJSON)
 
 ## Sanity checks
 device_type_check=$(device_type_match)
