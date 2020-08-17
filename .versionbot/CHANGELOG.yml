@@ -1,4 +1,29 @@
 - commits:
+    - subject: 'supervisor: if available, update supervisor without affecting it''s state'
+      hash: 2fea51041794e175ec1f28874b100dbe3868530b
+      body: >
+        Recently the supervisor added a codepath that assumes no files
+        underneath it will change during runtime.
+
+        OS update hooks can trigger a condition whereby the supervisor reboots
+        the device during a HUP,
+
+        which in turn bricks the device. As a workaround, we can use a transient
+
+        unit to ensure that the remote-executed update does not occur alongside
+
+        the locally-executed update.
+      footer:
+        Depends-on: 'https://github.com/balena-os/meta-balena/pull/1973'
+        depends-on: 'https://github.com/balena-os/meta-balena/pull/1973'
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.13.12
+  date: 2020-08-17T15:42:20.636Z
+- commits:
     - subject: 'registry: use provided arg for FQDN rather than local source'
       hash: a19be907175838afb125678541a2f176634467de
       body: ''
