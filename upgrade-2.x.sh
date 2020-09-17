@@ -302,6 +302,16 @@ function pre_update_fix_bootfiles_hook {
     mount --bind "$bootfiles_temp"  /etc/hostapp-update-hooks.d/0-bootfiles
 }
 
+function pre_update_jetson_fix {
+    log "Caching current extlinux.conf for ${SLUG} fix"
+    cp /mnt/boot/extlinux/extlinux.conf /tmp/extlinux.conf
+}
+
+function post_update_jetson_fix {
+    log "Applying extlinux.conf fix for ${SLUG}"
+    cp /tmp/extlinux.conf /mnt/boot/extlinux/extlinux.conf
+}
+
 #######################################
 # Update problematic persistent logging env var
 # Earlier supervisors might have set it to "", and
@@ -462,6 +472,12 @@ function hostapp_based_update {
                 pre_update_fix_bootfiles_hook
             fi
             ;;
+        jetson-tx2)
+            log "Running pre-update fixes for ${SLUG}"
+            if version_gt "${VERSION_ID}" "2.31.1" && version_gt "2.58.3" "${VERSION_ID}" ; then
+                pre_update_jetson_fix
+            fi
+            ;;
         *)
             log "No device-specific pre-update fix for ${SLUG}"
     esac
@@ -545,6 +561,16 @@ function hostapp_based_update {
         fi
         log "Starting hostapp-update"
         hostapp-update -i "${update_package}"
+        case ${SLUG} in
+            jetson-tx2)
+                log "Running post-update fixes for ${SLUG}"
+                if version_gt "${VERSION_ID}" "2.31.1" && version_gt "2.58.3" "${VERSION_ID}" ; then
+                    post_update_jetson_fix
+                fi
+                ;;
+            *)
+                log "No device-specific pre-update fix for ${SLUG}"
+        esac
     fi
 }
 
