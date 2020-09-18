@@ -307,6 +307,8 @@ function pre_update_jetson_fix {
     extlinux_path=/boot/extlinux
     mkdir -p "/tmp${extlinux_path}"
     cp "/mnt${extlinux_path}/extlinux.conf" "/tmp${extlinux_path}/extlinux.conf"
+    log "Stopping supervisor to prevent reboots during extlinux.conf updating"
+    stop_services
 }
 
 function parse_isolcpus {
