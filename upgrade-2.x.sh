@@ -1131,9 +1131,9 @@ if version_gt "${VERSION_ID}" "${minimum_hostapp_target_version}" ||
     # record the "source" of each image in the array above for clarity during fallback
     image_types=("delta" "balena_registry")
     update_failed=0
-    # login for private dts
+    # login for private device types
     DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} login "${REGISTRY_ENDPOINT}" -u "d_${UUID}" \
-    --password "${APIKEY}" > /dev/null 2>&1 || log WARN "logging into registry failed, proceeding anyway (only required for private dts)"
+    --password "${APIKEY}" > /dev/null 2>&1 || log WARN "logging into registry failed, proceeding anyway (only required for private device types)"
     for img in "${images[@]}"; do
         if [ -n "${img}" ] && hostapp_based_update "${img}"; then
             # once we've updated successfully, set our canonical image
