@@ -1,4 +1,16 @@
 - commits:
+    - subject: 'meta: dts -> device types for clarity'
+      hash: 848ee31fa77dcbba8d3bc768d89b1546d1e9a71f
+      body: ''
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.13.13
+  date: 2020-09-18T13:22:50.617Z
+- commits:
     - subject: 'supervisor: if available, update supervisor without affecting it''s state'
       hash: 2fea51041794e175ec1f28874b100dbe3868530b
       body: >
