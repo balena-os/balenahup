@@ -304,12 +304,44 @@ function pre_update_fix_bootfiles_hook {
 
 function pre_update_jetson_fix {
     log "Caching current extlinux.conf for ${SLUG} fix"
-    cp /mnt/boot/extlinux/extlinux.conf /tmp/extlinux.conf
+    extlinux_path=/boot/extlinux
+    mkdir -p "/tmp${extlinux_path}"
+    cp "/mnt${extlinux_path}/extlinux.conf" "/tmp${extlinux_path}/extlinux.conf"
+}
+
+function parse_isolcpus {
+    path=$1
+    if grep -q "isolcpus=" "${path}" ; then
+        # shellcheck disable=SC2013
+        for val in $(awk '/isolcpus=/' "${path}"); do
+            if echo "${val}" | grep -q "isolcpus="; then
+                echo "${val}"
+            fi
+        done
+    fi
 }
 
 function post_update_jetson_fix {
     log "Applying extlinux.conf fix for ${SLUG}"
-    cp /tmp/extlinux.conf /mnt/boot/extlinux/extlinux.conf
+    # check if current config has isolcpus set in extlinux.conf
+    extlinux_file=/boot/extlinux/extlinux.conf
+    local OLD_isolcpus NEW_isolcpus replacement_isolcpu
+    OLD_isolcpus=$(parse_isolcpus "/tmp${extlinux_file}")
+    NEW_isolcpus=$(parse_isolcpus "/mnt${extlinux_file}")
+    if [ "${OLD_isolcpus}" != "${NEW_isolcpus}" ]; then
+        replacement_isolcpu=$(mktemp)
+        cp "/mnt${extlinux_file}" "${replacement_isolcpu}"
+        log "extlinux difference detected"
+        if [ -n "${NEW_isolcpus}" ]; then
+            log "replacing \`isolcpu\` value in extlinux.conf"
+            sed -in "s/${NEW_isolcpus}/${OLD_isolcpus}/" "${replacement_isolcpu}"
+        else
+            log "adding previous \`isolcpu\` value to extlinux.conf"
+            sed -in "/APPEND/s/$/ ${OLD_isolcpus}/" "${replacement_isolcpu}"
+        fi
+        # do replacement
+        mv "${replacement_isolcpu}" "/mnt${extlinux_file}"
+    fi
 }
 
 #######################################
