@@ -221,7 +221,7 @@ function upgrade_supervisor() {
                     progress 90 "Running supervisor update"
                     stop_services
                     # use a transient unit in order to namespace-collide with a potential API-initiated update
-                    supervisor_update='systemd-run --unit run-update-supervisor update-resin-supervisor'
+                    supervisor_update='systemd-run --wait --unit run-update-supervisor update-resin-supervisor'
                     if version_gt "${VERSION_ID}" "${minimum_supervisor_stop}"; then
                         supervisor_update+=' -n'
                     fi
