@@ -1,4 +1,20 @@
 - commits:
+    - subject: 'post-update-workarounds: allow `hostapp-update` to fail properly'
+      hash: 43f73328c97264ea0975a2d7b996c0ad62f7ef7c
+      body: |
+        In order to detect issues with deltas and work around them with a
+        regular pull, we need `hostapp-update` to fail and propagate that back
+        to our caller. By splitting out these post-update steps into a different
+        function, we can `&&` them together and restore the previous behavior.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.13.16
+  date: 2020-09-21T15:45:50.242Z
+- commits:
     - subject: 'supervisor: wait for upgrade unit to complete'
       hash: 2eea7ca319afa1f5e2cc58dbc8e9617e29ec105b
       body: |
