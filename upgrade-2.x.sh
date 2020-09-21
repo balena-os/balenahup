@@ -302,6 +302,51 @@ function pre_update_fix_bootfiles_hook {
     mount --bind "$bootfiles_temp"  /etc/hostapp-update-hooks.d/0-bootfiles
 }
 
+function pre_update_jetson_fix {
+    log "Caching current extlinux.conf for ${SLUG} fix"
+    extlinux_root_path="boot/extlinux"
+    mkdir -p "/tmp/${extlinux_root_path}"
+    cp "/mnt/${extlinux_root_path}/extlinux.conf" "/tmp/${extlinux_root_path}/extlinux.conf"
+    log "Stopping supervisor to prevent reboots during extlinux.conf updating"
+    stop_services
+}
+
+function parse_isolcpus {
+    path=$1
+    if grep -q "isolcpus=" "${path}" ; then
+        # shellcheck disable=SC2013
+        for val in $(awk '/isolcpus=/' "${path}"); do
+            if echo "${val}" | grep -q "isolcpus="; then
+                echo "${val}"
+            fi
+        done
+    fi
+}
+
+function post_update_jetson_fix {
+    log "Applying extlinux.conf fix for ${SLUG}"
+    # check if current config has isolcpus set in extlinux.conf
+    extlinux_file="boot/extlinux/extlinux.conf"
+    local OLD_isolcpus NEW_isolcpus replacement_isolcpu
+    OLD_isolcpus=$(parse_isolcpus "/tmp/${extlinux_file}")
+    NEW_isolcpus=$(parse_isolcpus "/mnt/${extlinux_file}")
+    if [ "${OLD_isolcpus}" != "${NEW_isolcpus}" ]; then
+        replacement_isolcpu=$(mktemp)
+        cp "/mnt/${extlinux_file}" "${replacement_isolcpu}"
+        log "extlinux difference detected"
+        if [ -n "${NEW_isolcpus}" ]; then
+            log "replacing \`isolcpu\` value in extlinux.conf"
+            sed -in "s/${NEW_isolcpus}/${OLD_isolcpus}/" "${replacement_isolcpu}"
+        else
+            log "adding previous \`isolcpu\` value to extlinux.conf"
+            sed -in "/APPEND/s/$/ ${OLD_isolcpus}/" "${replacement_isolcpu}"
+        fi
+        # do replacement
+        mv "${replacement_isolcpu}" "/mnt/${extlinux_file}"
+        sync "/mnt/${extlinux_file}"
+    fi
+}
+
 #######################################
 # Update problematic persistent logging env var
 # Earlier supervisors might have set it to "", and
@@ -462,6 +507,12 @@ function hostapp_based_update {
                 pre_update_fix_bootfiles_hook
             fi
             ;;
+        jetson-tx2)
+            log "Running pre-update fixes for ${SLUG}"
+            if version_gt "${VERSION_ID}" "2.31.1" && version_gt "2.58.3" "${VERSION_ID}" ; then
+                pre_update_jetson_fix
+            fi
+            ;;
         *)
             log "No device-specific pre-update fix for ${SLUG}"
     esac
@@ -545,6 +596,16 @@ function hostapp_based_update {
         fi
         log "Starting hostapp-update"
         hostapp-update -i "${update_package}"
+        case ${SLUG} in
+            jetson-tx2)
+                log "Running post-update fixes for ${SLUG}"
+                if version_gt "${VERSION_ID}" "2.31.1" && version_gt "2.58.3" "${VERSION_ID}" ; then
+                    post_update_jetson_fix
+                fi
+                ;;
+            *)
+                log "No device-specific pre-update fix for ${SLUG}"
+        esac
     fi
 }
 
