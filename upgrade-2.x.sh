@@ -595,17 +595,7 @@ function hostapp_based_update {
             remove_containers
         fi
         log "Starting hostapp-update"
-        hostapp-update -i "${update_package}"
-        case ${SLUG} in
-            jetson-tx2)
-                log "Running post-update fixes for ${SLUG}"
-                if version_gt "${VERSION_ID}" "2.31.1" && version_gt "2.58.3" "${VERSION_ID}" ; then
-                    post_update_jetson_fix
-                fi
-                ;;
-            *)
-                log "No device-specific pre-update fix for ${SLUG}"
-        esac
+        hostapp-update -i "${update_package}" && post_update_fixes
     fi
 }
 
@@ -846,6 +836,19 @@ function finish_up() {
     fi
     rm -f "${TMPCRT}" > /dev/null 2>&1
     exit 0
+}
+
+function post_update_fixes() {
+    case ${SLUG} in
+        jetson-tx2)
+            log "Running post-update fixes for ${SLUG}"
+            if version_gt "${VERSION_ID}" "2.31.1" && version_gt "2.58.3" "${VERSION_ID}" ; then
+                post_update_jetson_fix
+            fi
+            ;;
+        *)
+            log "No device-specific pre-update fix for ${SLUG}"
+    esac
 }
 
 ###
