@@ -1,4 +1,21 @@
 - commits:
+    - subject: 'supervisor: wait for upgrade unit to complete'
+      hash: 2eea7ca319afa1f5e2cc58dbc8e9617e29ec105b
+      body: |
+        currently there are occasions when a supervisor upgrade does not
+        complete before the HUP reboots a device. this causes confusion when the
+        supervisor eventually does update 15 minutes after boot.
+      footer:
+        Connects-to: 'https://github.com/balena-os/balenahup/issues/300'
+        connects-to: 'https://github.com/balena-os/balenahup/issues/300'
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.13.15
+  date: 2020-09-21T13:00:56.490Z
+- commits:
     - subject: 'jetson-tx2: rudimentary fix for accidental overwrite of extlinux.conf'
       hash: 85c2b12309bcc52e96c314c834abca0ad52b334f
       body: |
