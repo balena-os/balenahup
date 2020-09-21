@@ -1,4 +1,20 @@
 - commits:
+    - subject: 'jetson-tx2: rudimentary fix for accidental overwrite of extlinux.conf'
+      hash: 85c2b12309bcc52e96c314c834abca0ad52b334f
+      body: |
+        As sorted in https://github.com/balena-os/meta-balena/pull/2013, we
+        missed some files in the hooks blacklist that cause devices to brick in
+        the field. until all jetson-tx2 devices are past balenaOS 2.58.3, we'll
+        need to sort this as part of the HUP process.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.13.14
+  date: 2020-09-18T17:11:41.655Z
+- commits:
     - subject: 'meta: dts -> device types for clarity'
       hash: 848ee31fa77dcbba8d3bc768d89b1546d1e9a71f
       body: ''
