@@ -3,7 +3,6 @@
 # default configuration
 NOREBOOT=no
 DELTA_VERSION=3
-IGNORE_SANITY_CHECKS=no
 SCRIPTNAME=upgrade-2.x.sh
 LEGACY_UPDATE=no
 STOP_ALL=no
@@ -100,13 +99,6 @@ Options:
   --stop-all
         Request the updater to stop all containers (including user application)
         before the update.
-
-  --ignore-sanity-checks
-        The update scripts runs a number of sanity checks on the device, whether or not
-        it is safe to update (e.g. device type and running system cross checks)
-        This flags turns sanity check failures from errors into warnings only, so the
-        the update is not stopped if there are any failures.
-        Use with extreme caution!
 
   --assume-supported
         This is now deprecated. Assuming supported device, and disabling the relevant check.
@@ -268,19 +260,6 @@ function remove_sample_wifi {
     else
         log "No resin-sample found at ${filename} with default config, good..."
     fi
-}
-
-function device_type_match {
-    # slug in `device-type.json` and `deviceType` in `config.json` should be always the same on proper devices`
-    local deviceslug
-    local devicetype
-    local match
-    if deviceslug=$(jq .slug "$DEVICETYPEJSON") && devicetype=$(jq .deviceType "$CONFIGJSON") && [ "$devicetype" = "$deviceslug" ]; then
-        match=yes
-    else
-        match=no
-    fi
-    echo "${match}"
 }
 
 # Pre update cleanup: remove some not-required files from the boot partition to clear some space
@@ -953,9 +932,6 @@ while [[ $# -gt 0 ]]; do
         --no-reboot)
             NOREBOOT="yes"
             ;;
-        --ignore-sanity-checks)
-            IGNORE_SANITY_CHECKS="yes"
-            ;;
         --staging)
             # no op
             ;;
@@ -1020,19 +996,6 @@ APIKEY=$(jq -r '.apiKey // .deviceApiKey' $CONFIGJSON)
 UUID=$(jq -r '.uuid' $CONFIGJSON)
 API_ENDPOINT=$(jq -r '.apiEndpoint' $CONFIGJSON)
 DELTA_ENDPOINT=$(jq -r '.deltaEndpoint' $CONFIGJSON)
-
-## Sanity checks
-device_type_check=$(device_type_match)
-if [ "$device_type_check" = "yes" ]; then
-    log "Device type check: OK"
-else
-    if [ "$IGNORE_SANITY_CHECKS" = "yes" ]; then
-        log WARN "Device type sanity check failed, but asked to ignore..."
-    else
-        log ERROR "Device type sanity check failed..."
-    fi
-fi
-## Sanity checks end
 
 if [ -n "$target_version" ]; then
     case $target_version in
