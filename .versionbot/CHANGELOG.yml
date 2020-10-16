@@ -1,4 +1,18 @@
 - commits:
+    - subject: 'jetson-tx2: migrate other special-case configuration during HUP'
+      hash: 9183c379f7fcaa4ef4a2f3a727647947b5b2335a
+      body: ''
+      footer:
+        Change-type: patch
+        change-type: patch
+        Connects-to: 'https://github.com/balena-os/balenahup/issues/305'
+        connects-to: 'https://github.com/balena-os/balenahup/issues/305'
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.13.17
+  date: 2020-10-16T18:07:50.853Z
+- commits:
     - subject: 'post-update-workarounds: allow `hostapp-update` to fail properly'
       hash: 43f73328c97264ea0975a2d7b996c0ad62f7ef7c
       body: |
