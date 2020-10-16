@@ -327,12 +327,16 @@ function post_update_jetson_fix {
     log "Applying extlinux.conf fix for ${SLUG}"
     # check if current config has isolcpus set in extlinux.conf
     extlinux_file="boot/extlinux/extlinux.conf"
+    uEnv_file="/mnt/boot/extra_uEnv.txt"
+    new_extlinux="/mnt/${extlinux_file}"
+    old_extlinux="/tmp/${extlinux_file}"
+    # step 1, translate the values from extlinux.conf
     local OLD_isolcpus NEW_isolcpus replacement_isolcpu
-    OLD_isolcpus=$(parse_isolcpus "/tmp/${extlinux_file}")
-    NEW_isolcpus=$(parse_isolcpus "/mnt/${extlinux_file}")
+    OLD_isolcpus=$(parse_isolcpus "${old_extlinux}")
+    NEW_isolcpus=$(parse_isolcpus "${new_extlinux}")
     if [ "${OLD_isolcpus}" != "${NEW_isolcpus}" ]; then
         replacement_isolcpu=$(mktemp)
-        cp "/mnt/${extlinux_file}" "${replacement_isolcpu}"
+        cp "${new_extlinux}" "${replacement_isolcpu}"
         log "extlinux difference detected"
         if [ -n "${NEW_isolcpus}" ]; then
             log "replacing \`isolcpu\` value in extlinux.conf"
@@ -342,8 +346,26 @@ function post_update_jetson_fix {
             sed -in "/APPEND/s/$/ ${OLD_isolcpus}/" "${replacement_isolcpu}"
         fi
         # do replacement
-        mv "${replacement_isolcpu}" "/mnt/${extlinux_file}"
-        sync "/mnt/${extlinux_file}"
+        mv "${replacement_isolcpu}" "${new_extlinux}" && sync "${new_extlinux}"
+    fi
+
+    # step 2, port across the FDT directive
+    FDT_value=$(awk '/^ *FDT/{print $NF}' ${old_extlinux})
+    if [ -n "${FDT_value}" ] && [ "${FDT_value}" != "default" ]; then
+        log "adding previous \`FDT\` value in ${uEnv_file}"
+        echo "custom_fdt_file=${FDT_value}" >> "${uEnv_file}" && sync "${uEnv_file}"
+    fi
+
+    # step 3, port across entire APPEND
+    APPEND_value=$(awk '/^ *APPEND/{for (i=2; i<=NF; i++) printf $i " "; print $NF}' ${old_extlinux})
+    if [ -n "${APPEND_value}" ]; then
+        if [ -e "${uEnv_file}" ] && grep -q extra_os_cmdline "${uEnv_file}"; then
+            log "replacing previous \`APPEND\` value in ${uEnv_file}"
+            sed -in "s/extra_os_cmdline=.*/extra_os_cmdline=${APPEND_value}/" "${uEnv_file}" && sync "${uEnv_file}"
+        else
+            log "appending previous \`APPEND\` value in ${uEnv_file}"
+            echo "extra_os_cmdline=${APPEND_value}" >> "${uEnv_file}" && sync "${uEnv_file}"
+        fi
     fi
 }
 
@@ -509,7 +531,8 @@ function hostapp_based_update {
             ;;
         jetson-tx2)
             log "Running pre-update fixes for ${SLUG}"
-            if version_gt "${VERSION_ID}" "2.31.1" && version_gt "2.58.3" "${VERSION_ID}" ; then
+            if version_gt "${VERSION_ID}" "2.31.1" && version_gt "2.58.3" "${target_version}" ; then
+                export JETSON_FIX=1
                 pre_update_jetson_fix
             fi
             ;;
@@ -842,7 +865,7 @@ function post_update_fixes() {
     case ${SLUG} in
         jetson-tx2)
             log "Running post-update fixes for ${SLUG}"
-            if version_gt "${VERSION_ID}" "2.31.1" && version_gt "2.58.3" "${VERSION_ID}" ; then
+            if [ ${JETSON_FIX} -eq 1 ]; then
                 post_update_jetson_fix
             fi
             ;;
