@@ -1,4 +1,25 @@
 - commits:
+    - subject: 'Remove device sanity checks, as they are no longer needed'
+      hash: 70b97121ccd2b3e75b3b3bea00b6bfad18811053
+      body: |
+        The device sanity checks examined two on-device files, in an attempt
+        to prevent HUPs from installing OS versions incompatible with the
+        underlying hardware.  It is no longer a useful check, as the script is
+        normally invoked directly from the dashboard.
+
+        The immediate prompt for this change is to enable hands-off
+        device-type changes for customers with private device types; by
+        removing the check, we can patch the device type in the API, and leave
+        OS upgrades to the customer.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Hugh Brown <hugh@balena.io>
+        signed-off-by: Hugh Brown <hugh@balena.io>
+      author: Hugh Brown
+  version: 2.13.18
+  date: 2020-10-19T09:41:53.765Z
+- commits:
     - subject: 'jetson-tx2: migrate other special-case configuration during HUP'
       hash: 9183c379f7fcaa4ef4a2f3a727647947b5b2335a
       body: ''
