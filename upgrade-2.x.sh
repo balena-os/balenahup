@@ -891,7 +891,7 @@ while [[ $# -gt 0 ]]; do
             if [ -z "$2" ]; then
                 log ERROR "\"$1\" argument needs a value."
             fi
-            SLUG=$2
+            FORCED_SLUG=$2
             shift
             ;;
         --hostos-version)
@@ -963,20 +963,6 @@ fi
 
 progress 25 "Preparing OS update"
 
-if version_gt "${target_version}" "${minimum_hostapp_target_version}" || [ "${target_version}" == "${minimum_hostapp_target_version}" ]; then
-    log "Target version supports hostapps, no device type support check required."
-else
-    case $SLUG in
-        # Check board support for device types that might have 2.x-2.x non-hostapp updates
-        # The same device types listed as below in the "Switching root partition..." section
-        artik710|beaglebone*|raspberry*|intel-nuc|up-board)
-            log "Device type root partition switch is known, proceeding"
-            ;;
-        *)
-            log ERROR "Unsupported board type $SLUG."
-    esac
-fi
-
 log "Loading info from config.json"
 if [ -f /mnt/boot/config.json ]; then
     CONFIGJSON=/mnt/boot/config.json
@@ -996,6 +982,27 @@ APIKEY=$(jq -r '.apiKey // .deviceApiKey' $CONFIGJSON)
 UUID=$(jq -r '.uuid' $CONFIGJSON)
 API_ENDPOINT=$(jq -r '.apiEndpoint' $CONFIGJSON)
 DELTA_ENDPOINT=$(jq -r '.deltaEndpoint' $CONFIGJSON)
+
+FETCHED_SLUG=$(CURL_CA_BUNDLE=${TMPCRT} curl -H "Authorization: Bearer ${APIKEY}" --silent --retry 5 \
+"${API_ENDPOINT}/v6/device?\$select=is_of__device_type&\$expand=is_of__device_type(\$select=slug)&\$filter=uuid%20eq%20%27${UUID}%27" 2>/dev/null \
+| jq -r '.d[0].is_of__device_type[0].slug'
+)
+
+SLUG=${FORCED_SLUG:-$FETCHED_SLUG}
+
+if version_gt "${target_version}" "${minimum_hostapp_target_version}" || [ "${target_version}" == "${minimum_hostapp_target_version}" ]; then
+    log "Target version supports hostapps, no device type support check required."
+else
+    case $SLUG in
+        # Check board support for device types that might have 2.x-2.x non-hostapp updates
+        # The same device types listed as below in the "Switching root partition..." section
+        artik710|beaglebone*|raspberry*|intel-nuc|up-board)
+            log "Device type root partition switch is known, proceeding"
+            ;;
+        *)
+            log ERROR "Unsupported board type $SLUG."
+    esac
+fi
 
 if [ -n "$target_version" ]; then
     case $target_version in
