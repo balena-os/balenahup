@@ -1,4 +1,16 @@
 - commits:
+    - subject: Make HUP fetch the device type slug from the API
+      hash: f573ae575c6d954d4a949f4efa9f934d48b0c3a0
+      body: ''
+      footer:
+        Change-type: minor
+        change-type: minor
+        Signed-off-by: Stevche Radevski <stevche@balena.io>
+        signed-off-by: Stevche Radevski <stevche@balena.io>
+      author: Stevche Radevski
+  version: 2.14.0
+  date: 2020-10-27T09:04:51.892Z
+- commits:
     - subject: 'Remove device sanity checks, as they are no longer needed'
       hash: 70b97121ccd2b3e75b3b3bea00b6bfad18811053
       body: |
