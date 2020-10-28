@@ -1,4 +1,16 @@
 - commits:
+    - subject: 'meta: remove legacy codeowners'
+      hash: 657ca06c746d0b1dceb94364d73430e9ccdd528e
+      body: ''
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.14.1
+  date: 2020-10-28T15:00:55.002Z
+- commits:
     - subject: Make HUP fetch the device type slug from the API
       hash: f573ae575c6d954d4a949f4efa9f934d48b0c3a0
       body: ''
