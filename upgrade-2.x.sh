@@ -969,14 +969,6 @@ if [ -f /mnt/boot/config.json ]; then
 else
     log ERROR "Don't know where config.json is."
 fi
-log "Loading info from device-type.json"
-if [ -f /mnt/boot/device-type.json ]; then
-    DEVICETYPEJSON=/mnt/boot/device-type.json
-elif [ -f /resin-boot/device-type.json ]; then
-    DEVICETYPEJSON=/resin-boot/device-type.json
-else
-    log ERROR "Don't know where device-type.json is."
-fi
 # If the user api key exists we use it instead of the deviceApiKey as it means we haven't done the key exchange yet
 APIKEY=$(jq -r '.apiKey // .deviceApiKey' $CONFIGJSON)
 UUID=$(jq -r '.uuid' $CONFIGJSON)
