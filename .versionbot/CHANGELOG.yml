@@ -1,4 +1,20 @@
 - commits:
+    - subject: >-
+        supervisor-update: use APIKEY when querying for the new target
+        supervisor state
+      hash: 8268b59e727de50360f5ab5afe1ae88f4647657b
+      body: ''
+      footer:
+        Connects-to: 'https://github.com/balena-io/balena-api/pull/2786'
+        connects-to: 'https://github.com/balena-io/balena-api/pull/2786'
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.14.3
+  date: 2020-11-12T17:51:40.548Z
+- commits:
     - subject: 'cleanup: remove unused DEVICETYPEJSON variable'
       hash: eba8ec022d657bda28593d2b7f35a6fa740e37a2
       body: ''
