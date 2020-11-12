@@ -1,4 +1,16 @@
 - commits:
+    - subject: 'cleanup: remove unused DEVICETYPEJSON variable'
+      hash: eba8ec022d657bda28593d2b7f35a6fa740e37a2
+      body: ''
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.14.2
+  date: 2020-11-12T17:35:50.416Z
+- commits:
     - subject: 'meta: remove legacy codeowners'
       hash: 657ca06c746d0b1dceb94364d73430e9ccdd528e
       body: ''
