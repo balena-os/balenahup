@@ -205,7 +205,7 @@ function upgrade_supervisor() {
                 log "Supervisor update: will be upgrading from v${CURRENT_SUPERVISOR_VERSION} to v${target_supervisor_version}"
                 UPDATER_SUPERVISOR_TAG="v${target_supervisor_version}"
                 # Get the supervisor id
-                if UPDATER_SUPERVISOR_ID=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent "${API_ENDPOINT}/v5/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'${UPDATER_SUPERVISOR_TAG}'))" | jq -e -r '.d[0].id'); then
+                if UPDATER_SUPERVISOR_ID=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --header "Authorization: Bearer ${APIKEY}" --silent "${API_ENDPOINT}/v5/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'${UPDATER_SUPERVISOR_TAG}'))" | jq -e -r '.d[0].id'); then
                     log "Extracted supervisor vars: ID: $UPDATER_SUPERVISOR_ID"
                     log "Setting supervisor version in the API..."
                     CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent --request PATCH --header "Authorization: Bearer ${APIKEY}" --header 'Content-Type: application/json' "${API_ENDPOINT}/v6/device(uuid='${UUID}')" --data-binary "{\"should_be_managed_by__supervisor_release\": \"${UPDATER_SUPERVISOR_ID}\"}" > /dev/null 2>&1
