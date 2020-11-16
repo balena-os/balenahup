@@ -14,7 +14,7 @@ const isIncrementalCommit = (changeType) => {
 };
 
 const metaUpdate = (cwd, version, callback) => {
-  return exec(`sed -i 's/version = '\\''.*'\\''/version = '\\'${version}\\''/g' app/meta/resinhupmeta.py`, {
+  return exec(`sed -i 's/version = '\\''.*'\\''/version = '\\'${version}\\''/g' app/meta/balenahupmeta.py`, {
     encoding: 'utf8',
   }, callback);
 };
