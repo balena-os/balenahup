@@ -1,4 +1,16 @@
 - commits:
+    - subject: rename a bunch of resins to balenas
+      hash: bd7a02385f9b0737b6a63904b76084d4c26d685d
+      body: ''
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.14.5
+  date: 2020-11-16T15:44:17.068Z
+- commits:
     - subject: remove accidentally added file
       hash: 677b43f3c233e9ec9a58cb680aef8faa2c8b5612
       body: ''
