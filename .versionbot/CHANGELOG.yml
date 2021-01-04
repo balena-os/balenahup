@@ -1,4 +1,18 @@
 - commits:
+    - subject: 'supervisor: in case of API query failure, report the received response'
+      hash: a4ec06b9cd7b9d5cf9074317ad3bb23bde97da7b
+      body: ''
+      footer:
+        Connects-to: 'https://github.com/balena-os/balenahup/issues/251'
+        connects-to: 'https://github.com/balena-os/balenahup/issues/251'
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.14.6
+  date: 2021-01-04T18:36:35.529Z
+- commits:
     - subject: rename a bunch of resins to balenas
       hash: bd7a02385f9b0737b6a63904b76084d4c26d685d
       body: ''
