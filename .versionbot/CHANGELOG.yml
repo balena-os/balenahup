@@ -1,4 +1,18 @@
 - commits:
+    - subject: >-
+        supervisor-upgrade: if the upgrade fails, grab what happened from
+        systemd
+      hash: 2b7b20da1f3865a158ee465cc9b929655937face
+      body: ''
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.14.7
+  date: 2021-02-18T14:36:42.646Z
+- commits:
     - subject: 'supervisor: in case of API query failure, report the received response'
       hash: a4ec06b9cd7b9d5cf9074317ad3bb23bde97da7b
       body: ''
