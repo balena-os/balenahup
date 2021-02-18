@@ -219,7 +219,8 @@ function upgrade_supervisor() {
                     if version_gt "${VERSION_ID}" "${minimum_supervisor_stop}"; then
                         supervisor_update+=' -n'
                     fi
-                    eval "${supervisor_update}" || log WARN "Supervisor couldn't be updated, continuing anyways"
+                    eval "${supervisor_update}" || (log WARN "Supervisor couldn't be updated, continuing anyways" && \
+                        systemctl status run-update-supervisor)
                     if version_gt "6.5.9" "${target_supervisor_version}" ; then
                         remove_containers
                         log "Removing supervisor database for migration"
