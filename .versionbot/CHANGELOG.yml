@@ -1,4 +1,18 @@
 - commits:
+    - subject: 'jetson: confirm variable exists before testing it'
+      hash: ce45decf33641af34842fa5ddbb71bd5626eb69c
+      body: ''
+      footer:
+        Connects-to: '#327'
+        connects-to: '#327'
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.14.8
+  date: 2021-03-09T22:21:21.707Z
+- commits:
     - subject: >-
         supervisor-upgrade: if the upgrade fails, grab what happened from
         systemd
