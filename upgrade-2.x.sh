@@ -850,6 +850,8 @@ function post_update_fixes() {
             if [[ -n "${JETSON_FIX}" && "${JETSON_FIX}" -eq 1 ]]; then
                 post_update_jetson_fix
             fi
+            # required for the supervisor to take control, see https://github.com/balena-os/balenahup/issues/328
+            touch /mnt/boot/extra_uEnv.txt
             ;;
         *)
             log "No device-specific pre-update fix for ${SLUG}"
