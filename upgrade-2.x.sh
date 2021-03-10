@@ -847,7 +847,7 @@ function post_update_fixes() {
     case ${SLUG} in
         jetson-tx2)
             log "Running post-update fixes for ${SLUG}"
-            if [ ${JETSON_FIX} -eq 1 ]; then
+            if [[ -n "${JETSON_FIX}" && "${JETSON_FIX}" -eq 1 ]]; then
                 post_update_jetson_fix
             fi
             ;;
