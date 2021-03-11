@@ -1,4 +1,23 @@
 - commits:
+    - subject: 'private DTs: do not log out from the registry until cleanup'
+      hash: a79d0991e9cd655a49f4743790c8e0fe35dddc48
+      body: |
+        since older OSes get a sideloaded balenaOS hostapp, it is untagged in
+        the local image store. when we crack that image open to find our new
+        target supervisor, we have to contact the upstream registry and retag
+        our local image with the registry reference. in order to do that, we
+        must remain logged in.
+      footer:
+        Connects-to: '#331'
+        connects-to: '#331'
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.14.10
+  date: 2021-03-11T19:25:22.810Z
+- commits:
     - subject: 'jetson: touch extra_uEnv.txt during HUP to allow supervisor mgmt'
       hash: 14c8c88fb2b53c7a412fb26237684b7f5d1d7e8d
       body: ''
