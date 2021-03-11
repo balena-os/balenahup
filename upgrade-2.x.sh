@@ -825,6 +825,9 @@ function finish_up() {
     fi
 
     sync
+
+    DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} logout "${REGISTRY_ENDPOINT}" > /dev/null 2>&1 || true
+
     if [ "${NOREBOOT}" == "no" ]; then
         # Reboot into new OS
         log "Rebooting into new OS in 5 seconds..."
@@ -1201,7 +1204,6 @@ if version_gt "${VERSION_ID}" "${minimum_hostapp_target_version}" ||
     if [ -z "${image}" ]; then
         log ERROR "all hostapp-update attempts have failed..."
     fi
-    DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} logout "${REGISTRY_ENDPOINT}" > /dev/null 2>&1
 
     if [ "${LEGACY_UPDATE}" = "yes" ]; then
         upgrade_supervisor "${image}" no_docker_host
