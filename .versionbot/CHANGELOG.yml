@@ -1,4 +1,18 @@
 - commits:
+    - subject: 'ESR: properly grab the meta-balena version from /etc/os-release'
+      hash: 9e5d1f25e475e1999cea522e14ea0801299dffa2
+      body: ''
+      footer:
+        Connects-to: 'https://github.com/balena-os/balenahup/issues/333'
+        connects-to: 'https://github.com/balena-os/balenahup/issues/333'
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+        Change-type: patch
+        change-type: patch
+      author: Matthew McGinn
+  version: 2.14.12
+  date: 2021-03-19T15:54:21.184Z
+- commits:
     - subject: 'supervisor-update: stop the supervisor before PATCHing the new target'
       hash: 218a30ede959cf997786c741967d7ef7b6879d86
       body: ''
