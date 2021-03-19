@@ -210,10 +210,10 @@ function upgrade_supervisor() {
                 if UPDATER_SUPERVISOR_ID=$(echo "${resp}" | jq -e -r '.d[0].id'); then
                     log "Extracted supervisor vars: ID: $UPDATER_SUPERVISOR_ID"
                     log "Setting supervisor version in the API..."
-                    CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --request PATCH --header "Authorization: Bearer ${APIKEY}" --header 'Content-Type: application/json' "${API_ENDPOINT}/v6/device(uuid='${UUID}')" --data-binary "{\"should_be_managed_by__supervisor_release\": \"${UPDATER_SUPERVISOR_ID}\"}" > /dev/null 2>&1
-                    log "Running supervisor updater..."
                     progress 90 "Running supervisor update"
                     stop_services
+                    CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --request PATCH --header "Authorization: Bearer ${APIKEY}" --header 'Content-Type: application/json' "${API_ENDPOINT}/v6/device(uuid='${UUID}')" --data-binary "{\"should_be_managed_by__supervisor_release\": \"${UPDATER_SUPERVISOR_ID}\"}" > /dev/null 2>&1
+                    log "Running supervisor updater..."
                     # use a transient unit in order to namespace-collide with a potential API-initiated update
                     supervisor_update='systemd-run --wait --unit run-update-supervisor update-resin-supervisor'
                     if version_gt "${VERSION_ID}" "${minimum_supervisor_stop}"; then
