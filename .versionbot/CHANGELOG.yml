@@ -1,4 +1,16 @@
 - commits:
+    - subject: 'supervisor-update: stop the supervisor before PATCHing the new target'
+      hash: 218a30ede959cf997786c741967d7ef7b6879d86
+      body: ''
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.14.11
+  date: 2021-03-19T15:26:52.069Z
+- commits:
     - subject: 'private DTs: do not log out from the registry until cleanup'
       hash: a79d0991e9cd655a49f4743790c8e0fe35dddc48
       body: |
