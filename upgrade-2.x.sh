@@ -216,7 +216,7 @@ function upgrade_supervisor() {
                     log "Running supervisor updater..."
                     # use a transient unit in order to namespace-collide with a potential API-initiated update
                     supervisor_update='systemd-run --wait --unit run-update-supervisor update-resin-supervisor'
-                    if version_gt "${VERSION_ID}" "${minimum_supervisor_stop}"; then
+                    if version_gt "${HOST_OS_VERSION}" "${minimum_supervisor_stop}"; then
                         supervisor_update+=' -n'
                     fi
                     eval "${supervisor_update}" || (log WARN "Supervisor couldn't be updated, continuing anyways" && \
@@ -485,7 +485,7 @@ function in_container_hostapp_update {
 #   DOCKERD
 #   LEGACY_UPDATE
 #   SLUG
-#   VERSION_ID
+#   HOST_OS_VERSION
 #   target_version
 #   minimum_balena_target_version
 # Arguments:
@@ -507,13 +507,13 @@ function hostapp_based_update {
         raspberry*)
             log "Running pre-update fixes for ${SLUG}"
             pre_update_pi_bootfiles_removal
-            if ! version_gt "${VERSION_ID}" "2.7.6" ; then
+            if ! version_gt "${HOST_OS_VERSION}" "2.7.6" ; then
                 pre_update_fix_bootfiles_hook
             fi
             ;;
         jetson-tx2)
             log "Running pre-update fixes for ${SLUG}"
-            if version_gt "${VERSION_ID}" "2.31.1" && version_gt "2.58.3" "${target_version}" ; then
+            if version_gt "${HOST_OS_VERSION}" "2.31.1" && version_gt "2.58.3" "${target_version}" ; then
                 export JETSON_FIX=1
                 pre_update_jetson_fix
             fi
@@ -989,6 +989,7 @@ FETCHED_SLUG=$(CURL_CA_BUNDLE=${TMPCRT} curl -H "Authorization: Bearer ${APIKEY}
 )
 
 SLUG=${FORCED_SLUG:-$FETCHED_SLUG}
+HOST_OS_VERSION=${META_BALENA_VERSION:-${VERSION_ID}}
 
 if version_gt "${target_version}" "${minimum_hostapp_target_version}" || [ "${target_version}" == "${minimum_hostapp_target_version}" ]; then
     log "Target version supports hostapps, no device type support check required."
@@ -1022,7 +1023,7 @@ else
     log ERROR "No target OS version specified."
 fi
 
-log "OS variant: ${VARIANT_ID}"
+log "OS variant: ${HOST_OS_VERSION}"
 
 # Check host OS version
 case $VERSION in
@@ -1040,7 +1041,7 @@ if [ -z "${target_image}" ]; then
 fi
 
 # starting with the balena engine, we can use native deltas
-if version_gt "${VERSION_ID}" "${minimum_balena_target_version}"; then
+if version_gt "${HOST_OS_VERSION}" "${minimum_balena_target_version}"; then
     log "Attempting host OS update using deltas"
     delta_image=$(find_delta "${target_image}")
 else
@@ -1099,8 +1100,8 @@ fi
 
 # fix resin-device-progress, between version 2.0.6 and 2.3.0
 # the script does not work using deviceApiKey
-if version_gt "$VERSION_ID" "2.0.6" &&
-    version_gt "2.3.0" "$VERSION_ID"; then
+if version_gt "${HOST_OS_VERSION}" "2.0.6" &&
+    version_gt "2.3.0" "${HOST_OS_VERSION}"; then
         log "Fixing resin-device-progress is required..."
         tools_path=/tmp/upgrade_tools_extra
         mkdir -p $tools_path
@@ -1114,8 +1115,8 @@ fi
 
 # Fix for issue: https://github.com/balena-os/meta-balena/pull/864
 # Also includes change from: https://github.com/balena-os/meta-balena/pull/882
-if version_gt "$VERSION_ID" "2.0.7" &&
-    version_gt "2.7.0" "$VERSION_ID"; then
+if version_gt "${HOST_OS_VERSION}" "2.0.7" &&
+    version_gt "2.7.0" "${HOST_OS_VERSION}"; then
         log "Fixing supervisor updater..."
         if CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --fail --silent -o "/tmp/update-resin-supervisor" https://raw.githubusercontent.com/balena-os/meta-balena/40d5a174da6b52d530c978e0cae22aa61f65d203/meta-resin-common/recipes-containers/docker-disk/docker-resin-supervisor-disk/update-resin-supervisor ; then
             chmod 755 "/tmp/update-resin-supervisor"
@@ -1129,8 +1130,8 @@ else
 fi
 
 # Fix issue with `read` on 2.10.x/2.11.0 balenaOS versions
-if version_gt "$VERSION_ID" "2.9.7" &&
-    version_gt "2.11.1" "$VERSION_ID"; then
+if version_gt "${HOST_OS_VERSION}" "2.9.7" &&
+    version_gt "2.11.1" "${HOST_OS_VERSION}"; then
         log "Fixing supervisor updater if needed..."
         #shellcheck disable=SC2016
         sed 's/read tag image_name <<<$data/read tag <<<"$(echo "$data" | head -n 1)" ; read image_name <<<"$(echo "$data" | tail -n 1)"/' /usr/bin/update-resin-supervisor > /tmp/fixed-update-resin-supervisor && \
@@ -1159,8 +1160,8 @@ fi
 # Apply this fix only to balenaOS version >=2.0.7, though, as docker in earlier
 # versions does not have that flag, and would not run properly
 if [ "$SLUG" = "raspberry-pi" ] && \
-    version_gt "$VERSION_ID" "2.0.7" && \
-    version_gt "2.5.1" "$VERSION_ID"; then
+    version_gt "${HOST_OS_VERSION}" "2.0.7" && \
+    version_gt "2.5.1" "${HOST_OS_VERSION}"; then
         if [ -f "/etc/systemd/system/docker.service.d/docker.conf" ]; then
             # development device have this config
             service_file="/etc/systemd/system/docker.service.d/docker.conf"
@@ -1180,8 +1181,8 @@ fi
 
 ### hostapp-update based updater
 
-if version_gt "${VERSION_ID}" "${minimum_hostapp_target_version}" ||
-    [ "${VERSION_ID}" == "${minimum_hostapp_target_version}" ]; then
+if version_gt "${HOST_OS_VERSION}" "${minimum_hostapp_target_version}" ||
+    [ "${HOST_OS_VERSION}" == "${minimum_hostapp_target_version}" ]; then
     log "hostapp-update command exists, use that for update"
     progress 50 "Running OS update"
     images=("${delta_image}" "${target_image}")
