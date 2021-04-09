@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 # default configuration
 NOREBOOT=no
@@ -600,7 +600,7 @@ function hostapp_based_update {
             remove_containers
         fi
         log "Starting hostapp-update"
-        hostapp-update -i "${update_package}" && post_update_fixes
+        bash -x hostapp-update -i "${update_package}" && post_update_fixes
     fi
 }
 
