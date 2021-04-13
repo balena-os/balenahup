@@ -127,7 +127,10 @@ function log {
     endtime=$(date +%s)
     if [ "$loglevel" == "ERROR" ]; then
         printf "[%09d%s%s\n" "$((endtime - starttime))" "][$loglevel]" "$1" >> /dev/stderr
-        progress 100 "OS update failed"
+        while ! resin-device-progress --percentage "100" --state "OS update failed"; do
+            ((c++)) && ((c==60)) && break
+            sleep 60
+        done
         exit 1
     else
         printf "[%09d%s%s\n" "$((endtime - starttime))" "][$loglevel]" "$1"
