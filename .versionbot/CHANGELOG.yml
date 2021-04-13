@@ -1,4 +1,18 @@
 - commits:
+    - subject: 'logging: retry reporting failures every minute for an hour'
+      hash: 1db205320da333e5e0d8be1e6179e890790eea6c
+      body: ''
+      footer:
+        Connects-to: 'https://github.com/balena-os/balenahup/issues/338'
+        connects-to: 'https://github.com/balena-os/balenahup/issues/338'
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.14.13
+  date: 2021-04-13T15:08:13.247Z
+- commits:
     - subject: 'ESR: properly grab the meta-balena version from /etc/os-release'
       hash: 9e5d1f25e475e1999cea522e14ea0801299dffa2
       body: ''
