@@ -1,4 +1,18 @@
 - commits:
+    - subject: 'reporting: retry failure reporting until successful'
+      hash: f53ee3b8738f28ca1da536e7c414781ddb4bfd26
+      body: ''
+      footer:
+        Connects-to: 'https://github.com/balena-os/balenahup/issues/338'
+        connects-to: 'https://github.com/balena-os/balenahup/issues/338'
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.14.14
+  date: 2021-04-21T15:12:12.998Z
+- commits:
     - subject: 'logging: retry reporting failures every minute for an hour'
       hash: 1db205320da333e5e0d8be1e6179e890790eea6c
       body: ''
