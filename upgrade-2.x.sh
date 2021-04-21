@@ -127,7 +127,10 @@ function log {
     endtime=$(date +%s)
     if [ "$loglevel" == "ERROR" ]; then
         printf "[%09d%s%s\n" "$((endtime - starttime))" "][$loglevel]" "$1" >> /dev/stderr
-        while ! resin-device-progress --percentage "100" --state "OS update failed"; do
+        perc=100
+        state="OS update failed"
+        while ! compare_device_state "${perc}" "${state}"; do
+            resin-device-progress --percentage "${perc}" --state "${state}"
             ((c++)) && ((c==60)) && break
             sleep 60
         done
@@ -140,6 +143,14 @@ function log {
 # Test if a version is greater than another
 function version_gt() {
     test "$(echo "$@" | tr " " "\n" | sort -V | head -n 1)" != "$1"
+}
+
+function compare_device_state() {
+    perc=$1
+    state=$2
+    resp=$(CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --header "Authorization: Bearer ${APIKEY}" \
+        "${API_ENDPOINT}/v6/device(uuid='${UUID}')?\$select=provisioning_state,provisioning_progress" | jq '.d[]')
+    test "${perc}" -eq "$(echo "${resp}" | jq -r '.provisioning_progress')" && test "${state}" = "$(echo "${resp}" | jq -r '.provisioning_state')"
 }
 
 function stop_services() {
