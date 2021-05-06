@@ -156,9 +156,9 @@ function compare_device_state() {
 function stop_services() {
     # Stopping supervisor and related services
     log "Stopping supervisor and related services..."
-    systemctl stop update-resin-supervisor.timer > /dev/null 2>&1
-    systemctl stop resin-supervisor > /dev/null 2>&1
-    ${DOCKER_CMD} rm -f resin_supervisor > /dev/null 2>&1 || true
+    systemctl stop update-balena-supervisor.timer > /dev/null 2>&1 || systemctl stop update-resin-supervisor.timer > /dev/null 2>&1
+    systemctl stop balena-supervisor  > /dev/null 2>&1 || systemctl stop resin-supervisor > /dev/null 2>&1
+    ${DOCKER_CMD} rm -f balena_supervisor resin_supervisor > /dev/null 2>&1 || true
 }
 
 function remove_containers() {
@@ -196,7 +196,7 @@ function upgrade_supervisor() {
     if [ -z "$target_supervisor_version" ]; then
         log "No explicit supervisor version was provided, update to default version in target balenaOS..."
         local DEFAULT_SUPERVISOR_VERSION
-        versioncheck_cmd=("run" "--rm" "${image}" "bash" "-c" "cat /etc/resin-supervisor/supervisor.conf | sed -rn 's/SUPERVISOR_TAG=v(.*)/\\1/p'")
+        versioncheck_cmd=("run" "--rm" "${image}" "bash" "-c" "cat /etc/*-supervisor/supervisor.conf | sed -rn 's/SUPERVISOR_TAG=v(.*)/\\1/p'")
         if [ -z "$no_docker_host" ]; then
             DEFAULT_SUPERVISOR_VERSION=$(DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} "${versioncheck_cmd[@]}")
         else
@@ -229,7 +229,7 @@ function upgrade_supervisor() {
                     CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --request PATCH --header "Authorization: Bearer ${APIKEY}" --header 'Content-Type: application/json' "${API_ENDPOINT}/v6/device(uuid='${UUID}')" --data-binary "{\"should_be_managed_by__supervisor_release\": \"${UPDATER_SUPERVISOR_ID}\"}" > /dev/null 2>&1
                     log "Running supervisor updater..."
                     # use a transient unit in order to namespace-collide with a potential API-initiated update
-                    supervisor_update='systemd-run --wait --unit run-update-supervisor update-resin-supervisor'
+                    supervisor_update="systemd-run --wait --unit run-update-supervisor $(which update-balena-supervisor || which update-resin-supervisor)"
                     if version_gt "${HOST_OS_VERSION}" "${minimum_supervisor_stop}"; then
                         supervisor_update+=' -n'
                     fi
@@ -257,8 +257,8 @@ function upgrade_supervisor() {
 
 function error_handler() {
     # If script fails (e.g. docker pull fails), restart the stopped services like the supervisor
-    systemctl start resin-supervisor
-    systemctl start update-resin-supervisor.timer
+    systemctl start balena-supervisor resin-supervisor || true
+    systemctl start update-balena-supervisor.timer update-resin-supervisor.timer || true
     exit 1
 }
 
