@@ -1,4 +1,17 @@
 - commits:
+    - subject: Rename resin-supervisor to balena-supervisor
+      hash: d484d7c5804b131bdd06c87710e5a53138f04ec9
+      body: |
+        Maintain compatibility with resin namespaces for now.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Kyle Harding <kyle@balena.io>
+        signed-off-by: Kyle Harding <kyle@balena.io>
+      author: Kyle Harding
+  version: 2.14.15
+  date: 2021-05-06T20:53:44.610Z
+- commits:
     - subject: 'reporting: retry failure reporting until successful'
       hash: f53ee3b8738f28ca1da536e7c414781ddb4bfd26
       body: ''
