@@ -1,7 +1,7 @@
 #!/bin/bash
 
 main_script_name="upgrade-2.x.sh"
-RESINHUP_ARGS=()
+BALENAHUP_ARGS=()
 UUIDS=""
 SSH_HOST=""
 NOCOLORS=no
@@ -22,16 +22,13 @@ Options:
         Display this help and exit.
 
   --staging
-        WARNING: this flag has been deprecated for this script, set --resinos-repo
-        to set the location of the staging resinOS images.
-        For backwards compatibility, this flag acts the same as
-        --resinos-repo resin/resinos-staging
+        WARNING: this flag has been deprecated for this script
 
   -u <UUID>, --uuid <UUID>
         Update this UUID. Multiple -u can be provided to updated mutiple devices.
 
   -s <SSH_HOST>, --ssh-host <SSH_HOST>
-        SSH host to be used in ssh connections (e.g. resin or resinstaging).
+        SSH host to be used in ssh connections (e.g. ssh.balena-devices.com or ssh.balena-staging-devices.com).
 
   -m <MAX_THREADS>, --max-threads <MAX_THREADS>
         Maximum number of threads to be used when updating devices in parallel. Useful to
@@ -47,17 +44,9 @@ Options:
         See ${main_script_name} help for more details.
         This is a mandatory argument.
 
-  --resinos-registry <REGISTRY>
-       Run ${main_script_name} with --resinos-registry <REGISTRY>, e.g. 'registry.hub.docker.com'
+  --balenaos-registry <REGISTRY>
+       Run ${main_script_name} with --balenaos-registry <REGISTRY>, e.g. 'registry2.balena-cloud.com'
        See ${main_script_name} help for more details.
-
-  --resinos-repo <REPOSITORY>
-        Run ${main_script_name} with --resinos-repo <REPOSITORY>, e.g. 'resin/resinos'
-        See ${main_script_name} help for more details.
-
-  --resinos-tag <TAG>
-        Run ${main_script_name} with --resinos-tag <TAG>, e.g. '2.9.5_rev1-raspberrypi3'
-        See ${main_script_name} help for more details.
 
   --supervisor-version <SUPERVISOR_VERSION>
         Run ${main_script_name} with --supervisor-version <SUPERVISOR_VERSION>, use e.g. 6.2.5
@@ -204,14 +193,13 @@ while [[ $# -gt 0 ]]; do
             exit 0
             ;;
         --staging)
-            log WARN "--staging has been deprecated, in the future --resinos-repo to set the right place to pull the images from."
-            RESINHUP_ARGS+=( "--staging" )
+            log WARN "--staging has been deprecated"
             ;;
         --ignore-sanity-checks)
-            RESINHUP_ARGS+=( "--ignore-sanity-checks" )
+            BALENAHUP_ARGS+=( "--ignore-sanity-checks" )
             ;;
         --assume-supported)
-            RESINHUP_ARGS+=( "--assume-supported" )
+            BALENAHUP_ARGS+=( "--assume-supported" )
             ;;
         -u|--uuid)
             if [ -z "$2" ]; then
@@ -239,7 +227,7 @@ while [[ $# -gt 0 ]]; do
                 log ERROR "\"$1\" argument needs a value."
             fi
             SLUG=$2
-            RESINHUP_ARGS+=( "--force-slug $SLUG" )
+            BALENAHUP_ARGS+=( "--force-slug $SLUG" )
             shift
             ;;
         --hostos-version)
@@ -247,35 +235,27 @@ while [[ $# -gt 0 ]]; do
                 log ERROR "\"$1\" argument needs a value."
             fi
             HOSTOS_VERSION=$2
-            RESINHUP_ARGS+=( "--hostos-version $HOSTOS_VERSION" )
+            BALENAHUP_ARGS+=( "--hostos-version $HOSTOS_VERSION" )
             shift
             ;;
-        --resinos-registry)
+        --balenaos-registry)
             if [ -z "$2" ]; then
                 log ERROR "\"$1\" argument needs a value."
             fi
-            RESINOS_REGISTRY=$2
-            RESINHUP_ARGS+=( "--resinos-registry $RESINOS_REGISTRY" )
+            BALENAOS_REGISTRY=$2
+            BALENAHUP_ARGS+=( "--balenaos-registry $BALENAOS_REGISTRY" )
             shift
             ;;
         --resinos-repo)
-            if [ -z "$2" ]; then
-                log ERROR "\"$1\" argument needs a value."
-            fi
-            RESINOS_REPO=$2
-            RESINHUP_ARGS+=( "--resinos-repo $RESINOS_REPO" )
+            log WARN "--resinos-repo has been deprecated"
             shift
             ;;
         --resinos-tag)
-            if [ -z "$2" ]; then
-                log ERROR "\"$1\" argument needs a value."
-            fi
-            RESINOS_TAG=$2
-            RESINHUP_ARGS+=( "--resinos-tag $RESINOS_TAG" )
+            log WARN "--resinos-tag has been deprecated"
             shift
             ;;
         --stop-all)
-            RESINHUP_ARGS+=( "--stop-all" )
+            BALENAHUP_ARGS+=( "--stop-all" )
             shift
             ;;
         --supervisor-version)
@@ -283,11 +263,11 @@ while [[ $# -gt 0 ]]; do
                 log ERROR "\"$1\" argument needs a value."
             fi
             SUPERVISOR_VERSION=$2
-            RESINHUP_ARGS+=( "--supervisor-version $SUPERVISOR_VERSION" )
+            BALENAHUP_ARGS+=( "--supervisor-version $SUPERVISOR_VERSION" )
             shift
             ;;
         --no-reboot)
-            RESINHUP_ARGS+=( "--no-reboot" )
+            BALENAHUP_ARGS+=( "--no-reboot" )
             ;;
         --no-colors)
             NOCOLORS=yes
@@ -325,8 +305,8 @@ for uuid in $UUIDS; do
     fi
 
     # Connect to device
-    echo "Running ${main_script_name} ${RESINHUP_ARGS[*]} ..." >> "$log_filename"
-    ssh "$SSH_HOST" host -s "${uuid}" "bash -s" -- "${RESINHUP_ARGS[@]}"  < "${UPDATE_SCRIPT}" >> "$log_filename" 2>&1 &
+    echo "Running ${main_script_name} ${BALENAHUP_ARGS[*]} ..." >> "$log_filename"
+    ssh "$SSH_HOST" host -s "${uuid}" "bash -s" -- "${BALENAHUP_ARGS[@]}"  < "${UPDATE_SCRIPT}" >> "$log_filename" 2>&1 &
 
     # Manage queue of threads
     PID=$!
