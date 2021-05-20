@@ -1,4 +1,16 @@
 - commits:
+    - subject: '2.x: remove resin remnants from ssh script'
+      hash: 7d5087e155b36af09df120b41e5a204a020bedc6
+      body: ''
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Matthew McGinn <matthew@balena.io>
+        signed-off-by: Matthew McGinn <matthew@balena.io>
+      author: Matthew McGinn
+  version: 2.14.17
+  date: 2021-05-20T17:19:27.198Z
+- commits:
     - subject: 'meta: update codeowners'
       hash: 05d6593f6abb47f677f9433cd9212e0d39b9a620
       body: ''
