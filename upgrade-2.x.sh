@@ -751,7 +751,7 @@ function get_image_location() {
     image=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent -X GET \
         -H "Content-Type: application/json" \
         -H "Authorization: Bearer ${APIKEY}" \
-        "${API_ENDPOINT}/v5/release?\$expand=release_tag,belongs_to__application,contains__image/image&\$filter=(belongs_to__application/any(a:a/device_type%20eq%20'${SLUG}'%20and%20is_host%20eq%20true))%20and%20(release_tag/any(rt:(rt/tag_key%20eq%20'version')%20and%20(rt/value%20eq%20'${version}')))" \
+        "${API_ENDPOINT}/v5/release?\$expand=release_tag,belongs_to__application,contains__image/image&\$filter=(belongs_to__application/any(a:a/device_type%20eq%20'${SLUG}'%20and%20is_host%20eq%20true))%20and%20is_invalidated%20eq%20false%20and%20(release_tag/any(rt:(rt/tag_key%20eq%20'version')%20and%20(rt/value%20eq%20'${version}')))" \
         | jq -r "[.d[] | select(.release_tag[].value == \"${variant_downcase}\") | .contains__image[0].image[0] | [.is_stored_at__image_location, .content_hash] | \"\(.[0])@\(.[1])\"]")
     if echo "${image}" | jq -e '. | length == 1' > /dev/null; then
         echo "${image}" | jq -r '.[0]'
