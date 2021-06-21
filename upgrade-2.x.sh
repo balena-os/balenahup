@@ -848,10 +848,10 @@ function finish_up() {
         progress 100 "Update successful, rebooting"
         systemd-run --on-active=5 --quiet --unit=hup-reboot.service systemctl reboot
         # If the previous reboot command has failed for any reason, let's try differently
-        (sleep 300 && nohup bash -c "reboot --force" > /dev/null 2>&1) &
+        (sleep 300 && log "Forcing reboot after timeout..." && nohup bash -c "reboot --force" > /dev/null 2>&1) &
         # If the previous 2 reboot commands have failed for any reason, try the Magic SysRq
         # enable and send reboot request
-        (sleep 600 && echo 1 > /proc/sys/kernel/sysrq && echo b > /proc/sysrq-trigger) &
+        (sleep 600 && log "Triggering sysrq reboot after timeout" && echo 1 > /proc/sys/kernel/sysrq && echo b > /proc/sysrq-trigger) &
     else
         log "Finished update, not rebooting as requested."
         progress 100 "Update successful"
