@@ -1,4 +1,20 @@
 - commits:
+    - subject: 'upgrade-2.x.sh: Prevent supervisor update from halting HUP'
+      hash: aa84b8f5a3803f6d6cedd894f205c379139bb4ef
+      body: |
+        Rather than attempting to print logs after a failed
+        supervisor update just default to piping the logs during
+        the systemd-run command and print the warning afterwards
+        if required.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Kyle Harding <kyle@balena.io>
+        signed-off-by: Kyle Harding <kyle@balena.io>
+      author: Kyle Harding
+  version: 2.14.20
+  date: 2021-08-16T18:06:20.806Z
+- commits:
     - subject: Delete CODEOWNERS
       hash: d102db1f9f29ba8fbbbbc1d7cd951f7727eced05
       body: ''
