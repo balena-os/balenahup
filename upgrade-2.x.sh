@@ -527,7 +527,7 @@ function hostapp_based_update {
             ;;
         jetson-tx2)
             log "Running pre-update fixes for ${SLUG}"
-            if version_gt "${HOST_OS_VERSION}" "2.31.1" && version_gt "2.58.3" "${target_version}" ; then
+            if version_gt "${HOST_OS_VERSION}" "2.31.1" && version_gt "2.84.7" "${target_version}" ; then
                 export JETSON_FIX=1
                 pre_update_jetson_fix
             fi
