@@ -229,11 +229,12 @@ function upgrade_supervisor() {
                     CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --request PATCH --header "Authorization: Bearer ${APIKEY}" --header 'Content-Type: application/json' "${API_ENDPOINT}/v6/device(uuid='${UUID}')" --data-binary "{\"should_be_managed_by__supervisor_release\": \"${UPDATER_SUPERVISOR_ID}\"}" > /dev/null 2>&1
                     log "Running supervisor updater..."
                     # use a transient unit in order to namespace-collide with a potential API-initiated update
-                    supervisor_update="systemd-run --wait --pipe --unit run-update-supervisor $(which update-balena-supervisor || which update-resin-supervisor)"
+                    supervisor_update="systemd-run --wait --unit run-update-supervisor $(which update-balena-supervisor || which update-resin-supervisor)"
                     if version_gt "${HOST_OS_VERSION}" "${minimum_supervisor_stop}"; then
                         supervisor_update+=' -n'
                     fi
                     eval "${supervisor_update}" || log WARN "Supervisor couldn't be updated, continuing anyways"
+                    systemctl status run-update-supervisor --no-pager
                     if version_gt "6.5.9" "${target_supervisor_version}" ; then
                         remove_containers
                         log "Removing supervisor database for migration"
