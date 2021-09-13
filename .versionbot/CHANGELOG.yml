@@ -1,4 +1,21 @@
 - commits:
+    - subject: 'upgrade-2.x.sh: Remove unsupported flag from supervisor upgrade'
+      hash: da243e6c61e19b4cf30fe7a45deb6f1c8a01351b
+      body: |
+        The --pipe flag is not supported in older versions of systemd like
+        those running on balenaOS 2.31.2+rev1.
+
+        Restore the old behaviour of runnning a separate systemctl status
+        command after the upgrade transient service has completed or failed.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Kyle Harding <kyle@balena.io>
+        signed-off-by: Kyle Harding <kyle@balena.io>
+      author: Kyle Harding
+  version: 2.14.21
+  date: 2021-09-10T14:04:50.470Z
+- commits:
     - subject: 'upgrade-2.x.sh: Prevent supervisor update from halting HUP'
       hash: aa84b8f5a3803f6d6cedd894f205c379139bb4ef
       body: |
