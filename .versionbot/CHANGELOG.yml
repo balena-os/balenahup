@@ -1,4 +1,48 @@
 - commits:
+    - subject: 'upgrade-2.x: apply jetson fix to OS < v2.84.7'
+      hash: 26519d2cb37a6967204a5e24f5633b5610df4d0b
+      body: >
+        A mistyped path in the hostapp-update hooks in meta-balena caused the
+
+        extlinux.conf file to not be persisted across HUP, causing variables set
+
+        in the config to be reset by the supervisor, triggering untimely reboots
+
+        during upgrades.
+
+
+        A fix has been made to meta-balena [0] to properly persist the
+
+        configuration across a HUP, but this will require an OS upgrade to take
+
+        effect.
+
+
+        The supervisor has a similar fix in place to prevent reboots when
+
+        healthcheck breadcrumbs are present, but this requires a new supervisor
+
+        release.
+
+
+        To cover devices that are running older supervisor releases on older OS
+
+        versions, extend the version check to apply the Jetson fix to affected
+
+        OS versions.
+
+
+        [0]
+        https://github.com/balena-os/meta-balena/commit/096024808224aea2100e2a2a1f95ef75e23493ef
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Joseph Kogut <joseph@balena.io>
+        signed-off-by: Joseph Kogut <joseph@balena.io>
+      author: Joseph Kogut
+  version: 2.14.22
+  date: 2021-09-13T16:35:21.448Z
+- commits:
     - subject: 'upgrade-2.x.sh: Remove unsupported flag from supervisor upgrade'
       hash: da243e6c61e19b4cf30fe7a45deb6f1c8a01351b
       body: |
