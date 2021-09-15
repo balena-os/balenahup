@@ -1,4 +1,16 @@
 - commits:
+    - subject: 'upgrade-2.x: Catch failure when dumping sv update logs'
+      hash: dc48089f114d064d263ceb5ce1dbac2ae242d336
+      body: ''
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Kyle Harding <kyle@balena.io>
+        signed-off-by: Kyle Harding <kyle@balena.io>
+      author: Kyle Harding
+  version: 2.14.23
+  date: 2021-09-15T17:22:28.632Z
+- commits:
     - subject: 'upgrade-2.x: apply jetson fix to OS < v2.84.7'
       hash: 26519d2cb37a6967204a5e24f5633b5610df4d0b
       body: >

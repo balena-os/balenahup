@@ -11,7 +11,7 @@
 #
 
 title = 'resinhup'
-version = '2.14.22'
+version = '2.14.23'
 description = 'A resin host OS update tool'
 author = 'Andrei Gherzan'
 author_email = 'andrei@resin.io'
