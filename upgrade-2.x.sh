@@ -234,7 +234,7 @@ function upgrade_supervisor() {
                         supervisor_update+=' -n'
                     fi
                     eval "${supervisor_update}" || log WARN "Supervisor couldn't be updated, continuing anyways"
-                    systemctl status run-update-supervisor --no-pager
+                    journalctl -a -u run-update-supervisor --no-pager || true
                     if version_gt "6.5.9" "${target_supervisor_version}" ; then
                         remove_containers
                         log "Removing supervisor database for migration"
