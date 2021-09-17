@@ -1049,6 +1049,14 @@ case $VERSION in
         ;;
 esac
 
+if [ "${SLUG}" = "raspberrypi4-64" ] && \
+    [ "${target_version}" = "2.83.10+rev1" ] ; then
+    board_rev="$(awk '{print $NF}' < /proc/device-tree/model)"
+    if [ "${board_rev}" = "1.4" ] ; then
+        log ERROR "Upgrading to release 2.83.10+rev1 is disabled for Raspberry Pi 4 Model B Rev 1.4 due to an EEPROM issue"
+    fi
+fi
+
 target_image=$(get_image_location "${target_version}")
 if [ -z "${target_image}" ]; then
     log ERROR "Zero or multiple matching target hostapp releases found, update attempt has failed..."
