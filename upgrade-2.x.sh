@@ -16,7 +16,7 @@ minimum_hostapp_target_version=2.5.1
 minimum_balena_target_version=2.9.0
 minimum_supervisor_stop=2.53.10
 
-# This will set VERSION, SLUG, and VARIANT_ID
+# This will set VERSION, SLUG
 . /etc/os-release
 
 # Don't run anything before this source as it sets PATH here
@@ -737,7 +737,7 @@ function find_partitions {
 #   APIKEY
 #   API_ENDPOINT
 #   SLUG
-#   VARIANT
+#   VARIANT (deprecated)
 # Arguments:
 #   version: the OS version to look for
 # Returns:
@@ -746,7 +746,7 @@ function find_partitions {
 function get_image_location() {
     # we need to strip the target_version's variant tag to query the API properly
     local version=${1/.dev/}
-    variant_downcase=$(echo "${VARIANT}" | tr "[:upper:]" "[:lower:]")
+    variant_downcase=$(echo "${VARIANT:-production}" | tr "[:upper:]" "[:lower:]")
     # TODO: could improve the quality of the API call here
     image=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent -X GET \
         -H "Content-Type: application/json" \
