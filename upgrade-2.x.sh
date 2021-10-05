@@ -363,6 +363,13 @@ function post_update_jetson_fix {
             echo "extra_os_cmdline=${APPEND_value}" >> "${uEnv_file}" && sync "${uEnv_file}"
         fi
     fi
+
+    if [ -e "${uEnv_file}" ] && grep -q '^os_bc_lim=' "${uEnv_file}"; then
+        log "Fix for jetson-tx2 bootcount limit already applied"
+    else
+        echo "os_bc_lim=3" >>  "${uEnv_file}" && sync "${uEnv_file}"
+        log "Applied fix for jetson-tx2 bootcount limit to extra_uEnv.txt"
+    fi
 }
 
 #######################################
