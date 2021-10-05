@@ -1,4 +1,19 @@
 - commits:
+    - subject: Backport increased os_bc_limit to existing releases
+      hash: 1d5745a92782e16bb95726fb70cec0c862651d75
+      body: |
+        Starting with BalenaOS v2.85.9 the u-boot bootcount limit
+        has been increased to 3. Let's apply this fix previous
+        jetson-tx2 releases, like 2.73 or 2.82.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Alexandru Costache <alexandru@balena.io>
+        signed-off-by: Alexandru Costache <alexandru@balena.io>
+      author: Alexandru Costache
+  version: 2.14.26
+  date: 2021-10-05T12:25:28.079Z
+- commits:
     - subject: Deprecate VARIANT in os-release file
       hash: f30220bd585fc268d45ff38f6c5e326ee0182fcf
       body: ''
