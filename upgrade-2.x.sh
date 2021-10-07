@@ -256,6 +256,7 @@ function upgrade_supervisor() {
 }
 
 function error_handler() {
+    log "Restoring supervisor"
     # If script fails (e.g. docker pull fails), restart the stopped services like the supervisor
     systemctl start balena-supervisor resin-supervisor || true
     systemctl start update-balena-supervisor.timer update-resin-supervisor.timer || true
@@ -422,7 +423,6 @@ function in_container_hostapp_update {
     local target_docker_cmd
     local target_dockerd
     local volumes_args=()
-    local -i retrycount=0
     local tmp_image
 
     stop_services
@@ -442,20 +442,6 @@ function in_container_hostapp_update {
         target_docker_cmd="docker"
         target_dockerd="dockerd"
     fi
-
-    while true ; do
-        if ${DOCKER_CMD} pull "${update_package}"; then
-            break
-        else
-            log WARN "Couldn't pull docker image, was try #${retrycount}..."
-        fi
-        retrycount+=1
-        if [ $retrycount -ge 10 ]; then
-            log ERROR "Couldn't pull docker image, giving up..."
-        else
-            sleep 10
-        fi
-    done
 
     tmp_image=$(mktemp -u "/tmp/hupfile.XXXXXXXX")
     log "Using ${tmp_image} for update image transfer into container"
@@ -515,6 +501,7 @@ function hostapp_based_update {
     local inactive_used
     local hostapp_image_count
     local storage_driver
+    local -i retrycount=0
     storage_driver=$(cat /boot/storage-driver)
 
     case ${SLUG} in
@@ -591,6 +578,25 @@ function hostapp_based_update {
             fi
         fi
     fi
+
+    # Preload update_package before performing any irreversible operations
+    # This avoids temporary network failures leaving the device in an inconsistent state
+    echo "Preloading ${update_package}"
+    while true ; do
+        if DOCKER_HOST=unix:///var/run/${DOCKER_CMD}-host.sock ${DOCKER_CMD} pull "${update_package}"; then
+            break
+        else
+            log WARN "Couldn't pull docker image, was try #${retrycount}..."
+        fi
+        retrycount+=1
+        if [ $retrycount -ge 10 ]; then
+            log ERROR "Couldn't pull docker image, giving up..."
+	    error_handler
+	    exit 1
+        else
+            sleep 10
+        fi
+    done
 
     if [ "$balena_migration" = "yes" ]; then
             # Migrating to balena and hostapp-update hooks run inside the target container
