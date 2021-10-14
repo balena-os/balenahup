@@ -1,4 +1,22 @@
 - commits:
+    - subject: 'upgrade-2.x: preload update_package in hostapp_based_update'
+      hash: 67452f05c691ed010119ff5fe8a04155f7d96f39
+      body: |
+        Move retry logic for image pulling from in_container_hostapp_update to
+        caller, hostapp_based_update. This change ensures that the image is
+        successfully downloaded before running hostapp-update, avoiding
+        conditions where a network failure can cause a hostapp-update to run
+        hooks before failing, potentially breaking the boot process for some
+        devices.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Joseph Kogut <joseph@balena.io>
+        signed-off-by: Joseph Kogut <joseph@balena.io>
+      author: Joseph Kogut
+  version: 2.14.26
+  date: 2021-10-14T15:28:23.982Z
+- commits:
     - subject: Deprecate VARIANT in os-release file
       hash: f30220bd585fc268d45ff38f6c5e326ee0182fcf
       body: ''
