@@ -68,6 +68,23 @@ Options:
 
   --no-colors
         Avoid terminal colors.
+
+  --private-registry <PRIVATE_REGISTRY>
+        Run ${main_script_name} with --private-registry <PRIVATE_REGISTRY>. e.g.: balenalib/up-board-node
+        See ${main_script_name} help for more details.
+
+  --private-tag <PRIVATE_TAG>
+        Run ${main_script_name} with --private-tag <PRIVATE_TAG>. e.g. : 2.68.1_rev1-up-board-dev
+        See ${main_script_name} help for more details.
+
+  --private-user <PRIVATE_USER>
+        Run ${main_script_name} with --private-user <PRIVATE_USER>.
+        See ${main_script_name} help for more details.
+
+  --private-password <PRIVATE_PASSWORD>
+        Run ${main_script_name} with --private-password <PRIVATE_PASSWORD>.
+        See ${main_script_name} help for more details.
+
 EOF
 }
 
@@ -271,6 +288,38 @@ while [[ $# -gt 0 ]]; do
             ;;
         --no-colors)
             NOCOLORS=yes
+            ;;
+        --private-registry)
+            if [ -z "$2" ]; then
+                log ERROR "\"$1\" argument needs a value."
+            fi
+            PRIVATE_REGISTRY=$2
+            BALENAHUP_ARGS+=( "--private-registry $PRIVATE_REGISTRY" )
+            shift
+            ;;
+        --private-user)
+            if [ -z "$2" ]; then
+                log ERROR "\"$1\" argument needs a value."
+            fi
+            PRIVATE_USER=$2
+            BALENAHUP_ARGS+=( "--private-user $PRIVATE_USER" )
+            shift
+            ;;
+        --private-password)
+            if [ -z "$2" ]; then
+                log ERROR "\"$1\" argument needs a value."
+            fi
+            PRIVATE_PASSWORD=$2
+            BALENAHUP_ARGS+=( "--private-password $PRIVATE_PASSWORD")
+            shift
+            ;;
+        --private-tag)
+            if [ -z "$2" ]; then
+                log ERROR "\"$1\" argument needs a value."
+            fi
+            PRIVATE_TAG=$2
+            BALENAHUP_ARGS+=( "--private-tag $PRIVATE_TAG")
+            shift
             ;;
         *)
             log WARN "Unrecognized option $1."
