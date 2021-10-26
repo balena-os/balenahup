@@ -105,6 +105,19 @@ Options:
         Only enabled for updates that does not use update hooks, otherwise the updater
         wouldn't know how to switch partitions, so only available for balenaOS
         below ${minimum_hostapp_target_version}.
+
+    --private-registry <PRIVATE_REGISTRY>
+        Private upstream registry to use for host OS applications. e.g.: balenalib/up-board-node
+
+    --private-tag <PRIVATE_TAG>
+        Tag of the private image. e.g. : 2.68.1_rev1-up-board-dev
+
+    --private-user <PRIVATE_USER>
+        Username to log in on private registry.
+
+    --private-password <PRIVATE_PASSWORD>
+        Password to log in on private registry.
+
 EOF
 }
 
@@ -970,6 +983,34 @@ while [[ $# -gt 0 ]]; do
         --assume-supported)
             log WARN "The --assume-supported flag is deprecated, and has no effect."
             ;;
+        --private-registry)
+            if [ -z "$2" ]; then
+                log ERROR "\"$1\" argument needs a value."
+            fi
+            PRIVATE_REGISTRY=$2
+            shift
+            ;;
+        --private-user)
+            if [ -z "$2" ]; then
+                log ERROR "\"$1\" argument needs a value."
+            fi
+            PRIVATE_USER=$2
+            shift
+            ;;
+        --private-password)
+            if [ -z "$2" ]; then
+                log ERROR "\"$1\" argument needs a value."
+            fi
+            PRIVATE_PASSWORD=$2
+            shift
+            ;;
+        --private-tag)
+            if [ -z "$2" ]; then
+                log ERROR "\"$1\" argument needs a value."
+            fi
+            PRIVATE_TAG=$2
+            shift
+            ;;
         *)
             log WARN "Unrecognized option $1."
             ;;
@@ -987,7 +1028,9 @@ if [ -z "$target_version" ]; then
 fi
 
 if [ -z "${REGISTRY_ENDPOINT}" ]; then
-    log ERROR "--balenaos-registry is required."
+    if [ -z "${PRIVATE_REGISTRY}" ]; then
+        log ERROR "--balenaos-registry is required or provide a private registry."
+    fi
 fi
 
 progress 25 "Preparing OS update"
@@ -1214,13 +1257,27 @@ if version_gt "${HOST_OS_VERSION}" "${minimum_hostapp_target_version}" ||
     [ "${HOST_OS_VERSION}" == "${minimum_hostapp_target_version}" ]; then
     log "hostapp-update command exists, use that for update"
     progress 50 "Running OS update"
-    images=("${delta_image}" "${target_image}")
-    # record the "source" of each image in the array above for clarity during fallback
-    image_types=("delta" "balena_registry")
+    if [[ $PRIVATE_REGISTRY && $PRIVATE_TAG ]]; then
+        images=("${PRIVATE_REGISTRY}:${PRIVATE_TAG}" "${delta_image}" "${target_image}")
+        # record the "source" of each image in the array above for clarity during fallback
+        image_types=("private_registry" "delta" "balena_registry")
+    else
+        images=("${delta_image}" "${target_image}")
+        # record the "source" of each image in the array above for clarity during fallback
+        image_types=("delta" "balena_registry")
+    fi
+
     update_failed=0
     # login for private device types
-    DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} login "${REGISTRY_ENDPOINT}" -u "d_${UUID}" \
-    --password "${APIKEY}" > /dev/null 2>&1 || log WARN "logging into registry failed, proceeding anyway (only required for private device types)"
+
+    if [[ $PRIVATE_USER && $PRIVATE_PASSWORD ]]; then
+        DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} login -u ${PRIVATE_USER} \
+        --password ${PRIVATE_PASSWORD} > /dev/null 2>&1 || log WARN "logging into private registry failed, proceeding anyway ... (only required for private registry)"
+    else
+        DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} login "${REGISTRY_ENDPOINT}" -u "d_${UUID}" \
+        --password "${APIKEY}" > /dev/null 2>&1 || log WARN "logging into registry failed, proceeding anyway (only required for private device types)"
+    fi
+
     for img in "${images[@]}"; do
         if [ -n "${img}" ] && hostapp_based_update "${img}"; then
             # once we've updated successfully, set our canonical image
