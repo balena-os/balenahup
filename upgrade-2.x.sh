@@ -931,6 +931,7 @@ while [[ $# -gt 0 ]]; do
                 log ERROR "\"$1\" argument needs a value."
             fi
             target_version=$2
+            log "Raw target version: ${target_version}"
             case $target_version in
                 *.prod)
                     target_version="${target_version%%.prod}"
