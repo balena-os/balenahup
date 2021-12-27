@@ -1,4 +1,38 @@
 - commits:
+    - subject: 'upgrade-2.x: Log the raw target version the scrips received'
+      hash: d8206c759ba4845bf7620af5d85c8f704d25313f
+      body: ''
+      footer:
+        Change-type: patch
+        change-type: patch
+      author: Thodoris Greasidis
+    - subject: 'upgrade-2.x: Exclude draft hostApp releases'
+      hash: 14ce80bd05b93a51b3820a839f7ca3af749c5af2
+      body: |
+        Just to be safe from unexpected situations
+        when we start creating OS releases using
+        `balena deploy`. Once we are there we can
+        then figure out how to allow this in a safe way.
+      footer:
+        Change-type: patch
+        change-type: patch
+      author: Thodoris Greasidis
+    - subject: 'upgrade-2.x: Add support for upgrading to unified OS releases'
+      hash: 139296f35e02ce04e51063f5de1d25388fd95788
+      body: ''
+      footer:
+        Change-type: minor
+        change-type: minor
+        See: >-
+          https://jel.ly.fish/improvement-combine-os-variants-0d96399a-660b-4d38-adca-f661378cb86e
+        see: >-
+          https://jel.ly.fish/improvement-combine-os-variants-0d96399a-660b-4d38-adca-f661378cb86e
+        Signed-off-by: Thodoris Greasidis <thodoris@balena.io>
+        signed-off-by: Thodoris Greasidis <thodoris@balena.io>
+      author: Thodoris Greasidis
+  version: 2.15.0
+  date: 2021-12-24T14:00:39.872Z
+- commits:
     - subject: Backport increased os_bc_limit to existing releases
       hash: 1d5745a92782e16bb95726fb70cec0c862651d75
       body: |
