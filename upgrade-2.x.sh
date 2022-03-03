@@ -196,7 +196,7 @@ function upgrade_supervisor() {
     if [ -z "$target_supervisor_version" ]; then
         log "No explicit supervisor version was provided, update to default version in target balenaOS..."
         local DEFAULT_SUPERVISOR_VERSION
-        versioncheck_cmd=("run" "--rm" "${image}" "bash" "-c" "cat /etc/*-supervisor/supervisor.conf | sed -rn 's/SUPERVISOR_TAG=v(.*)/\\1/p'")
+        versioncheck_cmd=("run" "--rm" "${image}" "bash" "-c" "cat /etc/*-supervisor/supervisor.conf | sed -rn 's/SUPERVISOR_(TAG|VERSION)=v(.*)/\\2/p'")
         if [ -z "$no_docker_host" ]; then
             DEFAULT_SUPERVISOR_VERSION=$(DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} "${versioncheck_cmd[@]}")
         else
