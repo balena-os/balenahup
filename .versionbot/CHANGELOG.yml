@@ -1,12 +1,27 @@
 - commits:
-    - subject: 'upgrade-2.x: Log the raw target version the scrips received'
+    - subject: "upgrade-2.x.sh: Use SUPERVISOR_VERSION for version check"
+      hash: 149349b1f811a2bd07ae50499825edc49906eb0d
+      body: |
+        BalenaOS has renamed SUPERVISOR_TAG for SUPERVISOR_VERSION in
+        supervisor.conf.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Alex Gonzalez <alexg@balena.io>
+        signed-off-by: Alex Gonzalez <alexg@balena.io>
+      author: Alex Gonzalez
+  version: 2.15.1
+  title: "'upgrade-2.x.sh: Use SUPERVISOR_VERSION for version check'"
+  date: 2022-03-03T17:57:57.415Z
+- commits:
+    - subject: "upgrade-2.x: Log the raw target version the scrips received"
       hash: d8206c759ba4845bf7620af5d85c8f704d25313f
-      body: ''
+      body: ""
       footer:
         Change-type: patch
         change-type: patch
       author: Thodoris Greasidis
-    - subject: 'upgrade-2.x: Exclude draft hostApp releases'
+    - subject: "upgrade-2.x: Exclude draft hostApp releases"
       hash: 14ce80bd05b93a51b3820a839f7ca3af749c5af2
       body: |
         Just to be safe from unexpected situations
@@ -17,16 +32,14 @@
         Change-type: patch
         change-type: patch
       author: Thodoris Greasidis
-    - subject: 'upgrade-2.x: Add support for upgrading to unified OS releases'
+    - subject: "upgrade-2.x: Add support for upgrading to unified OS releases"
       hash: 139296f35e02ce04e51063f5de1d25388fd95788
-      body: ''
+      body: ""
       footer:
         Change-type: minor
         change-type: minor
-        See: >-
-          https://jel.ly.fish/improvement-combine-os-variants-0d96399a-660b-4d38-adca-f661378cb86e
-        see: >-
-          https://jel.ly.fish/improvement-combine-os-variants-0d96399a-660b-4d38-adca-f661378cb86e
+        See: https://jel.ly.fish/improvement-combine-os-variants-0d96399a-660b-4d38-adca-f661378cb86e
+        see: https://jel.ly.fish/improvement-combine-os-variants-0d96399a-660b-4d38-adca-f661378cb86e
         Signed-off-by: Thodoris Greasidis <thodoris@balena.io>
         signed-off-by: Thodoris Greasidis <thodoris@balena.io>
       author: Thodoris Greasidis
@@ -50,7 +63,7 @@
 - commits:
     - subject: Deprecate VARIANT in os-release file
       hash: f30220bd585fc268d45ff38f6c5e326ee0182fcf
-      body: ''
+      body: ""
       footer:
         Change-type: patch
         change-type: patch
@@ -62,7 +75,7 @@
 - commits:
     - subject: Temporarily disable upgrades to 2.83.10+rev1 for Pi4
       hash: c79251a4a8f3bbdda0c1ee7337bf418fb5139b3f
-      body: ''
+      body: ""
       footer:
         Change-type: patch
         change-type: patch
@@ -72,9 +85,9 @@
   version: 2.14.24
   date: 2021-09-17T18:55:16.651Z
 - commits:
-    - subject: 'upgrade-2.x: Catch failure when dumping sv update logs'
+    - subject: "upgrade-2.x: Catch failure when dumping sv update logs"
       hash: dc48089f114d064d263ceb5ce1dbac2ae242d336
-      body: ''
+      body: ""
       footer:
         Change-type: patch
         change-type: patch
@@ -84,7 +97,7 @@
   version: 2.14.23
   date: 2021-09-15T17:22:28.632Z
 - commits:
-    - subject: 'upgrade-2.x: apply jetson fix to OS < v2.84.7'
+    - subject: "upgrade-2.x: apply jetson fix to OS < v2.84.7"
       hash: 26519d2cb37a6967204a5e24f5633b5610df4d0b
       body: >
         A mistyped path in the hostapp-update hooks in meta-balena caused the
@@ -117,8 +130,7 @@
         OS versions.
 
 
-        [0]
-        https://github.com/balena-os/meta-balena/commit/096024808224aea2100e2a2a1f95ef75e23493ef
+        [0] https://github.com/balena-os/meta-balena/commit/096024808224aea2100e2a2a1f95ef75e23493ef
       footer:
         Change-type: patch
         change-type: patch
@@ -128,7 +140,7 @@
   version: 2.14.22
   date: 2021-09-13T16:35:21.448Z
 - commits:
-    - subject: 'upgrade-2.x.sh: Remove unsupported flag from supervisor upgrade'
+    - subject: "upgrade-2.x.sh: Remove unsupported flag from supervisor upgrade"
       hash: da243e6c61e19b4cf30fe7a45deb6f1c8a01351b
       body: |
         The --pipe flag is not supported in older versions of systemd like
@@ -145,7 +157,7 @@
   version: 2.14.21
   date: 2021-09-10T14:04:50.470Z
 - commits:
-    - subject: 'upgrade-2.x.sh: Prevent supervisor update from halting HUP'
+    - subject: "upgrade-2.x.sh: Prevent supervisor update from halting HUP"
       hash: aa84b8f5a3803f6d6cedd894f205c379139bb4ef
       body: |
         Rather than attempting to print logs after a failed
@@ -163,7 +175,7 @@
 - commits:
     - subject: Delete CODEOWNERS
       hash: d102db1f9f29ba8fbbbbc1d7cd951f7727eced05
-      body: ''
+      body: ""
       footer:
         Change-type: patch
         change-type: patch
@@ -175,23 +187,21 @@
 - commits:
     - subject: Filter out invalidated hostApp releases
       hash: ff470c32f7f8be7b1262da805346429efeea3412
-      body: ''
+      body: ""
       footer:
         Change-type: patch
         change-type: patch
-        See: >-
-          https://www.flowdock.com/app/rulemotion/resin-tech/threads/Q6G8ZOdl8tbn1uLErpDe4_0bwBD
-        see: >-
-          https://www.flowdock.com/app/rulemotion/resin-tech/threads/Q6G8ZOdl8tbn1uLErpDe4_0bwBD
+        See: https://www.flowdock.com/app/rulemotion/resin-tech/threads/Q6G8ZOdl8tbn1uLErpDe4_0bwBD
+        see: https://www.flowdock.com/app/rulemotion/resin-tech/threads/Q6G8ZOdl8tbn1uLErpDe4_0bwBD
         Signed-off-by: Thodoris Greasidis <thodoris@balena.io>
         signed-off-by: Thodoris Greasidis <thodoris@balena.io>
       author: Thodoris Greasidis
   version: 2.14.18
   date: 2021-06-10T12:56:36.200Z
 - commits:
-    - subject: '2.x: remove resin remnants from ssh script'
+    - subject: "2.x: remove resin remnants from ssh script"
       hash: 7d5087e155b36af09df120b41e5a204a020bedc6
-      body: ''
+      body: ""
       footer:
         Change-type: patch
         change-type: patch
@@ -201,9 +211,9 @@
   version: 2.14.17
   date: 2021-05-20T17:19:27.198Z
 - commits:
-    - subject: 'meta: update codeowners'
+    - subject: "meta: update codeowners"
       hash: 05d6593f6abb47f677f9433cd9212e0d39b9a620
-      body: ''
+      body: ""
       footer:
         Change-type: patch
         change-type: patch
@@ -226,12 +236,12 @@
   version: 2.14.15
   date: 2021-05-06T20:53:44.610Z
 - commits:
-    - subject: 'reporting: retry failure reporting until successful'
+    - subject: "reporting: retry failure reporting until successful"
       hash: f53ee3b8738f28ca1da536e7c414781ddb4bfd26
-      body: ''
+      body: ""
       footer:
-        Connects-to: 'https://github.com/balena-os/balenahup/issues/338'
-        connects-to: 'https://github.com/balena-os/balenahup/issues/338'
+        Connects-to: https://github.com/balena-os/balenahup/issues/338
+        connects-to: https://github.com/balena-os/balenahup/issues/338
         Change-type: patch
         change-type: patch
         Signed-off-by: Matthew McGinn <matthew@balena.io>
@@ -240,12 +250,12 @@
   version: 2.14.14
   date: 2021-04-21T15:12:12.998Z
 - commits:
-    - subject: 'logging: retry reporting failures every minute for an hour'
+    - subject: "logging: retry reporting failures every minute for an hour"
       hash: 1db205320da333e5e0d8be1e6179e890790eea6c
-      body: ''
+      body: ""
       footer:
-        Connects-to: 'https://github.com/balena-os/balenahup/issues/338'
-        connects-to: 'https://github.com/balena-os/balenahup/issues/338'
+        Connects-to: https://github.com/balena-os/balenahup/issues/338
+        connects-to: https://github.com/balena-os/balenahup/issues/338
         Change-type: patch
         change-type: patch
         Signed-off-by: Matthew McGinn <matthew@balena.io>
@@ -254,12 +264,12 @@
   version: 2.14.13
   date: 2021-04-13T15:08:13.247Z
 - commits:
-    - subject: 'ESR: properly grab the meta-balena version from /etc/os-release'
+    - subject: "ESR: properly grab the meta-balena version from /etc/os-release"
       hash: 9e5d1f25e475e1999cea522e14ea0801299dffa2
-      body: ''
+      body: ""
       footer:
-        Connects-to: 'https://github.com/balena-os/balenahup/issues/333'
-        connects-to: 'https://github.com/balena-os/balenahup/issues/333'
+        Connects-to: https://github.com/balena-os/balenahup/issues/333
+        connects-to: https://github.com/balena-os/balenahup/issues/333
         Signed-off-by: Matthew McGinn <matthew@balena.io>
         signed-off-by: Matthew McGinn <matthew@balena.io>
         Change-type: patch
@@ -268,9 +278,9 @@
   version: 2.14.12
   date: 2021-03-19T15:54:21.184Z
 - commits:
-    - subject: 'supervisor-update: stop the supervisor before PATCHing the new target'
+    - subject: "supervisor-update: stop the supervisor before PATCHing the new target"
       hash: 218a30ede959cf997786c741967d7ef7b6879d86
-      body: ''
+      body: ""
       footer:
         Change-type: patch
         change-type: patch
@@ -280,7 +290,7 @@
   version: 2.14.11
   date: 2021-03-19T15:26:52.069Z
 - commits:
-    - subject: 'private DTs: do not log out from the registry until cleanup'
+    - subject: "private DTs: do not log out from the registry until cleanup"
       hash: a79d0991e9cd655a49f4743790c8e0fe35dddc48
       body: |
         since older OSes get a sideloaded balenaOS hostapp, it is untagged in
@@ -289,8 +299,8 @@
         our local image with the registry reference. in order to do that, we
         must remain logged in.
       footer:
-        Connects-to: '#331'
-        connects-to: '#331'
+        Connects-to: "#331"
+        connects-to: "#331"
         Change-type: patch
         change-type: patch
         Signed-off-by: Matthew McGinn <matthew@balena.io>
@@ -299,12 +309,12 @@
   version: 2.14.10
   date: 2021-03-11T19:25:22.810Z
 - commits:
-    - subject: 'jetson: touch extra_uEnv.txt during HUP to allow supervisor mgmt'
+    - subject: "jetson: touch extra_uEnv.txt during HUP to allow supervisor mgmt"
       hash: 14c8c88fb2b53c7a412fb26237684b7f5d1d7e8d
-      body: ''
+      body: ""
       footer:
-        Connects-to: '#328'
-        connects-to: '#328'
+        Connects-to: "#328"
+        connects-to: "#328"
         Change-type: patch
         change-type: patch
         Signed-off-by: Matthew McGinn <matthew@balena.io>
@@ -313,12 +323,12 @@
   version: 2.14.9
   date: 2021-03-10T15:01:29.364Z
 - commits:
-    - subject: 'jetson: confirm variable exists before testing it'
+    - subject: "jetson: confirm variable exists before testing it"
       hash: ce45decf33641af34842fa5ddbb71bd5626eb69c
-      body: ''
+      body: ""
       footer:
-        Connects-to: '#327'
-        connects-to: '#327'
+        Connects-to: "#327"
+        connects-to: "#327"
         Change-type: patch
         change-type: patch
         Signed-off-by: Matthew McGinn <matthew@balena.io>
@@ -327,11 +337,10 @@
   version: 2.14.8
   date: 2021-03-09T22:21:21.707Z
 - commits:
-    - subject: >-
-        supervisor-upgrade: if the upgrade fails, grab what happened from
-        systemd
+    - subject: "supervisor-upgrade: if the upgrade fails, grab what happened from
+        systemd"
       hash: 2b7b20da1f3865a158ee465cc9b929655937face
-      body: ''
+      body: ""
       footer:
         Change-type: patch
         change-type: patch
@@ -341,12 +350,12 @@
   version: 2.14.7
   date: 2021-02-18T14:36:42.646Z
 - commits:
-    - subject: 'supervisor: in case of API query failure, report the received response'
+    - subject: "supervisor: in case of API query failure, report the received response"
       hash: a4ec06b9cd7b9d5cf9074317ad3bb23bde97da7b
-      body: ''
+      body: ""
       footer:
-        Connects-to: 'https://github.com/balena-os/balenahup/issues/251'
-        connects-to: 'https://github.com/balena-os/balenahup/issues/251'
+        Connects-to: https://github.com/balena-os/balenahup/issues/251
+        connects-to: https://github.com/balena-os/balenahup/issues/251
         Change-type: patch
         change-type: patch
         Signed-off-by: Matthew McGinn <matthew@balena.io>
@@ -357,7 +366,7 @@
 - commits:
     - subject: rename a bunch of resins to balenas
       hash: bd7a02385f9b0737b6a63904b76084d4c26d685d
-      body: ''
+      body: ""
       footer:
         Change-type: patch
         change-type: patch
@@ -369,7 +378,7 @@
 - commits:
     - subject: remove accidentally added file
       hash: 677b43f3c233e9ec9a58cb680aef8faa2c8b5612
-      body: ''
+      body: ""
       footer:
         Change-type: patch
         change-type: patch
@@ -379,14 +388,13 @@
   version: 2.14.4
   date: 2020-11-16T15:37:58.243Z
 - commits:
-    - subject: >-
-        supervisor-update: use APIKEY when querying for the new target
-        supervisor state
+    - subject: "supervisor-update: use APIKEY when querying for the new target
+        supervisor state"
       hash: 8268b59e727de50360f5ab5afe1ae88f4647657b
-      body: ''
+      body: ""
       footer:
-        Connects-to: 'https://github.com/balena-io/balena-api/pull/2786'
-        connects-to: 'https://github.com/balena-io/balena-api/pull/2786'
+        Connects-to: https://github.com/balena-io/balena-api/pull/2786
+        connects-to: https://github.com/balena-io/balena-api/pull/2786
         Change-type: patch
         change-type: patch
         Signed-off-by: Matthew McGinn <matthew@balena.io>
@@ -395,9 +403,9 @@
   version: 2.14.3
   date: 2020-11-12T17:51:40.548Z
 - commits:
-    - subject: 'cleanup: remove unused DEVICETYPEJSON variable'
+    - subject: "cleanup: remove unused DEVICETYPEJSON variable"
       hash: eba8ec022d657bda28593d2b7f35a6fa740e37a2
-      body: ''
+      body: ""
       footer:
         Change-type: patch
         change-type: patch
@@ -407,9 +415,9 @@
   version: 2.14.2
   date: 2020-11-12T17:35:50.416Z
 - commits:
-    - subject: 'meta: remove legacy codeowners'
+    - subject: "meta: remove legacy codeowners"
       hash: 657ca06c746d0b1dceb94364d73430e9ccdd528e
-      body: ''
+      body: ""
       footer:
         Change-type: patch
         change-type: patch
@@ -421,7 +429,7 @@
 - commits:
     - subject: Make HUP fetch the device type slug from the API
       hash: f573ae575c6d954d4a949f4efa9f934d48b0c3a0
-      body: ''
+      body: ""
       footer:
         Change-type: minor
         change-type: minor
@@ -431,7 +439,7 @@
   version: 2.14.0
   date: 2020-10-27T09:04:51.892Z
 - commits:
-    - subject: 'Remove device sanity checks, as they are no longer needed'
+    - subject: Remove device sanity checks, as they are no longer needed
       hash: 70b97121ccd2b3e75b3b3bea00b6bfad18811053
       body: |
         The device sanity checks examined two on-device files, in an attempt
@@ -452,21 +460,21 @@
   version: 2.13.18
   date: 2020-10-19T09:41:53.765Z
 - commits:
-    - subject: 'jetson-tx2: migrate other special-case configuration during HUP'
+    - subject: "jetson-tx2: migrate other special-case configuration during HUP"
       hash: 9183c379f7fcaa4ef4a2f3a727647947b5b2335a
-      body: ''
+      body: ""
       footer:
         Change-type: patch
         change-type: patch
-        Connects-to: 'https://github.com/balena-os/balenahup/issues/305'
-        connects-to: 'https://github.com/balena-os/balenahup/issues/305'
+        Connects-to: https://github.com/balena-os/balenahup/issues/305
+        connects-to: https://github.com/balena-os/balenahup/issues/305
         Signed-off-by: Matthew McGinn <matthew@balena.io>
         signed-off-by: Matthew McGinn <matthew@balena.io>
       author: Matthew McGinn
   version: 2.13.17
   date: 2020-10-16T18:07:50.853Z
 - commits:
-    - subject: 'post-update-workarounds: allow `hostapp-update` to fail properly'
+    - subject: "post-update-workarounds: allow `hostapp-update` to fail properly"
       hash: 43f73328c97264ea0975a2d7b996c0ad62f7ef7c
       body: |
         In order to detect issues with deltas and work around them with a
@@ -482,15 +490,15 @@
   version: 2.13.16
   date: 2020-09-21T15:45:50.242Z
 - commits:
-    - subject: 'supervisor: wait for upgrade unit to complete'
+    - subject: "supervisor: wait for upgrade unit to complete"
       hash: 2eea7ca319afa1f5e2cc58dbc8e9617e29ec105b
       body: |
         currently there are occasions when a supervisor upgrade does not
         complete before the HUP reboots a device. this causes confusion when the
         supervisor eventually does update 15 minutes after boot.
       footer:
-        Connects-to: 'https://github.com/balena-os/balenahup/issues/300'
-        connects-to: 'https://github.com/balena-os/balenahup/issues/300'
+        Connects-to: https://github.com/balena-os/balenahup/issues/300
+        connects-to: https://github.com/balena-os/balenahup/issues/300
         Change-type: patch
         change-type: patch
         Signed-off-by: Matthew McGinn <matthew@balena.io>
@@ -499,7 +507,7 @@
   version: 2.13.15
   date: 2020-09-21T13:00:56.490Z
 - commits:
-    - subject: 'jetson-tx2: rudimentary fix for accidental overwrite of extlinux.conf'
+    - subject: "jetson-tx2: rudimentary fix for accidental overwrite of extlinux.conf"
       hash: 85c2b12309bcc52e96c314c834abca0ad52b334f
       body: |
         As sorted in https://github.com/balena-os/meta-balena/pull/2013, we
@@ -515,9 +523,9 @@
   version: 2.13.14
   date: 2020-09-18T17:11:41.655Z
 - commits:
-    - subject: 'meta: dts -> device types for clarity'
+    - subject: "meta: dts -> device types for clarity"
       hash: 848ee31fa77dcbba8d3bc768d89b1546d1e9a71f
-      body: ''
+      body: ""
       footer:
         Change-type: patch
         change-type: patch
@@ -527,14 +535,14 @@
   version: 2.13.13
   date: 2020-09-18T13:22:50.617Z
 - commits:
-    - subject: 'supervisor: if available, update supervisor without affecting it''s state'
+    - subject: "supervisor: if available, update supervisor without affecting it's
+        state"
       hash: 2fea51041794e175ec1f28874b100dbe3868530b
       body: >
         Recently the supervisor added a codepath that assumes no files
         underneath it will change during runtime.
 
-        OS update hooks can trigger a condition whereby the supervisor reboots
-        the device during a HUP,
+        OS update hooks can trigger a condition whereby the supervisor reboots the device during a HUP,
 
         which in turn bricks the device. As a workaround, we can use a transient
 
@@ -542,8 +550,8 @@
 
         the locally-executed update.
       footer:
-        Depends-on: 'https://github.com/balena-os/meta-balena/pull/1973'
-        depends-on: 'https://github.com/balena-os/meta-balena/pull/1973'
+        Depends-on: https://github.com/balena-os/meta-balena/pull/1973
+        depends-on: https://github.com/balena-os/meta-balena/pull/1973
         Change-type: patch
         change-type: patch
         Signed-off-by: Matthew McGinn <matthew@balena.io>
@@ -552,12 +560,12 @@
   version: 2.13.12
   date: 2020-08-17T15:42:20.636Z
 - commits:
-    - subject: 'registry: use provided arg for FQDN rather than local source'
+    - subject: "registry: use provided arg for FQDN rather than local source"
       hash: a19be907175838afb125678541a2f176634467de
-      body: ''
+      body: ""
       footer:
-        Connects-to: 'https://github.com/balena-os/balenahup/issues/296'
-        connects-to: 'https://github.com/balena-os/balenahup/issues/296'
+        Connects-to: https://github.com/balena-os/balenahup/issues/296
+        connects-to: https://github.com/balena-os/balenahup/issues/296
         Change-type: patch
         change-type: patch
         Signed-off-by: Matthew McGinn <matthew@balena.io>
@@ -568,7 +576,7 @@
 - commits:
     - subject: log out from the correct REGISTRY_ENDPOINT
       hash: f42bee901c1ff6788e78b9aa94b9b9911d19941d
-      body: ''
+      body: ""
       footer:
         Change-type: patch
         change-type: patch
@@ -580,7 +588,7 @@
 - commits:
     - subject: Use a named key when querying for device by uuid
       hash: ec5bf5c26d15c89e4a6afa34a4df905d84bf4081
-      body: ''
+      body: ""
       footer:
         Change-type: patch
         change-type: patch
@@ -590,7 +598,7 @@
   version: 2.13.9
   date: 2020-07-30T20:20:56.913Z
 - commits:
-    - subject: 'non-hostapp: fix up retry count non-integer issue'
+    - subject: "non-hostapp: fix up retry count non-integer issue"
       hash: 8e5b4f2e958cd3d6f8e13575930cc04a965239e0
       body: |
         since the variable is not set as an integer, we are simply appending to
@@ -609,9 +617,9 @@
   version: 2.13.8
   date: 2020-07-17T12:33:06.547Z
 - commits:
-    - subject: 'supervisor update: fix bad curl command'
+    - subject: "supervisor update: fix bad curl command"
       hash: 87c74c81a45ab2cb29536a68a0efce5e8bcd87f0
-      body: ''
+      body: ""
       footer:
         Change-type: patch
         change-type: patch
@@ -621,9 +629,9 @@
   version: 2.13.7
   date: 2020-06-30T15:16:46.566Z
 - commits:
-    - subject: 'variants: remove warning about non-prod'
+    - subject: "variants: remove warning about non-prod"
       hash: a2042857398a9935c863a7bf9c234e037154b81c
-      body: ''
+      body: ""
       footer:
         Change-type: patch
         change-type: patch
@@ -635,10 +643,10 @@
 - commits:
     - subject: use device uuid not numeric id in legacy scripts
       hash: 6bca7ad9a4836842e4f3b133d251e683be8b4420
-      body: ''
+      body: ""
       footer:
-        HQ: 'https://github.com/balena-io/balena-io/issues/2227'
-        hq: 'https://github.com/balena-io/balena-io/issues/2227'
+        HQ: https://github.com/balena-io/balena-io/issues/2227
+        hq: https://github.com/balena-io/balena-io/issues/2227
         Change-type: patch
         change-type: patch
         Signed-off-by: Matthew McGinn <matthew@balena.io>
@@ -649,10 +657,10 @@
 - commits:
     - subject: use device uuid not numeric id
       hash: 379fdef58de3bc6c3a3158ae983d48db8af5750e
-      body: ''
+      body: ""
       footer:
-        HQ: 'https://github.com/balena-io/balena-io/issues/2227'
-        hq: 'https://github.com/balena-io/balena-io/issues/2227'
+        HQ: https://github.com/balena-io/balena-io/issues/2227
+        hq: https://github.com/balena-io/balena-io/issues/2227
         Change-type: patch
         change-type: patch
         Signed-off-by: Matthew McGinn <matthew@balena.io>
@@ -663,7 +671,7 @@
 - commits:
     - subject: remove ascii_downcase function to support old host OSes
       hash: f46a5b995d97ac121545e1cf8416c8910c20791f
-      body: ''
+      body: ""
       footer:
         Change-type: patch
         change-type: patch
@@ -673,9 +681,9 @@
   version: 2.13.3
   date: 2020-06-16T12:08:36.936Z
 - commits:
-    - subject: 'fix: backfill missing image variable for legacy upgrades'
+    - subject: "fix: backfill missing image variable for legacy upgrades"
       hash: 7d860e5a194b03482c6e490eee36b61543292a56
-      body: ''
+      body: ""
       footer:
         Change-type: patch
         change-type: patch
@@ -685,9 +693,9 @@
   version: 2.13.2
   date: 2020-06-05T16:56:22.755Z
 - commits:
-    - subject: 'legacy HUP: image -> target_image for balena registry compat'
+    - subject: "legacy HUP: image -> target_image for balena registry compat"
       hash: 53341773d547e6fe737398ebcf950d241aa2540f
-      body: ''
+      body: ""
       footer:
         Change-type: patch
         change-type: patch
@@ -697,9 +705,9 @@
   version: 2.13.1
   date: 2020-06-05T15:30:06.184Z
 - commits:
-    - subject: 'private dts: enable HUP for access-restricted device types'
+    - subject: "private dts: enable HUP for access-restricted device types"
       hash: bd7f482c18544231b3f82e676823db481694b6fc
-      body: ''
+      body: ""
       footer:
         Change-type: minor
         change-type: minor
@@ -709,12 +717,12 @@
   version: 2.13.0
   date: 2020-06-05T14:00:19.152Z
 - commits:
-    - subject: 'deltas: fix up service substitution to properly request deltas'
+    - subject: "deltas: fix up service substitution to properly request deltas"
       hash: 0fe35daadd6abd74c2239f5501310046f388b9ff
-      body: ''
+      body: ""
       footer:
-        Connects-to: '#275'
-        connects-to: '#275'
+        Connects-to: "#275"
+        connects-to: "#275"
         Change-type: patch
         change-type: patch
         Signed-off-by: Matthew McGinn <matthew@balena.io>
@@ -729,8 +737,8 @@
         since we removed the DockerHub fallback, if there are not one target
         hostapps, just bail and surface the error
       footer:
-        Connects-to: '#273'
-        connects-to: '#273'
+        Connects-to: "#273"
+        connects-to: "#273"
         Change-type: patch
         change-type: patch
         Signed-off-by: Matthew McGinn <matthew@balena.io>
@@ -739,12 +747,12 @@
   version: 2.12.5
   date: 2020-05-28T19:28:37.006Z
 - commits:
-    - subject: 'rename: check for balenahup folders existence before symlinking'
+    - subject: "rename: check for balenahup folders existence before symlinking"
       hash: 705cf1189ac75820f7ae84161dd143962a3b6b87
-      body: ''
+      body: ""
       footer:
-        Connects-to: '#266'
-        connects-to: '#266'
+        Connects-to: "#266"
+        connects-to: "#266"
         Change-type: patch
         change-type: patch
         Signed-off-by: Matthew McGinn <matthew@balena.io>
@@ -753,9 +761,9 @@
   version: 2.12.4
   date: 2020-05-21T19:34:22.500Z
 - commits:
-    - subject: 'meta: properly generate nested changelog'
+    - subject: "meta: properly generate nested changelog"
       hash: 6442ded09ce5283886c8c0136183055aa44d6897
-      body: ''
+      body: ""
       footer:
         Change-type: patch
         change-type: patch
@@ -772,7 +780,7 @@
       footers:
         change-type: patch
         signed-off-by: Matthew McGinn <matthew@balena.io>
-      subject: 'meta: add versionbot scaffolding for nested changelogs'
+      subject: "meta: add versionbot scaffolding for nested changelogs"
       body: null
 - version: 2.12.1
   date: 2020-05-21T12:42:00.000Z
@@ -780,7 +788,7 @@
     - hash: 0d7ff779dc379fe179e07e849e15409a65b7dad7
       author: Matthew McGinn
       footers:
-        connects-to: 'https://github.com/balena-os/resinhup/issues/266'
+        connects-to: https://github.com/balena-os/resinhup/issues/266
         signed-off-by: Matthew McGinn <matthew@balena.io>
         change-type: patch
       subject: rename most resin to balena
@@ -791,7 +799,7 @@
     - hash: e50de01d51372c91814437419fc6021fca99cbad
       author: Matthew McGinn
       footers:
-        connects-to: '#265'
+        connects-to: "#265"
         change-type: minor
         signed-off-by: Matthew McGinn <matthew@balena.io>
       subject: remove DockerHub fallback for 2.x HUPs
@@ -804,7 +812,7 @@
       footers:
         change-type: patch
         signed-off-by: Matthew McGinn <matthew@balena.io>
-      subject: 'codeowners: swap zubairlk and saintaardvark'
+      subject: "codeowners: swap zubairlk and saintaardvark"
       body: also add camerondiver
 - version: 2.11.2
   date: 2020-05-08T20:18:03.000Z
@@ -814,7 +822,8 @@
       footers:
         change-type: patch
         signed-off-by: Matthew McGinn <matthew@balena.io>
-      subject: 'delta HUP: make size log more defensive to handle old jq + bad responses'
+      subject: "delta HUP: make size log more defensive to handle old jq + bad
+        responses"
       body: null
 - version: 2.11.1
   date: 2020-05-04T21:46:49.000Z
@@ -822,10 +831,10 @@
     - hash: f9cfb1a0023b3ad3db892358678cbf83dcf8cc22
       author: Matthew McGinn
       footers:
-        connects-to: 'https://github.com/balena-os/resinhup/issues/261'
+        connects-to: https://github.com/balena-os/resinhup/issues/261
         change-type: patch
         signed-off-by: Matthew McGinn <matthew@balena.io>
-      subject: 'delta-hup: include size of delta'
+      subject: "delta-hup: include size of delta"
       body: null
 - version: 2.11.0
   date: 2020-05-01T17:01:30.000Z
@@ -833,18 +842,18 @@
     - hash: 16d3c6d3ea7418222773eda3f05db13c185f1d9b
       author: Matthew McGinn
       footers:
-        hq: 'https://github.com/balena-io/balena/issues/2164'
+        hq: https://github.com/balena-io/balena/issues/2164
         change-type: minor
         signed-off-by: Matthew McGinn <matthew@balena.io>
-      subject: 'hostapp-images: try pulling from balena registry before DockerHub'
+      subject: "hostapp-images: try pulling from balena registry before DockerHub"
       body: null
     - hash: 564f769a5a59d801e2ccb3963dd17ec3a9ef0a2c
       author: Matthew McGinn
       footers:
-        connects-to: 'https://github.com/balena-os/meta-balena/issues/1398'
+        connects-to: https://github.com/balena-os/meta-balena/issues/1398
         change-type: patch
         signed-off-by: Matthew McGinn <matthew@balena.io>
-      subject: 'TLS: reuse balenaRootCA to bypass local MitM and self-signed certs'
+      subject: "TLS: reuse balenaRootCA to bypass local MitM and self-signed certs"
       body: null
 - version: 2.10.0
   date: 2020-04-30T18:20:39.000Z
@@ -852,9 +861,9 @@
     - hash: 8a43c6b916320fc9c8d941b6923e06eda8da60a7
       author: Matthew McGinn
       footers:
-        depends-on: 'https://github.com/balena-io/balena-api/pull/2563'
-        connects-to: 'https://github.com/balena-os/resinhup/issues/257'
-        hq: 'https://github.com/balena-io/balena/issues/1113'
+        depends-on: https://github.com/balena-io/balena-api/pull/2563
+        connects-to: https://github.com/balena-os/resinhup/issues/257
+        hq: https://github.com/balena-io/balena/issues/1113
         change-type: minor
         signed-off-by: Matthew McGinn <matthew@balena.io>
       subject: enable delta host OS upgrades
@@ -867,7 +876,7 @@
       footers:
         change-type: patch
         signed-off-by: Matthew McGinn <matthew@balena.io>
-      subject: 'meta: add xginn8 as CODEOWNER'
+      subject: "meta: add xginn8 as CODEOWNER"
       body: null
 - version: 2.9.0
   date: 2019-11-25T13:42:52.000Z
@@ -877,7 +886,7 @@
       footers:
         change-type: minor
         signed-off-by: Matthew McGinn <matthew@balena.io>
-      subject: 'reboot: background subsequent reboot requests to exit cleanly'
+      subject: "reboot: background subsequent reboot requests to exit cleanly"
       body: null
 - version: 2.8.3
   date: 2019-11-21T22:53:44.000Z
@@ -897,7 +906,7 @@
       footers:
         change-type: patch
         signed-off-by: Matthew McGinn <matthew@balena.io>
-      subject: 'meta: update CODEOWNERS'
+      subject: "meta: update CODEOWNERS"
       body: null
 - version: 2.8.1
   date: 2019-11-06T16:51:06.000Z
@@ -919,7 +928,7 @@
       footers:
         change-type: minor
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: 'upgrade-2.x: Do not error out when getting a .dev device version'
+      subject: "upgrade-2.x: Do not error out when getting a .dev device version"
       body: We want to allow such updates in the future.
 - version: 2.7.0
   date: 2019-09-02T16:54:50.000Z
@@ -929,7 +938,7 @@
       footers:
         change-type: minor
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: 'Remove "--nolog" flag from 2.x updater, and always set up logfile'
+      subject: Remove "--nolog" flag from 2.x updater, and always set up logfile
       body: |-
         Previously we might have logged when there wasn't any logfile setup,
         for example if any of the argument parsing was throwing an error,
@@ -947,7 +956,7 @@
       footers:
         change-type: patch
         signed-off-by: Matthew McGinn <matthew@balena.io>
-      subject: 'logging: redirect ERROR messages to stderr (to pass back to the proxy)'
+      subject: "logging: redirect ERROR messages to stderr (to pass back to the proxy)"
       body: null
 - version: 2.6.7
   date: 2019-05-29T11:26:29.000Z
@@ -957,7 +966,7 @@
       footers:
         change-type: patch
         signed-off-by: Matthew McGinn <matthew@balena.io>
-      subject: 'typo: fix up minor exsits typo'
+      subject: "typo: fix up minor exsits typo"
       body: null
 - version: 2.6.6
   date: 2019-05-23T16:51:54.000Z
@@ -967,7 +976,7 @@
       footers:
         change-type: patch
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: 'upgrade-2.x: allow extra version format'
+      subject: "upgrade-2.x: allow extra version format"
       body: null
 - version: 2.6.5
   date: 2019-05-14T08:46:47.000Z
@@ -977,7 +986,7 @@
       footers:
         change-type: patch
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: 'upgrade-2.x: sanitize persistent logging device config vars'
+      subject: "upgrade-2.x: sanitize persistent logging device config vars"
       body: |-
         This is to fix a missmatch between supervisor's expectations between
         versions (older adds the incorrect empty string, while newer borks
@@ -990,7 +999,7 @@
       footers:
         change-type: patch
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: 'upgrade-1.x-to-2.x: also set the supervisor image name during update'
+      subject: "upgrade-1.x-to-2.x: also set the supervisor image name during update"
       body: |-
         This should allow to properly cache the image information locally,
         and clean up any v1 registries that might have been in use before.
@@ -1002,41 +1011,36 @@
       footers:
         change-type: patch
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: 'upgrade-2.x: increase timeout values during update to 5 minutes'
+      subject: "upgrade-2.x: increase timeout values during update to 5 minutes"
       body: >-
         The previous timeout was 0.2s*150=30s, which is got hit by some
         otherwise
 
-        normally working devices, that might be a) slower than usual, b) the
-        user
+        normally working devices, that might be a) slower than usual, b) the user
 
         application might be taking too much of the resources.
 
         Increase this x10, 0.2s*1500=300s=5min, which is still quite short, and
 
-        definitely shorter than if the user needs to ask support and retry
-        because
+        definitely shorter than if the user needs to ask support and retry because
 
-        of "spurious" timeouts. Valid errors should be still caught quite
-        quickly.
+        of "spurious" timeouts. Valid errors should be still caught quite quickly.
 - version: 2.6.2
   date: 2019-04-23T16:03:28.000Z
   commits:
     - hash: 5054b20b5d34ff008bb910f88712b00768f2aa34
       author: Gergely Imreh
       footers:
-        connects-to: '#229'
+        connects-to: "#229"
         change-type: patch
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: >-
-        upgrade-1.x-to-2.x: unify data partition unmounting and add preventing
-        umount step
+      subject: "upgrade-1.x-to-2.x: unify data partition unmounting and add preventing
+        umount step"
       body: >-
         Make data partition unmount a reusable function, and add an extra umount
         step
 
-        for one of the partition creation, which seemed to have triggered a
-        remount
+        for one of the partition creation, which seemed to have triggered a remount
 
         in some old SD card cases. This umount step was verified to fix things
 
@@ -1049,7 +1053,7 @@
       footers:
         change-type: patch
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: 'upgrade-1.x: also use supervisor registry if set'
+      subject: "upgrade-1.x: also use supervisor registry if set"
       body: Relevant for exampel for v1 registry use cases
 - version: 2.6.0
   date: 2019-04-23T14:27:13.000Z
@@ -1059,9 +1063,8 @@
       footers:
         change-type: minor
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: >-
-        upgrade-1.x: use the new 1.x HUP image, and allow setting the v1
-        registry
+      subject: "upgrade-1.x: use the new 1.x HUP image, and allow setting the v1
+        registry"
       body: null
 - version: 2.5.0
   date: 2019-04-23T10:54:21.000Z
@@ -1071,7 +1074,7 @@
       footers:
         change-type: minor
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: 'hup-1.x: allow updater to take a v1 Docker registry URL'
+      subject: "hup-1.x: allow updater to take a v1 Docker registry URL"
       body: Instead of being hard-coded into the image.
 - version: 2.4.1
   date: 2019-04-16T13:17:10.000Z
@@ -1081,7 +1084,7 @@
       footers:
         change-type: patch
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: 'upgrade 1x2x/2x: bump API calls to the latest API version'
+      subject: "upgrade 1x2x/2x: bump API calls to the latest API version"
       body: |-
         Also move the API keys from query parameter to header, to keep
         it out of our logs.
@@ -1093,7 +1096,7 @@
       footers:
         change-type: minor
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: 'upgrade-2.x: redo supported device slug test'
+      subject: "upgrade-2.x: redo supported device slug test"
       body: |-
         The test previously conflated two different things: device type support
         and setting a variable for device architecture that is needed in one of
@@ -1115,7 +1118,7 @@
       footers:
         change-type: patch
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: 'upgrade-2.x: Namespaced creation temporary folder'
+      subject: "upgrade-2.x: Namespaced creation temporary folder"
       body: null
 - version: 2.3.4
   date: 2019-03-19T15:35:50.000Z
@@ -1125,7 +1128,7 @@
       footers:
         change-type: patch
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: 'upgrade-2.x: user tempfile for FIFO'
+      subject: "upgrade-2.x: user tempfile for FIFO"
       body: |-
         Using temp files instead of fixed file name on the host OS
         side fixes an issue when the update has been interrupted, but
@@ -1142,21 +1145,66 @@
       footers:
         change-type: patch
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: 'upgrade-1.x-to-2.x: erase partition always before creating ext4'
-      body: "This might be needed, as if there was an ext4 file system created\non a partition that had ext4 before, it sometimes run into an issue\nlike this:\n```\n[000000448][LOG]Creating new state and data filesystems...\nmke2fs 1.43.4 (31-Jan-2017)\nDiscarding device blocks: done\nCreating filesystem with 20480 1k blocks and 2568 inodes\nFilesystem UUID: a8d4e2c5-6be8-4bc1-9b07-cc0dbc61abac\nSuperblock backups stored on blocks:\n\t8193\nAllocating group tables: done\nWriting inode tables: done\next2fs_update_bb_inode: Illegal triply indirect block found while setting bad block inode\n```\nOverwriting the partiton with zeros prevents that to happen.\nThe check also makes sure that `dd` will always marked as successful,\nas copying from `/dev/zero` otherwise always errors out on successful\noperation as well, with:\n```\ndd: error writing '/dev/mmcblk0p3': No space left on device\n```\nsince `/dev/zero` have infinite amount of data to give, and the target\nrepo doesn't have \"infinite\" space."
+      subject: "upgrade-1.x-to-2.x: erase partition always before creating ext4"
+      body: >-
+        This might be needed, as if there was an ext4 file system created
+
+        on a partition that had ext4 before, it sometimes run into an issue
+
+        like this:
+
+        ```
+
+        [000000448][LOG]Creating new state and data filesystems...
+
+        mke2fs 1.43.4 (31-Jan-2017)
+
+        Discarding device blocks: done
+
+        Creating filesystem with 20480 1k blocks and 2568 inodes
+
+        Filesystem UUID: a8d4e2c5-6be8-4bc1-9b07-cc0dbc61abac
+
+        Superblock backups stored on blocks:
+        	8193
+        Allocating group tables: done
+
+        Writing inode tables: done
+
+        ext2fs_update_bb_inode: Illegal triply indirect block found while setting bad block inode
+
+        ```
+
+        Overwriting the partiton with zeros prevents that to happen.
+
+        The check also makes sure that `dd` will always marked as successful,
+
+        as copying from `/dev/zero` otherwise always errors out on successful
+
+        operation as well, with:
+
+        ```
+
+        dd: error writing '/dev/mmcblk0p3': No space left on device
+
+        ```
+
+        since `/dev/zero` have infinite amount of data to give, and the target
+
+        repo doesn't have "infinite" space.
     - hash: 7c338b874942bfd4d0249af7f644df707d605098
       author: Gergely Imreh
       footers:
         change-type: patch
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: 'upgrade-1.x-to-2.x: add sync to every copy step'
+      subject: "upgrade-1.x-to-2.x: add sync to every copy step"
       body: null
     - hash: bfa6ca8bea275c0ce8366662aa7beeca3cab2af2
       author: Gergely Imreh
       footers:
         change-type: patch
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: 'upgrade-1.x-to-2.x: do not umount the boot partition'
+      subject: "upgrade-1.x-to-2.x: do not umount the boot partition"
       body: |-
         There seem to be no need for that partition to be actually
         umounted/remounted in the update process.
@@ -1182,7 +1230,7 @@
       footers:
         change-type: patch
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: 'upgrade-1x-to-2x: add retries to the docker pull step'
+      subject: "upgrade-1x-to-2x: add retries to the docker pull step"
       body: >-
         Previously under some circumstances the pull would fail, leaving
 
@@ -1194,9 +1242,7 @@
 
         Pulling repository docker.io/resin/resinos
 
-        Error while pulling image: Get
-        https://index.docker.io/v1/repositories/resin/resinos/images: dial tcp:
-        lookup index.docker.io on 127.0.0.2:53: server misbehaving
+        Error while pulling image: Get https://index.docker.io/v1/repositories/resin/resinos/images: dial tcp: lookup index.docker.io on 127.0.0.2:53: server misbehaving
 
         ```
 
@@ -1222,7 +1268,7 @@
       footers:
         change-type: patch
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: 'upgrade-2.x: expand on leftover data clearence after interrupted update'
+      subject: "upgrade-2.x: expand on leftover data clearence after interrupted update"
       body: |-
         The previous way didn't work with `overlay2` storage drivers, as the
         directory structure is different.
@@ -1238,9 +1284,8 @@
       footers:
         change-type: minor
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: >-
-        upgrade-2.x: Add whitelist for imx8m-var-dart and cl-som-imx8 device
-        types
+      subject: "upgrade-2.x: Add whitelist for imx8m-var-dart and cl-som-imx8 device
+        types"
       body: null
 - version: 2.1.9
   date: 2019-01-10T11:44:26.000Z
@@ -1250,7 +1295,7 @@
       footers:
         change-type: patch
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: 'upgrade-1.x-to-2.x: Fix incorrect migration to the state partition'
+      subject: "upgrade-1.x-to-2.x: Fix incorrect migration to the state partition"
       body: |-
         Previously some `etc/{docker,dropbear}` folders were created on the
         state partition but the files intended to go there were not copied
@@ -1263,15 +1308,14 @@
     - hash: bf7bd3b39770d94e1f9900e8f29499b10a9bd328
       author: Gergely Imreh
       footers:
-        connects-to: '#186'
+        connects-to: "#186"
         change-type: patch
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: 'upgrade-1.x-to-2.x: Add sync after going read-only for safety'
+      subject: "upgrade-1.x-to-2.x: Add sync after going read-only for safety"
       body: >-
         In the partition copy step, first we switch partitions to read-only,
 
-        then do a `dd` copy between them. Noticed that some SD cards/some
-        devices
+        then do a `dd` copy between them. Noticed that some SD cards/some devices
 
         the comparison afterwards fails, but if running the same `dd ...` line
 
@@ -1294,7 +1338,7 @@
       footers:
         change-type: patch
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: 'upgrade-2.x: Clean up inactive docker/balena folder if needed'
+      subject: "upgrade-2.x: Clean up inactive docker/balena folder if needed"
       body: |-
         When an update has been interrupted, there might be data
         left over that would stop further updates due to out of space
@@ -1311,7 +1355,7 @@
       footers:
         change-type: patch
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: 'upgrade-2.x: Remove supervisor container not just stop'
+      subject: "upgrade-2.x: Remove supervisor container not just stop"
       body: |-
         When stopping the supervisor service and container,
         also remove the container, so next time when it starts
@@ -1332,7 +1376,7 @@
       footers:
         change-type: patch
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: 'upgrade-1.x: Properly handle updates to logstream 1.x versions'
+      subject: "upgrade-1.x: Properly handle updates to logstream 1.x versions"
       body: |-
         We have some resinOS 1.x versions that have backported, logstream
         enabled supervisors. The updater checks the `VERSION` file online
@@ -1352,7 +1396,7 @@
       footers:
         change-type: patch
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: 'upgrade-2.x: Properly remove update image when needed'
+      subject: "upgrade-2.x: Properly remove update image when needed"
       body: |-
         Previously sometimes it was left there for certain updates,
         such as 2.7.8->2.13.6 as tested.
@@ -1364,7 +1408,7 @@
       footers:
         change-type: patch
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: 'upgrade-2.x: Fix balena migration'
+      subject: "upgrade-2.x: Fix balena migration"
       body: |-
         Balena migration requires moving the existing docker folder
         (used by docker-host) to the new balena folder. In some
@@ -1383,7 +1427,7 @@
       footers:
         change-type: patch
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: 'upgrade-2.x: add retries to docker pull where we expect timeouts'
+      subject: "upgrade-2.x: add retries to docker pull where we expect timeouts"
       body: |-
         On this specific update type (non hostapp to hostapp), on armv6
         devices we observe quite often `net/http: TLS handshake timeout`,
@@ -1395,7 +1439,7 @@
       footers:
         change-type: patch
         signed-off-by: Juan Cruz Viotti <jv@jviotti.com>
-      subject: 'resinhup.conf: Remove unused mixpanelToken variable'
+      subject: "resinhup.conf: Remove unused mixpanelToken variable"
       body: |-
         The `resinhup.conf` configuration file contains `mixpanelToken`
         variables that seem to be unused by the code.
@@ -1408,7 +1452,7 @@
       footers:
         change-type: patch
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: 'upgrade-1.x-to-2.x: Fixup of supervisor updater edge case'
+      subject: "upgrade-1.x-to-2.x: Fixup of supervisor updater edge case"
       body: null
 - version: 2.1.1
   date: 2018-10-18T12:08:15.000Z
@@ -1418,7 +1462,7 @@
       footers:
         change-type: patch
         signed-off-by: Gergely Imreh <gergely@balena.io>
-      subject: 'upgrade-1.x-to-2.x: Get the supervisor version from the new root'
+      subject: "upgrade-1.x-to-2.x: Get the supervisor version from the new root"
       body: |-
         Previously we got it from S3, but actually we can get it from
         the new OS, similarly to 2.x-2.x updates.
@@ -1432,7 +1476,7 @@
       footers:
         change-type: minor
         signed-off-by: Gergely Imreh <gergely@resin.io>
-      subject: 'upgrade-2.x: Add support for new boards'
+      subject: "upgrade-2.x: Add support for new boards"
       body: |-
         * Asus Tinker Board
         * Hummingboard
@@ -1445,7 +1489,7 @@
       footers:
         change-type: patch
         signed-off-by: Gergely Imreh <gergely@resin.io>
-      subject: 'upgrade-2.x: Only switch docker to single download where available'
+      subject: "upgrade-2.x: Only switch docker to single download where available"
       body: |-
         For an ongoing issue with ARMv6 devices downloading multilayer images
         from Docker HUB, we need to switch docker to not run parallel
@@ -1467,49 +1511,46 @@
       footers:
         change-type: patch
         signed-off-by: Gergely Imreh <gergely@resin.io>
-      subject: 'ugrade-1.x-to-2.x: changes to go into the self-service HUP'
+      subject: "ugrade-1.x-to-2.x: changes to go into the self-service HUP"
       body: >-
         * Exit properly when switching root partition
 
         * Source profile to get proper path information
 
-        * Enable loging (to /tmp/ as for 1.x->2.x the only filesystem  that does
-        not
+        * Enable loging (to /tmp/ as for 1.x->2.x the only filesystem  that does not
 
         change in the process)
 
         * Allow pulling from the staging resinOS Docker HUB repository
 
-        * Add script to call the updater through ssh (optional, for manual
-        updates)
+        * Add script to call the updater through ssh (optional, for manual updates)
     - hash: 10abae081f52758925b5f2a8105a626d021f33a1
       author: Gergely Imreh
       footers:
         change-type: patch
         signed-off-by: Gergely Imreh <gergely@resin.io>
-      subject: 'upgrade-1.x-to-2.x: bump up minimum Beaglebone hostos starting version'
+      subject: "upgrade-1.x-to-2.x: bump up minimum Beaglebone hostos starting version"
       body: To make sure we won't hit the eMMC bug before that version
     - hash: 789c545aa7cac93236ee1448d9aeb5d68d104e6c
       author: Gergely Imreh
       footers:
         change-type: patch
         signed-off-by: Gergely Imreh <imrehg@gmail.com>
-      subject: 'upgrade-1.x-to-2.x: bail out if cannot download update package'
+      subject: "upgrade-1.x-to-2.x: bail out if cannot download update package"
       body: null
     - hash: 8240b5c89928004b884fad8ca75946b8a6fc2566
       author: Gergely Imreh
       footers:
         change-type: patch
         signed-off-by: Gergely Imreh <imrehg@gmail.com>
-      subject: 'upgrade-1.x-to-2.x: fixing typo in status message'
+      subject: "upgrade-1.x-to-2.x: fixing typo in status message"
       body: null
     - hash: 61ac2723cdc82eeefd91008e7985cb892801c9e4
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: >-
-        upgrade-1.x-to-2.x: normalize target versions received in the UI's
-        format
+      subject: "upgrade-1.x-to-2.x: normalize target versions received in the UI's
+        format"
       body: |-
         The UI might pass a resinOS version format as `1.2.3+revX.prod` and
         `.dev`. Bail out on dev, and normalize prod to the resinOS's versioning.
@@ -1517,9 +1558,8 @@
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: >-
-        upgrade-1.x-to-2.x: possibility of redirecting complete script output to
-        file
+      subject: "upgrade-1.x-to-2.x: possibility of redirecting complete script output
+        to file"
       body: >-
         Previously the entries called with "log ..." were part of the logfile
 
@@ -1529,8 +1569,7 @@
 
         Doing these changes, all the output will be put in the logfile on the
 
-        device, with the downside, that over SSH there's no copy. To receive
-        logs
+        device, with the downside, that over SSH there's no copy. To receive logs
 
         over SSH, have to call with --no-log (then no logfile, but log on
 
@@ -1543,9 +1582,8 @@
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: >-
-        upgrade-1.x-to-2.x: check whether the target resinOS version exists in
-        registry
+      subject: "upgrade-1.x-to-2.x: check whether the target resinOS version exists in
+        registry"
       body: |-
         Checking the availability of a repo:tag by querying the manifest, if it
         does not, then bailout early.
@@ -1554,14 +1592,14 @@
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-1.x-to-2.x: fix up start-resin-supervisor for some versions'
-      body: 'Polyfill for https://github.com/resin-os/meta-resin/pull/877'
+      subject: "upgrade-1.x-to-2.x: fix up start-resin-supervisor for some versions"
+      body: Polyfill for https://github.com/resin-os/meta-resin/pull/877
     - hash: f59cdd3a88ed767e0b009f637ee8b28d04469bc8
       author: Gergely Imreh
       footers:
         change-type: patch
         signed-off-by: Gergely Imreh <imrehg@gmail.com>
-      subject: 'upgrade-1.x-to-2.x: bail out with an error if resin-data backup fails'
+      subject: "upgrade-1.x-to-2.x: bail out with an error if resin-data backup fails"
       body: |-
         So it can be seen in the dashboard as soon as it happens, instead of
         the process look hanging.
@@ -1569,9 +1607,8 @@
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: >-
-        upgrade-ssh-1.x-to-2.x: allow "--nolog" to be passed to the update
-        script
+      subject: 'upgrade-ssh-1.x-to-2.x: allow "--nolog" to be passed to the update
+        script'
       body: |-
         This would allow the local machine that runs the ssh updater to
         receive the logs, instead of being saved on the device. This can
@@ -1580,9 +1617,8 @@
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: >-
-        upgrade-1.x-to-2.x: for resinOS versions with supervisor v6.2.0-v6.3.4
-        bump it
+      subject: "upgrade-1.x-to-2.x: for resinOS versions with supervisor v6.2.0-v6.3.4
+        bump it"
       body: |-
         For resinOS versions that have these supervisors, bump to the first
         fixed version regarding https://github.com/resin-os/resinhup/issues/96
@@ -1591,14 +1627,13 @@
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-1.x-to-2.x: connman config changes only when required'
+      subject: "upgrade-1.x-to-2.x: connman config changes only when required"
       body: >-
         The connman configuration is modified for some versions to blacklist
 
         resin-vpn from the connman-managed interfaces. Previously that
 
-        setting modification was always done, even if it was already
-        blacklisted.
+        setting modification was always done, even if it was already blacklisted.
 
         For possibly better handling connman, only do the changes if `resin-vpn`
 
@@ -1607,13 +1642,13 @@
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-1.x-to-2.x: fix typo in function name'
+      subject: "upgrade-1.x-to-2.x: fix typo in function name"
       body: null
     - hash: c8b8c8db979f431af3238937d91d9bae7655d344
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-2.x: add options to log to file'
+      subject: "upgrade-2.x: add options to log to file"
       body: |-
         The logging function in this file was already able to handle
         logging to a file (eg. for when the script is invoked through the
@@ -1629,15 +1664,14 @@
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-2.x: enable using staging resinOS docker hub repository'
+      subject: "upgrade-2.x: enable using staging resinOS docker hub repository"
       body: null
     - hash: 41a1812c717bce5c237af077e0e3ce015d9ca2a2
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: >-
-        upgrade-2.x: switch order of root partition switch and supervisor
-        upgrade
+      subject: "upgrade-2.x: switch order of root partition switch and supervisor
+        upgrade"
       body: |-
         This would bunch the changes closer to each other, thus the irreversible
         changes are closer to each other in the execution, as well as if the
@@ -1647,20 +1681,19 @@
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-2.x: better version string normalization and defensive checking'
+      subject: "upgrade-2.x: better version string normalization and defensive checking"
       body: >-
         * remove `.prod` passed onto the script, as resinOS does not care about
         that
 
         * bail out on trying to upgrade to `.dev` version
 
-        * more defensive VARIANT_ID check for `prod` version, in case variable
-        does not exists
+        * more defensive VARIANT_ID check for `prod` version, in case variable does not exists
     - hash: 894bead2d80c1668c4fb658e9cb67b5c68cf9601
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-2.x: possibility of redirecting complete script output to file'
+      subject: "upgrade-2.x: possibility of redirecting complete script output to file"
       body: >-
         Previously the entries called with "log ..." were part of the logfile
 
@@ -1670,8 +1703,7 @@
 
         Doing these changes, all the output will be put in the logfile on the
 
-        device, with the downside, that over SSH there's no copy. To receive
-        logs
+        device, with the downside, that over SSH there's no copy. To receive logs
 
         over SSH, have to call with --no-log (then no logfile, but log on
 
@@ -1684,7 +1716,8 @@
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-2.x: check whether the target resinOS version exists in registry'
+      subject: "upgrade-2.x: check whether the target resinOS version exists in
+        registry"
       body: |-
         Checking the availability of a repo:tag by querying the manifest.
         This currently only works with Docker Hub.
@@ -1692,19 +1725,19 @@
       author: Gergely Imreh
       footers:
         change-type: minor
-      subject: 'upgrade-2.x: fix wrong loglevel'
+      subject: "upgrade-2.x: fix wrong loglevel"
       body: null
     - hash: ffa6458d336610d27849b34ed1b4383aa794959d
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-2.x: remove vulnerable resin-sample NM config if found'
+      subject: "upgrade-2.x: remove vulnerable resin-sample NM config if found"
       body: null
     - hash: 6915004a4ee1b4e91e30d7ea3432522b4cad1360
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-2.x: update APIKEY getting logic'
+      subject: "upgrade-2.x: update APIKEY getting logic"
       body: |-
         There are some devices that have both apiKey and deviceApiKey set,
         that is because they are running with a supervisor that cannot
@@ -1715,9 +1748,8 @@
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: >-
-        upgrade-2.x: add the first sanity check for the update (device type
-        check)
+      subject: "upgrade-2.x: add the first sanity check for the update (device type
+        check)"
       body: >-
         Adding sanity checks enables us bailing out as early as possible, when
         there
@@ -1729,35 +1761,33 @@
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-2.x: enable --nolog flag for the running-over-ssh script'
+      subject: "upgrade-2.x: enable --nolog flag for the running-over-ssh script"
       body: null
     - hash: 253ade20bf9f92a33ea97185a30f62c766911e18
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-2.x: rewrite nmcli check for resin-sample'
+      subject: "upgrade-2.x: rewrite nmcli check for resin-sample"
       body: Making it more explicit checking the active connection
     - hash: d01c1adff6cbe93bfe3f944781b76ea3b865ce97
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: >-
-        upgrade-2.x: fix nolog command line parameter for the over-the-ssh
-        updater
+      subject: "upgrade-2.x: fix nolog command line parameter for the over-the-ssh
+        updater"
       body: null
     - hash: 9c3cefd1ad5b5d9adc1ff08baf24bbab699cf25c
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-2.x: fixes to issues highlighted by shellcheck'
+      subject: "upgrade-2.x: fixes to issues highlighted by shellcheck"
       body: null
     - hash: ade1f1000df6da0f64d80099f509e01c1ee458e1
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: >-
-        upgrade-2.x: at the end of the supervisor update remove existing
-        containers
+      subject: "upgrade-2.x: at the end of the supervisor update remove existing
+        containers"
       body: |-
         This is so that the new supervisor can start the user application,
         as it would be if a live supervisor update was performed. Without
@@ -1767,13 +1797,14 @@
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-2.x: add explicit supervisor update command line argument'
+      subject: "upgrade-2.x: add explicit supervisor update command line argument"
       body: null
     - hash: cfe37f1955008e9ebab5747471eb27aa98399b4d
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-2.x: add patching resin-supervisor-progress on affected versions'
+      subject: "upgrade-2.x: add patching resin-supervisor-progress on affected
+        versions"
       body: |-
         Between 2.0.6 and 2.3.0 (exclusive, so those versions were not affected)
         the resin-supervisor-progress was broken when the device uses
@@ -1784,7 +1815,7 @@
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-2.x: check VERSION_ID for resin-device-progress patch'
+      subject: "upgrade-2.x: check VERSION_ID for resin-device-progress patch"
       body: |-
         VERSION has a format of eg. a.b.c+revX, while VERSION_ID is
         a.b.c (at least for non RC, non beta releases that we have now).
@@ -1795,19 +1826,19 @@
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-2.x: update download URI for x86 tools now that they are merged'
+      subject: "upgrade-2.x: update download URI for x86 tools now that they are merged"
       body: null
     - hash: a36b87ce75f06b79da560ddcac217dfab64d6f9d
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-2.x: change supervisor upgrade function''s name'
+      subject: "upgrade-2.x: change supervisor upgrade function's name"
       body: null
     - hash: c1383705fd6ea9370551bbb1a83c0d66f1245c48
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-2.x: more defensive supervisor upgrade script'
+      subject: "upgrade-2.x: more defensive supervisor upgrade script"
       body: |-
         The API call for the device's current supervisor might fail, and
         then the script bailed out previously, ending just before reboot.
@@ -1816,7 +1847,7 @@
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-2.x: add shellcheck exception to docker calls'
+      subject: "upgrade-2.x: add shellcheck exception to docker calls"
       body: |-
         For the exempted calls we want splitting as the call might return
         multiple ids by docker
@@ -1824,7 +1855,7 @@
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-2.x: restart supervisor if there''s an error in the script'
+      subject: "upgrade-2.x: restart supervisor if there's an error in the script"
       body: |-
         This is not to leave the device without running supervisor if there's
         any issue during the HUP process. Similar to how update-resin-supervisor
@@ -1833,21 +1864,20 @@
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: >-
-        upgrade-2.x: explicitly stop services, instead of doing it in dependent
-        function
+      subject: "upgrade-2.x: explicitly stop services, instead of doing it in
+        dependent function"
       body: null
     - hash: e4f8b9fad6849f085f3e40dd3d0e1e618a0982ce
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-2.x: make supervisor update issues errors instead of warnings'
+      subject: "upgrade-2.x: make supervisor update issues errors instead of warnings"
       body: Be more restrictive to find issues early.
     - hash: b9ed6255c2ba218f64a33c87d84e1b085e6e9eb2
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-1.x-to-2.x: also migrate resin-wifi-connect configuration'
+      subject: "upgrade-1.x-to-2.x: also migrate resin-wifi-connect configuration"
       body: |-
         Migrate settings from `network.config` created by resin-wifi-connect
         if found.
@@ -1855,13 +1885,13 @@
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-1.x-to-2.x: set new target versions'
+      subject: "upgrade-1.x-to-2.x: set new target versions"
       body: Set target versions to the latest 2.x resinOS version
     - hash: e77ce84fe18b1c8ed54af741de247fe1311414e0
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-1.x-to-2.x: migrate wifi connections to the boot partition'
+      subject: "upgrade-1.x-to-2.x: migrate wifi connections to the boot partition"
       body: |-
         Before migration was directly into `resin-state`, but it feels
         better to migrate to where the network connections would be
@@ -1870,27 +1900,26 @@
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-1.x-to-2.x: add more log output'
+      subject: "upgrade-1.x-to-2.x: add more log output"
       body: null
     - hash: 52f4686199fd28e7fbb61355d28c9af9138a3ee7
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: >-
-        upgrade-1.x-to-2.x: switch out reboot command to allo cleanly
-        disconnecting from the device
+      subject: "upgrade-1.x-to-2.x: switch out reboot command to allo cleanly
+        disconnecting from the device"
       body: null
     - hash: 46c85dc3cc96f7aca345994c6f4634debcd71a35
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-1.x-to-2.x: bump target supervisor version to the latest 1.X'
+      subject: "upgrade-1.x-to-2.x: bump target supervisor version to the latest 1.X"
       body: null
     - hash: 413e4f2a8d7097ce7d4cc844541485543449e15f
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-1.x-to-2.x: migrate root partition when it''s read-only'
+      subject: "upgrade-1.x-to-2.x: migrate root partition when it's read-only"
       body: |-
         Previously copying the root partition with `dd` while it was mounted
         rw and possibly used by user application, etc, can result in
@@ -1898,15 +1927,15 @@
     - hash: 1228324bd9b93b72dca9137f23acdd4183ed73e2
       author: Gergely Imreh
       footers:
-        connects-to: '#99'
+        connects-to: "#99"
         change-type: patch
-      subject: 'upgrade-1.x-to-2.x: bump target resinOS 2.x version'
+      subject: "upgrade-1.x-to-2.x: bump target resinOS 2.x version"
       body: null
     - hash: 61de5e84dbdb9a8794d86c9bd879f28719d1291b
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-1.x-to-2.x: adding extra functionality into the upgrade'
+      subject: "upgrade-1.x-to-2.x: adding extra functionality into the upgrade"
       body: |-
         * better supervisor upgrade
         * clearing supervisor database to get a fresh start
@@ -1915,7 +1944,7 @@
         * fixing indentation in the affected areas (tabs to 4 spaces)
     - hash: e1ca27b85a8fc7ccc5b15e92ae6bafea8df4a381
       author: Gergely Imreh
-      subject: 'upgrade-1.x-to-2.x: pre-check for wifi-config settings migrations'
+      subject: "upgrade-1.x-to-2.x: pre-check for wifi-config settings migrations"
       body: |-
         If there's a possible network.config file present, but e.g. it is
         empty, the script previously failed silently and did not finish
@@ -1925,7 +1954,7 @@
         change-type: patch
     - hash: 42fae1f4cdbb07fa52cb75e0fb4f266bf8062073
       author: Gergely Imreh
-      subject: 'upgrade-2.x: fix tool downloads and be more defensive about it.'
+      subject: "upgrade-2.x: fix tool downloads and be more defensive about it."
       body: null
       footers:
         change-type: patch
@@ -1933,55 +1962,55 @@
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'updater-2.x: extract hup package without an intermediate file'
+      subject: "updater-2.x: extract hup package without an intermediate file"
       body: |-
         In my tests it shaved off ~3.5 minutes from an RPi3's update
         (147s from start to finish vs. 361s).
     - hash: 361748b38da1110111e85395b46d87783fd714cf
       author: Gergely Imreh
       footers:
-        connects-to: 'https://github.com/resin-os/meta-resin/pull/877'
+        connects-to: https://github.com/resin-os/meta-resin/pull/877
         change-type: patch
-      subject: 'updater-2.x: add progress bars'
+      subject: "updater-2.x: add progress bars"
       body: null
     - hash: 72e5b895c39667ef3de4ead2e4770cfd4f084ae4
       author: Gergely Imreh
       footers:
-        connects-to: 'https://github.com/resin-os/meta-resin/pull/864'
+        connects-to: https://github.com/resin-os/meta-resin/pull/864
         change-type: patch
-      subject: 'updater-2.x: add command line options: hostos-version, noreboot'
-      body: 'Change type: patch'
+      subject: "updater-2.x: add command line options: hostos-version, noreboot"
+      body: "Change type: patch"
     - hash: 6c05cd92186e489591da7a99e9877d03597dc15f
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'updater-2.x: up-board support'
+      subject: "updater-2.x: up-board support"
       body: |-
         Provide the required `tar` binary (i586 static build) and add
         the required transition steps
     - hash: 6100c52186d8f1b8b42f0ad674b368ba422dee97
       author: Gergely Imreh
-      subject: 'updater-2.x: add support for Intel NUC'
+      subject: "updater-2.x: add support for Intel NUC"
       body: null
     - hash: e79cda43ec6421ca63ddb9ab59647cde211e335b
       author: Gergely Imreh
-      subject: 'updater-2.x: add log to know what partition is used for update'
+      subject: "updater-2.x: add log to know what partition is used for update"
       body: null
     - hash: 87b64f4f3172b2d9d977963c71260f08b9b85a07
       author: Gergely Imreh
-      subject: 'updater-2.x: add block device check of the update partition'
+      subject: "updater-2.x: add block device check of the update partition"
       body: null
     - hash: 472a9b7bd978dc8739de3aeb00787b57a2588c1f
       author: Gergely Imreh
-      subject: 'updater-2.x: stop only the supervisor, not the user containers'
+      subject: "updater-2.x: stop only the supervisor, not the user containers"
       body: null
     - hash: 4be49884b52793b8de431871013be03c2d9204c8
       author: Gergely Imreh
-      subject: 'upgrade-2.x: style updates similar to 1.x for variables.'
+      subject: "upgrade-2.x: style updates similar to 1.x for variables."
       body: null
     - hash: 9cfa9fed576384eeea91e2eaa292bec763a5c2a5
       author: Gergely Imreh
-      subject: 'upgrade-2.x: quoting variable'
+      subject: "upgrade-2.x: quoting variable"
       body: null
     - hash: e363b8fdb28ca2ed9b1e1bf809a7f4099e6b533d
       author: Gergely Imreh
@@ -1993,25 +2022,25 @@
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-2.x: updating supervisor versions at the end of the update'
+      subject: "upgrade-2.x: updating supervisor versions at the end of the update"
       body: |-
         Get the supervisor version for the target hostOS version, and if
         newer than the current one on the device, update it.
     - hash: 16f817df55e388edc3a7ad086687b841f1b5eec1
       author: Gergely Imreh
-      subject: 'upgrade-2.x.sh: run over ssh'
+      subject: "upgrade-2.x.sh: run over ssh"
       body: null
     - hash: 45faac52f3f96e51f544c538b3773540bec2a342
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'updater-2.x: add displayed status for supervisor update stage'
+      subject: "updater-2.x: add displayed status for supervisor update stage"
       body: null
     - hash: 04afa15e5df4482a53acbf91baa714e14001a455
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'upgrade-1.x-to-2.x: fixes since initial merge'
+      subject: "upgrade-1.x-to-2.x: fixes since initial merge"
       body: |-
         * binary download locations
         * adding error check to binary downloads
@@ -2025,7 +2054,7 @@
         change-type: major
         changelog-entry: Add 2.x upgrade script
         signed-off-by: Will Newton <willn@resin.io>
-      subject: 'upgrade-2.x.sh: Add script to upgrade 2.x host OS'
+      subject: "upgrade-2.x.sh: Add script to upgrade 2.x host OS"
       body: |-
         Add a script that can upgrade a 2.x resinOS version to another
         2.x version.
@@ -2034,7 +2063,7 @@
       footers:
         change-type: major
         signed-off-by: Will Newton <willn@resin.io>
-      subject: 'upgrade-binaries: Add static binaries for legacy upgrades'
+      subject: "upgrade-binaries: Add static binaries for legacy upgrades"
       body: |-
         resinOS version prior to 1.27 do not have all the tools
         required to do upgrades to 2.x. Add static binaries here so
@@ -2110,7 +2139,7 @@
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'artik5: update to Alpine-based image as well'
+      subject: "artik5: update to Alpine-based image as well"
       body: Missed in a previous PR
 - version: 1.2.0
   date: 2017-07-12T09:43:33.000Z
@@ -2119,8 +2148,8 @@
       author: Gergely Imreh
       footers:
         change-type: patch
-      subject: 'versionist: add support for versionist generation of CHANGELOG.md'
-      body: 'Also add changes to the meta file, using `sed`.'
+      subject: "versionist: add support for versionist generation of CHANGELOG.md"
+      body: Also add changes to the meta file, using `sed`.
     - hash: 52505fa114bd418e8c9ee8b04c8203a11a7c4c04
       author: Gergely Imreh
       footers:
@@ -2150,13 +2179,13 @@
       footers:
         change-type: patch
         signed-off-by: Gergely Imreh <imrehg@gmail.com>
-      subject: 'legacy-config: fix bug when migrating config.json'
+      subject: "legacy-config: fix bug when migrating config.json"
       body: |-
         Trying to copy with wrong syntax (to a directory, instead of a file),
         which breaks update process.
     - hash: 367dd5dbbe5d86ecc454ec5899c0590819f72e9e
       author: Gergely Imreh
-      subject: 'legacy-config: add ChangeLog'
+      subject: "legacy-config: add ChangeLog"
       body: null
 - version: 1.1.3
   date: 2017-05-25T12:35:27.000Z
@@ -2164,7 +2193,7 @@
     - hash: 723f0b6ffa0d2143e6308c55d44a9f87dbd7663c
       author: Gergely Imreh
       footers:
-        connects-to: '#64'
+        connects-to: "#64"
         signed-off-by: Gergely Imreh <imrehg@gmail.com>
       subject: whitelist /etc/hostname
       body: null
@@ -2181,7 +2210,7 @@
       author: Will Newton
       footers:
         signed-off-by: Will Newton <willn@resin.io>
-      subject: 'conf/resinhup.conf: Whitelist etc/openvpn/resin.conf'
+      subject: "conf/resinhup.conf: Whitelist etc/openvpn/resin.conf"
       body: |-
         This file differs between production and staging so
         whitelist it so that resinhup can succeed on staging.
@@ -2189,11 +2218,11 @@
       author: Will Newton
       footers:
         signed-off-by: Will Newton <willn@resin.io>
-      subject: 'CHANGELOG.md: Add entry for staging resinhup'
+      subject: "CHANGELOG.md: Add entry for staging resinhup"
       body: null
     - hash: 1b14cbb3d0ca88f54a60bbfde1f8ed215c636c64
       author: Pascal Vizeli
-      subject: 'Bugfix: ''update'' not exists on this place.'
+      subject: "Bugfix: 'update' not exists on this place."
       body: null
 - version: 1.1.1
   date: 2017-01-23T16:28:14.000Z
@@ -2202,19 +2231,19 @@
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'dockerhub.py: Name the resinos image as ''resinos'' not ''resinhup'''
+      subject: "dockerhub.py: Name the resinos image as 'resinos' not 'resinhup'"
       body: null
     - hash: d742958cd9ddb2b205c68490c9a71a4f6920eee7
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'resinhup.py: Implement argument which allows downgrades'
+      subject: "resinhup.py: Implement argument which allows downgrades"
       body: null
     - hash: b7ddaa69929ef5dc1d6b7745750c191220eb8a82
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'CHANGELOG.md: Add entry for this patch set'
+      subject: "CHANGELOG.md: Add entry for this patch set"
       body: null
 - version: 1.1.0
   date: 2017-01-09T11:26:29.000Z
@@ -2223,45 +2252,44 @@
       author: Michal Mazurek
       footers:
         signed-off-by: Michal Mazurek <michal@resin.io>
-      subject: 'resinhup.conf: whitelist splash/resin-logo.png'
+      subject: "resinhup.conf: whitelist splash/resin-logo.png"
       body: null
     - hash: 1f6def73678f7b890f4a5484d3ad3a077664efe0
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'Dockerfile.artik5: Add file for artik5'
+      subject: "Dockerfile.artik5: Add file for artik5"
       body: null
     - hash: 362bda9743809169e4dec9895fec42a061807e4c
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'resinhup.conf: Add artik5 as supported machine'
+      subject: "resinhup.conf: Add artik5 as supported machine"
       body: null
     - hash: ae94a56ed602f7c22dec7fdcb801b817963e0a6a
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'bootconf.py: Add bootloader configuration support for artik5'
+      subject: "bootconf.py: Add bootloader configuration support for artik5"
       body: null
     - hash: bad00f2c3a52dde0d7424d7528084ea75f4bc037
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'CHANGELOG.md: Add entry for this patchset'
+      subject: "CHANGELOG.md: Add entry for this patchset"
       body: null
     - hash: acbf16d0c3db13448a36447eb222970213660c17
       author: Michal Mazurek
       footers:
         signed-off-by: Michal Mazurek <michal@resin.io>
-      subject: 'resinhup.py: attempt to retry a fetch if it failed'
+      subject: "resinhup.py: attempt to retry a fetch if it failed"
       body: null
     - hash: ba0e7a22dc3b8bfc8d0a72a460e689f7cbad107b
       author: Michal Mazurek
       footers:
         signed-off-by: Michal Mazurek <michal@resin.io>
-      subject: >-
-        docker-build-and-push.sh: mention the default --registry argument in the
-        help message
+      subject: "docker-build-and-push.sh: mention the default --registry argument in
+        the help message"
       body: null
 - version: 1.0.0
   date: 2016-12-23T18:29:46.000Z
@@ -2270,33 +2298,30 @@
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'resinhup.conf: Ignore some files'
+      subject: "resinhup.conf: Ignore some files"
       body: >-
         supervisor.conf - can be modified by update-resin-supervisor
 
-        update-resin-supervisor - is scp'd via ssh/vpn while running resinhup
-        ssh wrapper
+        update-resin-supervisor - is scp'd via ssh/vpn while running resinhup ssh wrapper
     - hash: 627de1420db3c636353ff9da6dc62ad842c5ca96
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: >-
-        docker-build-and-push.sh: Push to both dockerhub and resinstaging docker
-        registry
-      body: >-
-        Some device might not be able to pull from dockerhub so have
-        resinstaging as a backup.
+      subject: "docker-build-and-push.sh: Push to both dockerhub and resinstaging
+        docker registry"
+      body: Some device might not be able to pull from dockerhub so have resinstaging
+        as a backup.
     - hash: 73210cefa904d4062eea0d7991a378ca3fd9d96f
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'util.py: Add testcase where safeCopy ignores multiple entries'
+      subject: "util.py: Add testcase where safeCopy ignores multiple entries"
       body: null
     - hash: cdd4af5e1d8a2ea66eaae477588ba14d8f5ef63d
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'util.py: Fix bug when altering the list during iteration'
+      subject: "util.py: Fix bug when altering the list during iteration"
       body: >-
         If the list is modified, the current index is messed up and will result
         in
@@ -2306,21 +2331,20 @@
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'CHANGELOG.md: Add entry for this patchset'
+      subject: "CHANGELOG.md: Add entry for this patchset"
       body: null
     - hash: bd5e41e4ce761bbec9d0b9675ef86c81a4082984
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'dockerhub.py: Fix docker_version old variable'
+      subject: "dockerhub.py: Fix docker_version old variable"
       body: null
     - hash: 28c5a1d1851159e174211d25c75ba7489276ade3
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: >-
-        Dockerfile.*: Make sure we have a requests module version that works
-        with dockerpy
+      subject: "Dockerfile.*: Make sure we have a requests module version that works
+        with dockerpy"
       body: |-
         Ref.:
         https://github.com/docker/docker-py/issues/1321
@@ -2328,15 +2352,13 @@
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'dockerhub.py: Make it work with rce'
+      subject: "dockerhub.py: Make it work with rce"
       body: >-
         This patch fixes two issues on boards running rce:
 
-        1. As rce is actually docker 1.4.3 it can't pull from docker registry
-        (v2). As
+        1. As rce is actually docker 1.4.3 it can't pull from docker registry (v2). As
 
-        well we know that we did the migrate from rce to docker in 1.5.0 so, if
-        we
+        well we know that we did the migrate from rce to docker in 1.5.0 so, if we
 
         update a device with rce, make sure it tries to get the update from our
 
@@ -2347,31 +2369,31 @@
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'util.py: Use version 1.0.0 on devices without version (or wrong one)'
+      subject: "util.py: Use version 1.0.0 on devices without version (or wrong one)"
       body: null
     - hash: 7d2382978af0b1b1737256eab7ae3bac34b8b0e9
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'resinhup.py: getCurrentHostOSVersion always returns a value now'
+      subject: "resinhup.py: getCurrentHostOSVersion always returns a value now"
       body: null
     - hash: 78841240a2475404096e1b71406f0239cf9a9a4f
       author: Michal Mazurek
       footers:
         signed-off-by: Michal Mazurek <michal@resin.io>
-      subject: 'resinhup.conf: typo'
+      subject: "resinhup.conf: typo"
       body: null
     - hash: 0c47b47d8e8e15dd971f787f921afda71e40dc56
       author: Michal Mazurek
       footers:
         signed-off-by: Michal Mazurek <michal@resin.io>
-      subject: 'README.md: a couple fixups'
+      subject: "README.md: a couple fixups"
       body: null
     - hash: 77b863f16b35e855fb6ce7ca451c4cd099fdda8b
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'util.py: When getting VERSION strip out double quotes too'
+      subject: "util.py: When getting VERSION strip out double quotes too"
       body: >-
         os-release provides now values in double quotes which need to be
         stripped too
@@ -2381,23 +2403,21 @@
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'util.py: Have de ability to ignore a set of directories/files when copy'
+      subject: "util.py: Have de ability to ignore a set of directories/files when copy"
       body: Add as well test for ignoring a file and a directory.
     - hash: d605225ae5b41b5bc4ebffbb0fa2d4f121b7d4d1
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: >-
-        tar.py: Error if download fails and not let the error propagate to
-        unpack
+      subject: "tar.py: Error if download fails and not let the error propagate to
+        unpack"
       body: null
     - hash: 378615feffc626cb6e4592e226352c3d4ec98d2f
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: >-
-        tar.py: The resinhup update packages don't contain a rootfs archive
-        anymore
+      subject: "tar.py: The resinhup update packages don't contain a rootfs archive
+        anymore"
       body: >-
         Given this, we don't need to unpack a rootfs archive anymore but only
         copy a
@@ -2407,24 +2427,21 @@
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: >-
-        resinhup.py: Rename --force-fingerprint to simple --force to use it in
-        multiple things
+      subject: "resinhup.py: Rename --force-fingerprint to simple --force to use it in
+        multiple things"
       body: >-
         --force is used now to avoid version check too - to force update to a
         specific
 
-        version even if the device is already there or is already after the
-        required
+        version even if the device is already there or is already after the required
 
         version.
     - hash: 284cd62b088d03eaf82c396a8172684ef0a3e290
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: >-
-        Dockerfile.*: Replace the run command with a script so we can avoid
-        double maintenance
+      subject: "Dockerfile.*: Replace the run command with a script so we can avoid
+        double maintenance"
       body: >-
         In this way if we want to change the resinhup default arguments we can
         use only
@@ -2434,13 +2451,13 @@
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'docker-build-and-push.sh: Fix a super extra hyper small typo'
+      subject: "docker-build-and-push.sh: Fix a super extra hyper small typo"
       body: null
     - hash: 5b370cb59d2eba957ac567e5912d13050123ba2a
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'resinhup.conf: Use fingerprint files as package fingerprints'
+      subject: "resinhup.conf: Use fingerprint files as package fingerprints"
       body: >-
         The resinhup update packages have changed the format into a FHS
         structure where /
@@ -2450,21 +2467,20 @@
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'dockerhub.py: Implement a new fetcher which uses a dockerhub repository'
+      subject: "dockerhub.py: Implement a new fetcher which uses a dockerhub repository"
       body: null
     - hash: 8847c9898e719c05d53f73fc8816129f751e6c9c
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: >-
-        fetcher.py: Implement a fetcher class for abstracting the fetcher
-        implementation
+      subject: "fetcher.py: Implement a fetcher class for abstracting the fetcher
+        implementation"
       body: null
     - hash: e65ca7c863a1a5fcdcc4d16d2bae648143e4a5b8
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'resinhup.conf: Default the fetcher to dockerhub type'
+      subject: "resinhup.conf: Default the fetcher to dockerhub type"
       body: >-
         The default way of providing the resinhup update packages in resin is
         now
@@ -2480,11 +2496,9 @@
       body: >-
         In some cases there is needed for the update to come with an overlay fs
 
-        structure which is intended to be written on top of new rootfs after
-        update.
+        structure which is intended to be written on top of new rootfs after update.
 
-        This overlay FHS needs to be in a directory called quirks and located in
-        the
+        This overlay FHS needs to be in a directory called quirks and located in the
 
         root of the update files structure.
 
@@ -2495,34 +2509,33 @@
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'dockerhub.py/tar.py: Replace workspacefile by a file object'
+      subject: "dockerhub.py/tar.py: Replace workspacefile by a file object"
       body: >-
         As well we need now to test the archive after we unpack it. And this is
         because
 
         because of the fact that now we are opening the tar file without seek
 
-        availability so we can't read first the filenames and then unpack as the
-        data in
+        availability so we can't read first the filenames and then unpack as the data in
 
         tar stream is interleaved (header/data/header/data etc).
     - hash: 60e8aeb37af40d67b32dbe49f5166929d3e95319
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'tar.py: Use urllib3 to not load the entire update package in memory'
+      subject: "tar.py: Use urllib3 to not load the entire update package in memory"
       body: null
     - hash: 79ae31029415c784935a9ca05ad7b92eff51db15
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'docker-build-and-push.sh: Replace unknown log with echo'
+      subject: "docker-build-and-push.sh: Replace unknown log with echo"
       body: null
     - hash: dfe69a0f44412ffa1584a73439bf6549e327d2ba
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'resinhup.conf: config.json is now in boot partition'
+      subject: "resinhup.conf: config.json is now in boot partition"
       body: null
     - hash: 2922932264bdb14b83fb661e622dd16adbcd9ea8
       author: Andrei Gherzan
@@ -2534,20 +2547,19 @@
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'resinhup.py: We support only versions where config.json is in boot'
+      subject: "resinhup.py: We support only versions where config.json is in boot"
       body: >-
         config.json switch was done in 1.12.0 and we don't want to update
         devices with
 
-        versions before as this would make the updater more complex for no
-        value. Let's
+        versions before as this would make the updater more complex for no value. Let's
 
         state a restriction here.
     - hash: 9350cab2dbf5f8f87c6011072444974a0b1563c9
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'resinhup.conf: Remove unused variable'
+      subject: "resinhup.conf: Remove unused variable"
       body: null
     - hash: 3db65cdd705e13a11fce9a50be6aa0f9f15207a9
       author: Michal Mazurek
@@ -2559,19 +2571,19 @@
       author: Michal Mazurek
       footers:
         signed-off-by: Michal Mazurek <michal@resin.io>
-      subject: 'dockerhub: sort headers'
+      subject: "dockerhub: sort headers"
       body: null
     - hash: 859de9c77b965f28cde064a114bee92a7a929067
       author: Michal Mazurek
       footers:
         signed-off-by: Michal Mazurek <michal@resin.io>
-      subject: 'fetcher: sort headers'
+      subject: "fetcher: sort headers"
       body: null
     - hash: c062262398ca4e73de05c7ca4e80f99dd362abdd
       author: Michal Mazurek
       footers:
         signed-off-by: Michal Mazurek <michal@resin.io>
-      subject: 'docker-build-and-push: add configurable registry'
+      subject: "docker-build-and-push: add configurable registry"
       body: |-
         The new option is -r, or --registry
         Also fix a bug that manifested itself if two images with the same
@@ -2580,33 +2592,32 @@
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'util.py: Fix the case were the symlink points to a directory'
+      subject: "util.py: Fix the case were the symlink points to a directory"
       body: null
     - hash: e98743fa9784c25d988ada1b485bdff12721b13f
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'util.py: Treat symlinks in dir entries from walk function'
+      subject: "util.py: Treat symlinks in dir entries from walk function"
       body: null
     - hash: 84f9d6e9f48e276911f998ced96175628246d14f
       author: Michal Mazurek
       footers:
         signed-off-by: Michal Mazurek <michal@resin.io>
-      subject: 'resinhup.conf: add usr/bin/run-resinhup.sh to the whitelist'
+      subject: "resinhup.conf: add usr/bin/run-resinhup.sh to the whitelist"
       body: null
     - hash: 9b641c6b381d9e2f1ad0010ae3345c26f170b6c0
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'fingerprint/tests: Make test directories boot/root specific'
+      subject: "fingerprint/tests: Make test directories boot/root specific"
       body: null
     - hash: 363d5b980af00d060adc6fc411f4c746011840f6
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: >-
-        resinhup.conf: Make defaultFingerPrintFile and whitelist root/boot
-        specific
+      subject: "resinhup.conf: Make defaultFingerPrintFile and whitelist root/boot
+        specific"
       body: >-
         We test the fingerprints on boot partition too so make these
         configuration
@@ -2616,47 +2627,45 @@
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: >-
-        resin-ba1f2511fc30423bdbb183fe33f3dd0f.fingerprint: Remove unused
-        section
+      subject: "resin-ba1f2511fc30423bdbb183fe33f3dd0f.fingerprint: Remove unused
+        section"
       body: null
     - hash: fac29f5f927355661c254c7bcfdbe809eab3cf79
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'fingerprint.py: Implement fingerprints scan on boot partition too'
+      subject: "fingerprint.py: Implement fingerprints scan on boot partition too"
       body: null
     - hash: 05fe2736ed1786459986ace3deca940f69ea3b96
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'resinhup.py: Adapt for fingerprint scan on boot partition'
+      subject: "resinhup.py: Adapt for fingerprint scan on boot partition"
       body: null
     - hash: 3985d2ff49463ae46760795924d5e7a90d45b665
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'fingerprint.py: Separate printFingerPrints by root/boot'
+      subject: "fingerprint.py: Separate printFingerPrints by root/boot"
       body: null
     - hash: 523b4a100bb26295cc698f52ea72035b0edd2e95
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'fingerprint.py: warn is deprecated'
+      subject: "fingerprint.py: warn is deprecated"
       body: null
     - hash: 9ab5a8a85e1a5eba2e187e342e48ffa5b6ac4064
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: >-
-        resinhup.conf: Whitelist files in boot partition that we persist over
-        updates
+      subject: "resinhup.conf: Whitelist files in boot partition that we persist over
+        updates"
       body: null
     - hash: 887c9efa6ef7cc747c995d10f8ee69993365b0fc
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'resinhup.conf: We persist cmdline.txt over updates'
+      subject: "resinhup.conf: We persist cmdline.txt over updates"
       body: |-
         We do this currently because this tool configured the bootloader
         using this file.
@@ -2676,19 +2685,19 @@
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'updater.py: Remove ignore_files as we can use boot_whitelist'
+      subject: "updater.py: Remove ignore_files as we can use boot_whitelist"
       body: null
     - hash: a6a8de114577efc457fe7367a19e3a3a12e6a721
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'README.md: Improve documentation'
+      subject: "README.md: Improve documentation"
       body: null
     - hash: 77bfed00a16d367c5ba70dc348b7d778dfba4eb3
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'util.py: Implement getCurrentHostOSVersion'
+      subject: "util.py: Implement getCurrentHostOSVersion"
       body: >-
         This function will return the current OS version based on the
         information
@@ -2698,22 +2707,20 @@
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: >-
-        tar.py: Make version and remote configurable when running the
-        constructor
+      subject: "tar.py: Make version and remote configurable when running the
+        constructor"
       body: null
     - hash: a4c9619c5ae3c48b0d999315def3549d1b50dca6
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'resinhup.py: Implement version and remote'
+      subject: "resinhup.py: Implement version and remote"
       body: >-
         Add version and remote arguments:
 
         - version for specifying the version we want to update to
 
-        - remote for specifying an alternative source which will overwrite at
-        runtime the
+        - remote for specifying an alternative source which will overwrite at runtime the
 
         one configured through configuration file
 
@@ -2721,33 +2728,31 @@
 
         The version argument is mandatory.
 
-        Exit update if the current version is already at the requested one or
-        greater.
+        Exit update if the current version is already at the requested one or greater.
     - hash: 51b9f3c3bf64c98973ec6e52b062c64eb3ad2104
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'CHANGELOG.md: Add entry for this patch set'
+      subject: "CHANGELOG.md: Add entry for this patch set"
       body: null
     - hash: 2ac24b9423e9bb83bb8c3f77bdf07f9faf5b9b54
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: >-
-        resinhup.py: Handle case where the format of current version is
-        unparsable
+      subject: "resinhup.py: Handle case where the format of current version is
+        unparsable"
       body: null
     - hash: 633233f198bed8e607627ce675330619f305070a
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'resinhup.conf: Add deltaEndpoint for staging/production'
+      subject: "resinhup.conf: Add deltaEndpoint for staging/production"
       body: null
     - hash: d8210ae738eaa854e53326f92a56b33e457a5ee1
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'util.py: fsync after copymode and do it on parent directory too'
+      subject: "util.py: fsync after copymode and do it on parent directory too"
       body: |-
         fsync on the file gives the guarantee that the new file is written but
         it doesn't mean the that parent directory entry was.
@@ -2762,13 +2767,13 @@
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'docker-build-and-push.sh: Add argument to push only one Dockerfile'
+      subject: "docker-build-and-push.sh: Add argument to push only one Dockerfile"
       body: null
     - hash: 3d888def12112fc483ef8cff3eb0f6d6696de93d
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'util.py: Implement getPartitionIndex'
+      subject: "util.py: Implement getPartitionIndex"
       body: |-
         This returns the index of a partition.
         Ex:
@@ -2779,27 +2784,26 @@
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: >-
-        bootconf.py: Implement configuration on uboot uEnv based on partition
-        indexes
+      subject: "bootconf.py: Implement configuration on uboot uEnv based on partition
+        indexes"
       body: null
     - hash: 6a670e71c0bcfc5aacb6ddcbcc47bac51c8347a9
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'docker-build-and-push.sh: Make tag configurable'
+      subject: "docker-build-and-push.sh: Make tag configurable"
       body: null
     - hash: 527e959818dfda0383e70403740b49f5d11f1d2b
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'bootconf.py: Fix typo'
+      subject: "bootconf.py: Fix typo"
       body: null
     - hash: 1ec9f7350edcfa7bb6b1559ed29689cfb93d9eb4
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'updater.py: Fail if the data partition was not labeled'
+      subject: "updater.py: Fail if the data partition was not labeled"
       body: |-
         This should have been done in the wrapper ran on host as a hack
         function.
@@ -2807,15 +2811,15 @@
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: >-
-        resinhup.py: Be able to overwrite --staging with RESINHUP_STAGING env
-        variable
+      subject: "resinhup.py: Be able to overwrite --staging with RESINHUP_STAGING env
+        variable"
       body: null
     - hash: d7e3bda738790051a714e61703c62ba69d3cd37e
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'docker-build-and-push.sh: Add helper script to build and push all images'
+      subject: "docker-build-and-push.sh: Add helper script to build and push all
+        images"
       body: null
     - hash: b44fb8497b90032bcfa17a9d4bc1d17ee0e4648b
       author: Andrei Gherzan
@@ -2833,21 +2837,20 @@
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: >-
-        Dockerfile.raspberry3: Use resin/raspberrypi3-debian:jessie as base
-        image
+      subject: "Dockerfile.raspberry3: Use resin/raspberrypi3-debian:jessie as base
+        image"
       body: null
     - hash: 357cb6c6c1d25a6c0b9847e271f2523694dc87aa
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'bootconf.py: Simplify check for rpi'
+      subject: "bootconf.py: Simplify check for rpi"
       body: null
     - hash: 31bf2ed13ce94abc1b6acf9c9ec5b20d3a911035
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'util.py: Fix getRootDevice for sdX devices'
+      subject: "util.py: Fix getRootDevice for sdX devices"
       body: null
     - hash: b6dcfb37cd04189c2aa019d9d6a0960eb644a57a
       author: Andrei Gherzan
@@ -2859,41 +2862,39 @@
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: >-
-        bootconf.py: Avoid multiple calls to runningDevice in
-        configureBootloader
+      subject: "bootconf.py: Avoid multiple calls to runningDevice in
+        configureBootloader"
       body: null
     - hash: b9c0638623c5140c20251ad91c412d24b2352b7c
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'Dockerfile.*: Replace ADD by COPY'
+      subject: "Dockerfile.*: Replace ADD by COPY"
       body: null
     - hash: cd6251e0229932be9f46ae1c4227af7a98a3ec54
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'resinhup.conf: Keep /etc/supervisor.conf over updates'
+      subject: "resinhup.conf: Keep /etc/supervisor.conf over updates"
       body: This file might have been already changed by supervisor updates.
     - hash: 9c0f2f22978e5785cd6e07781471d2894c5b2149
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: >-
-        updater.py: If not available set registered_at to date +%s in
-        config.json
+      subject: "updater.py: If not available set registered_at to date +%s in
+        config.json"
       body: null
     - hash: eba84458d25e8223d6734a37000b0a0dd6f025d3
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: >-
-        repartitioner.py: Don't fail if requested size is greater than current
-        one
+      subject: "repartitioner.py: Don't fail if requested size is greater than current
+        one"
       body: We use this to detect State D.
     - hash: fd7a7facaaf65f63b8a0b50e2acca88250575b32
       author: Andrei Gherzan
       footers:
         signed-off-by: Andrei Gherzan <andrei@resin.io>
-      subject: 'updater.py: Convert value back to str as it is assumed in follow up code'
+      subject: "updater.py: Convert value back to str as it is assumed in follow up
+        code"
       body: null
