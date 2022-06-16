@@ -521,8 +521,10 @@ function hostapp_based_update {
     local balena_migration=no
     local inactive_used
     local hostapp_image_count
-    local storage_driver
-    storage_driver=$(cat /boot/storage-driver)
+    storage_driver=overlay2
+    if [ -f /boot/storage-driver ]; then
+        storage_driver=$(cat /boot/storage-driver)
+    fi
 
     case ${SLUG} in
         raspberry*)
