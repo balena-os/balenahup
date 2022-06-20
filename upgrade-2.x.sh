@@ -589,7 +589,7 @@ function hostapp_based_update {
             hostapp_image_count=$(DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} images -q | wc -l)
             if [ "$hostapp_image_count" -eq "0" ]; then
                 # There are no hostapp images, but space is still taken up
-                local target_folder="${inactive}/${DOCKER_CMD}/${storage_driver}/"
+                local target_folder="${inactive}/${DOCKER_CMD}/"
                 log "Found potential leftover data, cleaning ${target_folder}"
                 systemctl stop "${DOCKER_CMD}-host"
                 find "$target_folder" -mindepth 1 -maxdepth 1 -exec rm -r "{}" \; || true
