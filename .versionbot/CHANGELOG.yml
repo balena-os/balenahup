@@ -1,4 +1,42 @@
 - commits:
+    - subject: "upgrade-2.x: On leftover data clean all engine storage"
+      hash: 43851fb00f0a1319677f2586ca41a17c16c9493f
+      body: |
+        The device might have done an aufs to overlay transition so cleaning
+        only the current storage engine leftovers does not leave enough space
+        for the update.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Alex Gonzalez <alexg@balena.io>
+        signed-off-by: Alex Gonzalez <alexg@balena.io>
+      author: Alex Gonzalez
+    - subject: "upgrade-2.x.sh: Default to overlay2 as storage driver"
+      hash: 0052a9d6263cd0f27e0931e7f75fa405ef819e3b
+      body: >
+        Recent balenaOS versions default to overlay2 and do not expose the
+
+        engine storage in the boot partition.
+
+
+        Leave non-hostapp based to hostapp based updates and docker to balena
+
+        migration paths as is - no need to retest these old releases.
+
+
+        On hostapp based updates, keep checking the boot partition for the engine
+
+        storage to remain backwards compatible.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Alex Gonzalez <alexg@balena.io>
+        signed-off-by: Alex Gonzalez <alexg@balena.io>
+      author: Alex Gonzalez
+  version: 2.15.2
+  title: "'Stop reading the storage driver from the boot partition'"
+  date: 2022-06-20T17:27:55.181Z
+- commits:
     - subject: "upgrade-2.x.sh: Use SUPERVISOR_VERSION for version check"
       hash: 149349b1f811a2bd07ae50499825edc49906eb0d
       body: |
