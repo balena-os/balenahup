@@ -170,6 +170,16 @@ function remove_containers() {
     ${DOCKER_CMD} rm $(${DOCKER_CMD} ps -a -q) > /dev/null 2>&1 || true
 }
 
+function remove_rec_files() {
+    local boot_dir='/mnt/boot'
+    shopt -s nullglob
+    for f in ${boot_dir}/*.REC; do
+        log WARN "Removing $f from boot partition"
+        rm -f $f
+    done
+    sync ${boot_dir}
+}
+
 #######################################
 # Upgrade the supervisor on the device.
 # Extract the supervisor version with which the the target hostOS is shipped,
@@ -526,6 +536,9 @@ function hostapp_based_update {
         storage_driver=$(cat /boot/storage-driver)
     fi
 
+    # remove REC files on boot partition
+    remove_rec_files
+
     case ${SLUG} in
         raspberry*)
             log "Running pre-update fixes for ${SLUG}"
@@ -650,6 +663,8 @@ function non_hostapp_to_hostapp_update {
     tmp_inactive=$(mktemp -d "/tmp/hupinactive.XXXXXXXX")
     log "Mounting inactive partition ${update_part} to ${tmp_inactive}..."
     mount "${update_part}" "${tmp_inactive}" || log ERROR "Cannot mount inactive partition..."
+    # remove REC files on boot partition
+    remove_rec_files
 
     case "${SLUG}" in
         raspberry*)
@@ -1264,6 +1279,9 @@ fi
 
 # Find partition information
 find_partitions
+
+# remove REC files on boot partition
+remove_rec_files
 
 # Stop supervisor, plus all running containers if requested
 stop_services
