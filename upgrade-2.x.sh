@@ -236,7 +236,10 @@ function upgrade_supervisor() {
                     log "Setting supervisor version in the API..."
                     progress 90 "Running supervisor update"
                     stop_services
-                    CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --request PATCH --header "Authorization: Bearer ${APIKEY}" --header 'Content-Type: application/json' "${API_ENDPOINT}/v6/device(uuid='${UUID}')" --data-binary "{\"should_be_managed_by__supervisor_release\": \"${UPDATER_SUPERVISOR_ID}\"}" > /dev/null 2>&1
+                    _status_code=$(CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --request PATCH --header "Authorization: Bearer ${APIKEY}" --header 'Content-Type: application/json' "${API_ENDPOINT}/v6/device(uuid='${UUID}')" --data-binary "{\"should_be_managed_by__supervisor_release\": \"${UPDATER_SUPERVISOR_ID}\"}" > /dev/null 2>&1)
+                    if [[ "${_status_code}" != 2* ]]; then
+                        log "Unable to set supervisor version in the API"
+                    fi
                     log "Running supervisor updater..."
                     # use a transient unit in order to namespace-collide with a potential API-initiated update
                     supervisor_update="systemd-run --wait --unit run-update-supervisor $(which update-balena-supervisor || which update-resin-supervisor)"
