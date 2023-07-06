@@ -1,4 +1,17 @@
 - commits:
+    - subject: "flowzone: add workflow"
+      hash: f44f71d6959fdbc05059525160e8ea122eb1d3af
+      body: ""
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Alex Gonzalez <alexg@balena.io>
+        signed-off-by: Alex Gonzalez <alexg@balena.io>
+      author: Alex Gonzalez
+  version: 2.15.4
+  title: ""
+  date: 2023-07-06T12:08:27.543Z
+- commits:
     - subject: "upgrade-2.x: Remove REC files before updating"
       hash: 9cd6317d0ca8be6311147e6fb5bc5fe7049821ac
       body: >
