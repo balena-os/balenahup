@@ -1,4 +1,17 @@
 - commits:
+    - subject: "upgrade-2.x.sh: Adapt to support major balenaOS version upgrades"
+      hash: 1c70bafcf2f591daea3a5c2fd8ff43e777b7f64c
+      body: ""
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Alex Gonzalez <alexg@balena.io>
+        signed-off-by: Alex Gonzalez <alexg@balena.io>
+      author: Alex Gonzalez
+  version: 2.15.5
+  title: ""
+  date: 2023-07-06T12:19:28.978Z
+- commits:
     - subject: "flowzone: add workflow"
       hash: f44f71d6959fdbc05059525160e8ea122eb1d3af
       body: ""
