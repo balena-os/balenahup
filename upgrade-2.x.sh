@@ -1069,7 +1069,7 @@ log "OS variant: ${HOST_OS_VERSION}"
 
 # Check host OS version
 case $VERSION in
-    2.*|2[0-9][0-9][0-9].*.*)
+    [2-9].*|2[0-9][0-9][0-9].*.*)
         log "Host OS version \"$VERSION\" OK."
         ;;
     *)
