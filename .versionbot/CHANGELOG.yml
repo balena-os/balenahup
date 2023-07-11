@@ -1,4 +1,21 @@
 - commits:
+    - subject: "upgrade-2.x: Allow upgrading from balenaOS v3.x"
+      hash: 18c5655cc1e80d5ce8cc757e964a9cfe6f519944
+      body: |
+        We need this for newer balenaOS devices which
+        we plan to release, for example the Jetson Orin
+        Nano wich will have the first production image on
+        balenaOS 3.x.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Alexandru Costache <alexandru@balena.io>
+        signed-off-by: Alexandru Costache <alexandru@balena.io>
+      author: Alexandru Costache
+  version: 2.15.6
+  title: ""
+  date: 2023-07-11T18:04:44.687Z
+- commits:
     - subject: "upgrade-2.x.sh: Adapt to support major balenaOS version upgrades"
       hash: 1c70bafcf2f591daea3a5c2fd8ff43e777b7f64c
       body: ""
