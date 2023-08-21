@@ -6,7 +6,9 @@ DELTA_VERSION=3
 SCRIPTNAME=upgrade-2.x.sh
 LEGACY_UPDATE=no
 STOP_ALL=no
-
+OPENBALENA=no
+NODELTA=no
+VERBOSE=no
 set -o errexit
 set -o pipefail
 
@@ -29,6 +31,7 @@ else
     DOCKER_CMD="docker"
     DOCKERD="dockerd"
 fi
+
 
 ###
 # Helper functions
@@ -58,7 +61,8 @@ function progress {
 
 function help {
     cat << EOF
-Helper to run hostOS updates on balenaOS 2.x devices
+
+"Helper to run hostOS updates on balenaOS 2.x devices
 
 Options:
   -h, --help
@@ -100,11 +104,20 @@ Options:
         Request the updater to stop all containers (including user application)
         before the update.
 
+  --open-balena
+        Allows to upgrade an openBalena device
+
+  --no-delta
+        Ignore delta updates
+
+  --verbose
+        Show log in console, do not redirect in log file
+
   --assume-supported
         This is now deprecated. Assuming supported device, and disabling the relevant check.
         Only enabled for updates that does not use update hooks, otherwise the updater
         wouldn't know how to switch partitions, so only available for balenaOS
-        below ${minimum_hostapp_target_version}.
+        below ${minimum_hostapp_target_version}."
 EOF
 }
 
@@ -149,7 +162,7 @@ function compare_device_state() {
     perc=$1
     state=$2
     resp=$(CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --header "Authorization: Bearer ${APIKEY}" \
-        "${API_ENDPOINT}/v6/device(uuid='${UUID}')?\$select=provisioning_state,provisioning_progress" | jq '.d[]')
+        "${DEVICE_API_ENDPOINT}/v6/device(uuid='${UUID}')?\$select=provisioning_state,provisioning_progress" | jq '.d[]')
     test "${perc}" -eq "$(echo "${resp}" | jq -r '.provisioning_progress')" && test "${state}" = "$(echo "${resp}" | jq -r '.provisioning_state')"
 }
 
@@ -157,8 +170,11 @@ function stop_services() {
     # Stopping supervisor and related services
     log "Stopping supervisor and related services..."
     systemctl stop update-balena-supervisor.timer > /dev/null 2>&1 || systemctl stop update-resin-supervisor.timer > /dev/null 2>&1
+    log "Stopping supervisor and related services part 1..."
     systemctl stop balena-supervisor  > /dev/null 2>&1 || systemctl stop resin-supervisor > /dev/null 2>&1
+    log "Stopping supervisor and related services part 2..."
     ${DOCKER_CMD} rm -f balena_supervisor resin_supervisor > /dev/null 2>&1 || true
+    log "Stopping supervisor and related services part 3... return"
 }
 
 function remove_containers() {
@@ -182,12 +198,15 @@ function remove_rec_files() {
 
 #######################################
 # Upgrade the supervisor on the device.
+# Use Public BalenaAPI, to get the available os-image of the given device-type (slug)
+# Use OpenBalenaAPI (self-hosted) to get supervisor-version or device specific information 
 # Extract the supervisor version with which the the target hostOS is shipped,
 # and if it's newer than the supervisor running on the device, then fetch the
 # information that is required for supervisor update, and do the update with
 # the tools shipped with the hostOS.
 # Globals:
-#   API_ENDPOINT
+#   DEVICE_API_ENDPOINT
+#   PUBLIC_API_ENDPOINT
 #   APIKEY
 #   UUID
 #   SLUG
@@ -204,7 +223,7 @@ function upgrade_supervisor() {
     log "Supervisor update start..."
 
     if [ -z "$target_supervisor_version" ]; then
-        log "No explicit supervisor version was provided, update to default version in target balenaOS..."
+        log "Supervisor update: No explicit supervisor version was provided, update to default version in target balenaOS..."
         local DEFAULT_SUPERVISOR_VERSION
         versioncheck_cmd=("run" "--rm" "${image}" "bash" "-c" "cat /etc/*-supervisor/supervisor.conf | sed -rn 's/SUPERVISOR_(TAG|VERSION)=v(.*)/\\2/p'")
         if [ -z "$no_docker_host" ]; then
@@ -213,36 +232,59 @@ function upgrade_supervisor() {
             DEFAULT_SUPERVISOR_VERSION=$(${DOCKER_CMD} "${versioncheck_cmd[@]}")
         fi
         if [ -z "$DEFAULT_SUPERVISOR_VERSION" ]; then
-            log ERROR "Could not get the default supervisor version for this balenaOS release, bailing out."
+            log ERROR "Supervisor update: Could not get the default supervisor version for this balenaOS release, bailing out."
         else
-            log "Extracted default version is v$DEFAULT_SUPERVISOR_VERSION..."
+            log "Supervisor update: Extracted default version is v$DEFAULT_SUPERVISOR_VERSION..."
             target_supervisor_version="$DEFAULT_SUPERVISOR_VERSION"
 
         fi
     fi
-
-    resp=$(CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --header "Authorization: Bearer ${APIKEY}" "${API_ENDPOINT}/v6/device(uuid='${UUID}')?\$select=supervisor_version")
+    log "upgrade_supervisor: $DEVICE_API_ENDPOINT"
+    resp=$(CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --header "Authorization: Bearer ${APIKEY}" "${DEVICE_API_ENDPOINT}/v6/device(uuid='${UUID}')?\$select=supervisor_version")
     if CURRENT_SUPERVISOR_VERSION=$(echo "${resp}" | jq -r '.d[0].supervisor_version'); then
         if [ -z "$CURRENT_SUPERVISOR_VERSION" ]; then
-            log ERROR "Could not get current supervisor version from the API, got ${resp}"
+            log ERROR "Supervisor update: Could not get current supervisor version from the API, got ${resp}"
         else
             if version_gt "$target_supervisor_version" "$CURRENT_SUPERVISOR_VERSION" ; then
                 log "Supervisor update: will be upgrading from v${CURRENT_SUPERVISOR_VERSION} to v${target_supervisor_version}"
                 UPDATER_SUPERVISOR_TAG="v${target_supervisor_version}"
                 # Get the supervisor id
-                resp=$(CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --header "Authorization: Bearer ${APIKEY}" --silent "${API_ENDPOINT}/v5/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'${UPDATER_SUPERVISOR_TAG}'))")
+                resp=$(CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --header "Authorization: Bearer ${APIKEY}" --silent "${PUBLIC_API_ENDPOINT}/v5/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'${UPDATER_SUPERVISOR_TAG}'))")
                 if UPDATER_SUPERVISOR_ID=$(echo "${resp}" | jq -e -r '.d[0].id'); then
                     log "Extracted supervisor vars: ID: $UPDATER_SUPERVISOR_ID"
                     log "Setting supervisor version in the API..."
                     progress 90 "Running supervisor update"
                     stop_services
-                    CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --request PATCH --header "Authorization: Bearer ${APIKEY}" --header 'Content-Type: application/json' "${API_ENDPOINT}/v6/device(uuid='${UUID}')" --data-binary "{\"should_be_managed_by__supervisor_release\": \"${UPDATER_SUPERVISOR_ID}\"}" > /dev/null 2>&1
+
                     log "Running supervisor updater..."
-                    # use a transient unit in order to namespace-collide with a potential API-initiated update
-                    supervisor_update="systemd-run --wait --unit run-update-supervisor $(which update-balena-supervisor || which update-resin-supervisor)"
-                    if version_gt "${HOST_OS_VERSION}" "${minimum_supervisor_stop}"; then
-                        supervisor_update+=' -n'
+
+                    if [ "$OPENBALENA" == "yes" ]; then
+                        # run customized update-balena-supervisor script
+                        supervisor_update="systemd-run --wait --unit run-update-supervisor /tmp/update-balena-supervisor"
+
+	                    if version_gt "${HOST_OS_VERSION}" "${minimum_supervisor_stop}"; then
+                            # get device_type
+                            device_type=$(curl --silent --header "Authorization: Bearer ${APIKEY}" "${DEVICE_API_ENDPOINT}/v6/device" | jq -e -r '.d[0].is_of__device_type | .__id')
+                            log "Supervisor update device_type: $device_type"
+                            # get docker image with right supervisor version
+                            supervisor_docker_image=$(curl --silent --header "Authorization: Bearer ${APIKEY}" --header "User-Agent: --compressed" "${PUBLIC_API_ENDPOINT}/v6/supervisor_release?\$select=id,supervisor_version,image_name,is_for__device_type&\$filter=id%20eq%20${UPDATER_SUPERVISOR_ID}%20and%20is_for__device_type%20eq%20${device_type}"   | jq -e -r '.d[0].image_name')
+                            log "Supervisor update: supervisor_docker_image $supervisor_docker_image"
+
+                            supervisor_update+=" -i ${supervisor_docker_image} -n -v ${target_supervisor_version}"
+                    else
+                        # set supervisor id to devices configuration via api-endpoint
+                        CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --request PATCH --header "Authorization: Bearer ${APIKEY}" --header 'Content-Type: application/json' "${API_ENDPOINT}/v6/device(uuid='${UUID}')" --data-binary "{\"should_be_managed_by__supervisor_release\": \"${UPDATER_SUPERVISOR_ID}\"}" > /dev/null 2>&1
+                        # use a transient unit in order to namespace-collide with a potential API-initiated update
+                        supervisor_update="systemd-run --wait --unit run-update-supervisor $(which update-balena-supervisor || which update-resin-supervisor)"
+                        if version_gt "${HOST_OS_VERSION}" "${minimum_supervisor_stop}"; then
+                            supervisor_update+=' -n'
+                        fi
+
                     fi
+
+
+                    fi
+                    echo "Supervisor update:: $supervisor_update"
                     eval "${supervisor_update}" || log WARN "Supervisor couldn't be updated, continuing anyways"
                     journalctl -a -u run-update-supervisor --no-pager || true
                     if version_gt "6.5.9" "${target_supervisor_version}" ; then
@@ -250,6 +292,8 @@ function upgrade_supervisor() {
                         log "Removing supervisor database for migration"
                         rm /resin-data/resin-supervisor/database.sqlite || true
                     fi
+
+                    log "Supervisor update: finnished"
                 else
                     log ERROR "Couldn't extract supervisor vars, got ${resp}"
                 fi
@@ -261,8 +305,10 @@ function upgrade_supervisor() {
         log WARN "Could not parse current supervisor version from the API, skipping update (got ${resp})..."
     fi
 
+    log "Supervisor update: start persistent_logging_config_var"
     # Post supervisor update fixes
     persistent_logging_config_var
+    log "Supervisor update: supervisor_update returned"
 }
 
 function error_handler() {
@@ -388,7 +434,8 @@ function post_update_jetson_fix {
 # that doesn't validate on newer supervisor versions.
 # Convert into proper false value.
 # Globals:
-#   API_ENDPOINT
+#   PUBLIC_API_ENDPOINT
+#   DEVICE_API_ENDPOINT
 #   APIKEY
 #   CONFIGJSON
 #   UUID
@@ -396,12 +443,14 @@ function post_update_jetson_fix {
 #   None
 #######################################
 function persistent_logging_config_var {
-    PROBLEMATIC_ENV_VAR=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent -X GET "${API_ENDPOINT}/v5/device_config_variable?\$filter=device/uuid%20eq%20'${UUID}'" -H "Content-Type: application/json" -H "Authorization: Bearer ${APIKEY}" | jq -r '.d[] | select((.name == "RESIN_SUPERVISOR_PERSISTENT_LOGGING") and (.value == "")) | .id')
+    log "persistent_logging_config_var"
+    PROBLEMATIC_ENV_VAR=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent -X GET "${DEVICE_API_ENDPOINT}/v6/device_config_variable?\$filter=device/uuid%20eq%20'${UUID}'" -H "Content-Type: application/json" -H "Authorization: Bearer ${APIKEY}" | jq -r '.d[] | select((.name == "RESIN_SUPERVISOR_PERSISTENT_LOGGING") and (.value == "")) | .id')
     if [ -n "${PROBLEMATIC_ENV_VAR}" ]; then
+        echo "CHANGE SOMETHING PROBLEMATIC_ENV_VAR:"
         local tmpfile
         log "Updating problematic RESIN_SUPERVISOR_PERSISTENT_LOGGING config variable"
         CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent -X PATCH \
-            "${API_ENDPOINT}/v5/device_config_variable(${PROBLEMATIC_ENV_VAR})" \
+            "${DEVICE_API_ENDPOINT}/v6/device_config_variable(${PROBLEMATIC_ENV_VAR})" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${APIKEY}" \
             --data '{
@@ -416,6 +465,8 @@ function persistent_logging_config_var {
         mv "$CONFIGJSON.temp" "$CONFIGJSON" || log ERROR "Couldn't move updated config.json onto original."
         sync
     fi
+
+    log "persistent_logging_config_var --EXIT--"
 }
 
 #######################################
@@ -532,6 +583,9 @@ function hostapp_based_update {
     local inactive_used
     local hostapp_image_count
     storage_driver=overlay2
+
+    log "hostapp_based_update"
+
     if [ -f /boot/storage-driver ]; then
         storage_driver=$(cat /boot/storage-driver)
     fi
@@ -564,6 +618,7 @@ function hostapp_based_update {
             balena_migration="yes"
     fi
 
+    log "hostapp_based_update DOCKER_CMD: $DOCKER_CMD"
     if ! [ -S "/var/run/${DOCKER_CMD}-host.sock" ]; then
         ## Happens on devices booting after a regular HUP update onto a hostapps enabled balenaOS
         log "Do not have ${DOCKER_CMD}-host running; legacy mode"
@@ -635,7 +690,7 @@ function hostapp_based_update {
             stop_services
             remove_containers
         fi
-        log "Starting hostapp-update"
+        log "Starting hostapp-update script stored on device"
         hostapp-update -i "${update_package}" && post_update_fixes
     fi
 }
@@ -759,7 +814,7 @@ function find_partitions {
 # Query public apps for a matching image
 # Globals:
 #   APIKEY
-#   API_ENDPOINT
+#   PUBLIC_API_ENDPOINT
 #   SLUG
 #   VARIANT (deprecated)
 # Arguments:
@@ -778,7 +833,7 @@ function get_image_location() {
     image=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent -X GET \
         -H "Content-Type: application/json" \
         -H "Authorization: Bearer ${APIKEY}" \
-        "${API_ENDPOINT}/v6/release?\$select=id&\$expand=contains__image/image&\$filter=(belongs_to__application/any(a:a/is_for__device_type/any(dt:dt/slug%20eq%20'${SLUG}')%20and%20is_host%20eq%20true))%20and%20is_final%20eq%20true%20and%20is_invalidated%20eq%20false%20and%20(release_tag/any(rt:(rt/tag_key%20eq%20'version')%20and%20(rt/value%20eq%20'${version}')))%20and%20((release_tag/any(rt:(rt/tag_key%20eq%20'variant')%20and%20(rt/value%20eq%20'${variant_tag}')))%20or%20not(release_tag/any(rt:rt/tag_key%20eq%20'variant')))" \
+        "${PUBLIC_API_ENDPOINT}/v6/release?\$select=id&\$expand=contains__image/image&\$filter=(belongs_to__application/any(a:a/is_for__device_type/any(dt:dt/slug%20eq%20'${SLUG}')%20and%20is_host%20eq%20true))%20and%20is_final%20eq%20true%20and%20is_invalidated%20eq%20false%20and%20(release_tag/any(rt:(rt/tag_key%20eq%20'version')%20and%20(rt/value%20eq%20'${version}')))%20and%20((release_tag/any(rt:(rt/tag_key%20eq%20'variant')%20and%20(rt/value%20eq%20'${variant_tag}')))%20or%20not(release_tag/any(rt:rt/tag_key%20eq%20'variant')))" \
         | jq -r "[.d[] | .contains__image[0].image[0] | [.is_stored_at__image_location, .content_hash] | \"\(.[0])@\(.[1])\"]")
     if echo "${image}" | jq -e '. | length == 1' > /dev/null; then
         echo "${image}" | jq -r '.[0]'
@@ -792,7 +847,7 @@ function get_image_location() {
 # Get a delta token
 # Globals:
 #   APIKEY
-#   API_ENDPOINT
+#   PUBLIC_API_ENDPOINT
 #   REGISTRY_ENDPOINT
 #   UUID
 # Arguments:
@@ -807,7 +862,7 @@ function get_delta_token() {
     CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent -X GET \
         -u "d_${UUID}:${APIKEY}" \
         -H "Content-Type: application/json" \
-        "${API_ENDPOINT}/auth/v1/token?service=${REGISTRY_ENDPOINT}&scope=repository:${dst}:pull&scope=repository:${src}:pull" \
+        "${PUBLIC_API_ENDPOINT}/auth/v1/token?service=${REGISTRY_ENDPOINT}&scope=repository:${dst}:pull&scope=repository:${src}:pull" \
         | jq -r '.token'
 }
 
@@ -816,6 +871,7 @@ function get_delta_token() {
 # Globals:
 #   APIKEY
 #   DELTA_ENDPOINT
+#   PUBLIC_DELTA_ENDPOINT
 #   DELTA_VERSION
 #   VERSION
 # Arguments:
@@ -834,7 +890,7 @@ function find_delta() {
         # TODO: should we retry this more extensively? deltas may take a while to generate..
         delta_token=$(get_delta_token "${src_image}" "${target_image}")
         delta=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent -X GET \
-            "${DELTA_ENDPOINT}/api/v${DELTA_VERSION}/delta?src=${src_image}&dest=${target_image}" \
+            "${PUBLIC_DELTA_ENDPOINT}/api/v${DELTA_VERSION}/delta?src=${src_image}&dest=${target_image}" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${delta_token}" | jq -r '.name')
         if [ -n "${delta}" ]; then
@@ -871,19 +927,23 @@ function finish_up() {
 
     if [ "${NOREBOOT}" == "no" ]; then
         # Reboot into new OS
-        log "Rebooting into new OS in 5 seconds..."
+        log "Update successful, rebooting into new OS in 5 seconds..."
         progress 100 "Update successful, rebooting"
         systemd-run --on-active=5 --quiet --unit=hup-reboot.service systemctl reboot
         # If the previous reboot command has failed for any reason, let's try differently
-        (sleep 300 && nohup bash -c "reboot --force" > /dev/null 2>&1) &
         # If the previous 2 reboot commands have failed for any reason, try the Magic SysRq
         # enable and send reboot request
-        (sleep 600 && echo 1 > /proc/sys/kernel/sysrq && echo b > /proc/sysrq-trigger) &
+        # (sleep 300 && nohup bash -c "reboot --force" > /dev/null 2>&1) &
+        # (sleep 600 && echo 1 > /proc/sys/kernel/sysrq && echo b > /proc/sysrq-trigger) &
     else
         log "Finished update, not rebooting as requested."
         progress 100 "Update successful"
     fi
+
+    log "remove temp folder..."
     rm -f "${TMPCRT}" > /dev/null 2>&1
+
+    log "Finished update, Exit with 0."
     exit 0
 }
 
@@ -918,19 +978,12 @@ starttime=$(date +%s)
 if [ -d "/mnt/data/resinhup" ] && [ ! -e "/mnt/data/balenahup" ]; then
     ln -s "/mnt/data/resinhup" "/mnt/data/balenahup"
 fi
-# LOGFILE init and header
-LOGFILE="/mnt/data/balenahup/$SCRIPTNAME.$(date +"%Y%m%d_%H%M%S").log"
-mkdir -p "$(dirname "$LOGFILE")"
-echo "================$SCRIPTNAME HEADER START====================" > "$LOGFILE"
-date >> "$LOGFILE"
-# redirect all logs to the logfile, but also stderr to console (proxy)
-exec > >(cat >> "$LOGFILE")
-exec 2> >(tee -a "$LOGFILE" >&2)
+
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     arg="$1"
-
+    echo "argument: $arg"
     case $arg in
         -h|--help)
             help
@@ -966,11 +1019,9 @@ while [[ $# -gt 0 ]]; do
             ;;
         --resinos-repo | --balenaos-repo)
             # no op
-            shift
             ;;
         --resinos-tag | --balenaos-tag)
             # no op
-            shift
             ;;
         --supervisor-version)
             if [ -z "$2" ]; then
@@ -988,6 +1039,15 @@ while [[ $# -gt 0 ]]; do
         --stop-all)
             STOP_ALL="yes"
             ;;
+        --open-balena)
+            OPENBALENA="yes"
+            ;;
+        --no-delta)
+            NODELTA="yes"
+            ;;
+        --verbose)
+            VERBOSE="yes"
+            ;;
         --assume-supported)
             log WARN "The --assume-supported flag is deprecated, and has no effect."
             ;;
@@ -999,9 +1059,22 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Run on start
+log "Check lock"
 _prepare_locking
 # Try to get lock, and exit if cannot, meaning another instance is running already
-exlock_now || exit 9
+exlock_now || ( log "Upgrade locked - Exit" && exit 9)
+
+# LOGFILE init and header
+LOGFILE="/mnt/data/balenahup/$SCRIPTNAME.$(date +"%Y%m%d_%H%M%S").log"
+mkdir -p "$(dirname "$LOGFILE")"
+echo "================$SCRIPTNAME HEADER START====================" > "$LOGFILE"
+date >> "$LOGFILE"
+# redirect all logs to the logfile, but also stderr to console (proxy)
+if [ "$VERBOSE" == "no" ]; then
+    echo "redirect everything to logfile: $LOGFILE"
+    exec > >(cat >> "$LOGFILE")
+    exec 2> >(tee -a "$LOGFILE" >&2)
+fi
 
 if [ -z "$target_version" ]; then
     log ERROR "--hostos-version is required."
@@ -1019,16 +1092,32 @@ if [ -f /mnt/boot/config.json ]; then
 else
     log ERROR "Don't know where config.json is."
 fi
+
+# use public balena-api to get informations about the os-image and update specific informations
+PUBLIC_API_ENDPOINT="https://api.balena-cloud.com"
+PUBLIC_DELTA_ENDPOINT="https://delta.balena-cloud.com"
 # If the user api key exists we use it instead of the deviceApiKey as it means we haven't done the key exchange yet
 APIKEY=$(jq -r '.apiKey // .deviceApiKey' $CONFIGJSON)
 UUID=$(jq -r '.uuid' $CONFIGJSON)
-API_ENDPOINT=$(jq -r '.apiEndpoint' $CONFIGJSON)
+# use the api endpoint from the config.json - file to get device-specific informations from self-hosted balena-api
+DEVICE_API_ENDPOINT=$(jq -r '.apiEndpoint' $CONFIGJSON)
 DELTA_ENDPOINT=$(jq -r '.deltaEndpoint' $CONFIGJSON)
 
+# get the device-type (slug) of the device
+# apikey is ignored by public, only usefull for custom-build-images and self hosted os-image registry
 FETCHED_SLUG=$(CURL_CA_BUNDLE=${TMPCRT} curl -H "Authorization: Bearer ${APIKEY}" --silent --retry 5 \
-"${API_ENDPOINT}/v6/device?\$select=is_of__device_type&\$expand=is_of__device_type(\$select=slug)&\$filter=uuid%20eq%20%27${UUID}%27" 2>/dev/null \
+"${DEVICE_API_ENDPOINT}/v6/device?\$select=is_of__device_type&\$expand=is_of__device_type(\$select=slug)&\$filter=uuid%20eq%20%27${UUID}%27" 2>/dev/null \
 | jq -r '.d[0].is_of__device_type[0].slug'
 )
+
+log "APIKEY=$APIKEY"
+log "UUID=$UUID"
+log "PUBLIC_API_ENDPOINT=$PUBLIC_API_ENDPOINT"
+log "PUBLIC_DELTA_ENDPOINT=$PUBLIC_DELTA_ENDPOINT"
+log "DEVICE_API_ENDPOINT=$DEVICE_API_ENDPOINT"
+log "DELTA_ENDPOINT=$DELTA_ENDPOINT"
+log "FETCHED_SLUG=$FETCHED_SLUG"
+
 
 SLUG=${FORCED_SLUG:-$FETCHED_SLUG}
 HOST_OS_VERSION=${META_BALENA_VERSION:-${VERSION_ID}}
@@ -1085,21 +1174,26 @@ if [ "${SLUG}" = "raspberrypi4-64" ] && \
     fi
 fi
 
+# check if there is an os-image (stored as docker-container) for the given device-type (slug) use public-balena-api for this operation
 target_image=$(get_image_location "${target_version}")
+
 if [ -z "${target_image}" ]; then
     log ERROR "Zero or multiple matching target hostapp releases found, update attempt has failed..."
 fi
 
 # starting with the balena engine, we can use native deltas
-if version_gt "${HOST_OS_VERSION}" "${minimum_balena_target_version}"; then
-    log "Attempting host OS update using deltas"
-    delta_image=$(find_delta "${target_image}")
-else
-    log "Device not delta capable"
+if [ "$NODELTA" == "no" ]; then
+    if version_gt "${HOST_OS_VERSION}" "${minimum_balena_target_version}"; then
+        log "Attempting host OS update using deltas"
+        delta_image=$(find_delta "${target_image}")
+    else
+        log "Device not delta capable"
+    fi
 fi
+
 if [ -n "${delta_image}" ]; then
     delta_size=$(CURL_CA_BUNDLE=${TMPCRT} curl -H "Authorization: Bearer ${APIKEY}" --silent --retry 10 \
-    "${API_ENDPOINT}/v5/delta?\$filter=((status%20eq%20'success')%20and%20(version%20eq%20'${DELTA_VERSION}')%20and%20(is_stored_at__location%20eq%20'${delta_image}'))" 2>/dev/null \
+    "${PUBLIC_API_ENDPOINT}/v6/delta?\$filter=((status%20eq%20'success')%20and%20(version%20eq%20'${DELTA_VERSION}')%20and%20(is_stored_at__location%20eq%20'${delta_image}'))" 2>/dev/null \
     | jq -r '.d[0].size|tonumber / (1024.0 * 1024.0) | floor' 2>/dev/null || /bin/true)
     log "Found delta image: ${delta_image}, size: ${delta_size:-unknown} MB"
 
@@ -1243,6 +1337,7 @@ if version_gt "${HOST_OS_VERSION}" "${minimum_hostapp_target_version}" ||
     DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} login "${REGISTRY_ENDPOINT}" -u "d_${UUID}" \
     --password "${APIKEY}" > /dev/null 2>&1 || log WARN "logging into registry failed, proceeding anyway (only required for private device types)"
     for img in "${images[@]}"; do
+        log "start hostupdate with $img"
         if [ -n "${img}" ] && hostapp_based_update "${img}"; then
             # once we've updated successfully, set our canonical image
             image=${img}
@@ -1261,7 +1356,10 @@ if version_gt "${HOST_OS_VERSION}" "${minimum_hostapp_target_version}" ||
         finish_up "${image}"
     else
         upgrade_supervisor "${image}"
+        log "Supervisor was upgraded!"
         finish_up "${image}"
+
+        log "!!!! After finish_up NEVER SHOULD REACH THIS END !!!!"
     fi
 
 elif version_gt "${target_version}" "${minimum_hostapp_target_version}" ||
