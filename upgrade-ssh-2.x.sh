@@ -10,11 +10,15 @@ FAILED=0
 NUM=0
 QUEUE=""
 MAX_THREADS=5
+OPENBALENA=no
+VERBOSE=no
+
+PUBLIC_BALENAOS_REGISTRY="registry2.balena-cloud.com"
 
 # Help function
 function help {
     cat << EOF
-Wrapper to run host OS updates on fleet of devices over ssh.
+"Wrapper to run host OS updates on fleet of devices over ssh.
 $0 <OPTION>
 
 Options:
@@ -68,6 +72,16 @@ Options:
 
   --no-colors
         Avoid terminal colors.
+
+  --open-balena
+        Allows to upgrade an openBalena device
+
+  --no-delta
+        Ignore delta updates
+
+  --verbose
+        Show log in console, do not redirect in log file
+"
 EOF
 }
 
@@ -152,10 +166,10 @@ function checkqueue {
             local _UUID
             _UUID=$(echo "$entry" | cut -d: -f2)
             if [ "$_exitcode" != "0" ]; then
-                log WARN "Updating $_UUID failed."
+                log WARN "Updating $_UUID failed. Exit Code: $_exitcode"
                 FAILED=1
             else
-                log SUCCESS "Updating $_UUID succeeded."
+                log SUCCESS "Updating $_UUID succeeded. Exit Code: $_exitcode"
             fi
             regeneratequeue
             break
@@ -272,6 +286,18 @@ while [[ $# -gt 0 ]]; do
         --no-colors)
             NOCOLORS=yes
             ;;
+        -o | --open-balena)
+            BALENAHUP_ARGS+=( "--open-balena" )
+            OPENBALENA=yes
+            ;;
+        --no-delta)
+            BALENAHUP_ARGS+=( "--no-delta" )
+            ;;
+        --verbose)
+            BALENAHUP_ARGS+=( "--verbose" )
+            VERBOSE="yes"
+            echo "VERBOSE"
+            ;;
         *)
             log WARN "Unrecognized option $1."
             ;;
@@ -280,14 +306,19 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Check argument(s)
-if [ -z "$UUIDS" ] || [ -z "$SSH_HOST" ]; then
-    log ERROR "No UUID and/or SSH_HOST specified."
+if [ -z "$UUIDS" ]; then
+    log ERROR "No UUID specified."
+fi
+
+if [ -z "$BALENAOS_REGISTRY" ]; then
+    BALENAHUP_ARGS+=( "--balenaos-registry $PUBLIC_BALENAOS_REGISTRY" )
+    log "Use public balena resgistry."
 fi
 
 CURRENT_UPDATE=0
 NR_UPDATES=$(echo "$UUIDS" | wc -w)
 
-# 0 threads means Parallelise everything
+# 0 threads means Parallelise everything 
 if [ "$MAX_THREADS" -eq 0 ]; then
     MAX_THREADS=$NR_UPDATES
 fi
@@ -299,14 +330,35 @@ for uuid in $UUIDS; do
     log "[$CURRENT_UPDATE/$NR_UPDATES] Updating $uuid on $SSH_HOST."
     log_filename="$uuid.upgrade2x.log"
 
-    if ! ssh "$SSH_HOST" host -s "${uuid}" "exit"> /dev/null 2>&1; then
+    if ! ssh "${uuid}.balena" "exit"> /dev/null 2>&1; then
         log WARN "[$CURRENT_UPDATE/$NR_UPDATES] Can't connect to device. Skipping..."
         continue
     fi
+    log "balena args: ${BALENAHUP_ARGS[*]}"
 
     # Connect to device
-    echo "Running ${main_script_name} ${BALENAHUP_ARGS[*]} ..." >> "$log_filename"
-    ssh "$SSH_HOST" host -s "${uuid}" "bash -s" -- "${BALENAHUP_ARGS[@]}"  < "${UPDATE_SCRIPT}" >> "$log_filename" 2>&1 &
+   
+    if [ "$OPENBALENA" == "yes" ]; then
+        log "Upgrade openBalena-device"
+        # Copy new upgrade-supervisor-script to device
+        log "Copy custom upgrade-supervisor-script to device"
+        scp ./update-balena-supervisor.sh "${uuid}.balena:/tmp/update-balena-supervisor" >> "$log_filename" 2>&1
+
+        # Start upgrade script per ssh directly on device
+        log "Running openBalen upgrade ${main_script_name} ${BALENAHUP_ARGS[*]} ..."
+        if [ "$VERBOSE" == "no" ]; then
+            ssh -o "StrictHostKeyChecking no" -o "ControlMaster no" -o "UserKnownHostsFile /dev/null" -o "LogLevel ERROR" "${uuid}.balena" "bash -s" -- "${BALENAHUP_ARGS[@]}"  < "${UPDATE_SCRIPT}" >> "$log_filename" 2>&1 &
+        else
+            ssh -o "StrictHostKeyChecking no" -o "ControlMaster no" -o "UserKnownHostsFile /dev/null" -o "LogLevel ERROR" "${uuid}.balena" "bash -s" -- "${BALENAHUP_ARGS[@]}"  < "${UPDATE_SCRIPT}" &
+        fi
+    else
+        log "Running upgrade ${main_script_name} ${BALENAHUP_ARGS[*]} ..."
+        if [ "$VERBOSE" == "no" ]; then
+            ssh "$SSH_HOST" host -s "${uuid}" "bash -s" -- "${BALENAHUP_ARGS[@]}"  < "${UPDATE_SCRIPT}" >> "$log_filename" 2>&1 &
+        else
+            ssh "$SSH_HOST" host -s "${uuid}" "bash -s" -- "${BALENAHUP_ARGS[@]}"  < "${UPDATE_SCRIPT}" &
+        fi
+    fi
 
     # Manage queue of threads
     PID=$!
@@ -323,6 +375,7 @@ while [ -n "$QUEUE" ]; do
     checkqueue
     sleep 0.5
 done
+
 wait
 
 if [ $FAILED -eq 1 ]; then
