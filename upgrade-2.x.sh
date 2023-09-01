@@ -133,6 +133,7 @@ function log {
             resin-device-progress --percentage "${perc}" --state "${state}"
             ((c++)) && ((c==60)) && break
             sleep 60
+            printf "[%09d%s%s\n" "$((endtime - starttime))" "][$loglevel]" "Trying to set provisioning state to "${state}"" >> /dev/stderr
         done
         exit 1
     else
@@ -181,91 +182,194 @@ function remove_rec_files() {
 }
 
 #######################################
-# Upgrade the supervisor on the device.
-# Extract the supervisor version with which the the target hostOS is shipped,
-# and if it's newer than the supervisor running on the device, then fetch the
-# information that is required for supervisor update, and do the update with
-# the tools shipped with the hostOS.
+# Extract the supervisor version from the provided image if not provided in arguments
+# Arguments:
+#   image: the docker image to extract the version from
+# Globals:
+#  target_supervisor_version: the supervisor version argument
+# Output:
+#   supervisor_version: the supervisor version
+# Returns:
+#   0: Success
+#   Non-zero: Failure
+#######################################
+function _extract_supervisor_version() {
+    local image=$1
+    local supervisor_version
+
+    if [ -n "$target_supervisor_version" ]; then
+        echo "${target_supervisor_version}"
+    else
+        [ -z "${image}" ] && log "Target docker image is required" && return 1
+        log "No explicit supervisor version was provided, update to default version in target balenaOS..."
+        versioncheck_cmd=("run" "--rm" "${image}" "bash" "-c" "cat /etc/*-supervisor/supervisor.conf | sed -rn 's/SUPERVISOR_(TAG|VERSION)=v(.*)/\\2/p'")
+        if [ "${LEGACY_UPDATE}" = "yes" ]; then
+            supervisor_version=$(${DOCKER_CMD} "${versioncheck_cmd[@]}")
+        else
+            supervisor_version=$(DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} "${versioncheck_cmd[@]}")
+        fi
+        if [ -z "$supervisor_version" ]; then
+            log WARN "Could not get the default supervisor version for this balenaOS release, bailing out."
+            # should not get here
+            return 1
+        else
+            log "Extracted default version is v$supervisor_version..."
+            echo "${supervisor_version}"
+        fi
+    fi
+}
+
+#######################################
+# Helper function to run a transient unit to update the supervisor.
+# Returns
+#   0: Success
+#   1: Failure
+#######################################
+function _run_supervisor_update() {
+    local supervisor_update
+    local ret=0
+
+    # use a transient unit in order to namespace-collide with a potential API-initiated update
+    supervisor_update="systemd-run --wait --unit run-update-supervisor $(which update-balena-supervisor || which update-resin-supervisor)"
+    if version_gt "${HOST_OS_VERSION}" "${minimum_supervisor_stop}"; then
+        supervisor_update+=' -n'
+    fi
+    eval "${supervisor_update}" || (log WARN "Supervisor couldn't be updated" && ret=1)
+    journalctl -a -u run-update-supervisor --no-pager || true
+    return ret
+}
+
+function _patch_supervisor_version() {
+    local version=$1
+    local _status_code
+    local UPDATER_SUPERVISOR_TAG
+    local UPDATER_SUPERVISOR_ID
+
+    [ -z "${version}" ] && log "Supervisor version is required" && return 1
+    UPDATER_SUPERVISOR_TAG="v${version}"
+
+    # Get the supervisor id
+    resp=$(CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --header "Authorization: Bearer ${APIKEY}" --silent "${API_ENDPOINT}/v5/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'${UPDATER_SUPERVISOR_TAG}'))")
+    if UPDATER_SUPERVISOR_ID=$(echo "${resp}" | jq -e -r '.d[0].id'); then
+        log "Extracted supervisor vars: ID: $UPDATER_SUPERVISOR_ID"
+        log "Setting supervisor version in the API..."
+
+        _status_code=$(CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --request PATCH --header "Authorization: Bearer ${APIKEY}" --header 'Content-Type: application/json' "${API_ENDPOINT}/v6/device(uuid='${UUID}')" --data-binary "{\"should_be_managed_by__supervisor_release\": \"${UPDATER_SUPERVISOR_ID}\"}" > /dev/null 2>&1)
+        if [[ "${_status_code}" != 2* ]]; then
+            log WARN "Unable to set supervisor version in the API"
+            return 1
+        fi
+    else
+        log WARN "Failed fetching supervisor id from API: ${resp}"
+        return 1
+    fi
+}
+
+#######################################
+# Helper function to patch the target state supervisor version and then
+# run a supervisor update atomically - if it fails the version is reverted.
 # Globals:
 #   API_ENDPOINT
 #   APIKEY
 #   UUID
 #   SLUG
-#   target_supervisor_version
 # Arguments:
-#   image: the docker image to exctract the config from
-#   non_docker_host: empty value will use docker-host, non empty value will use the main docker
-# Returns:
-#   None
+#   target_version: supervisor version to update to
+#   current_version: current supervisor version to revert to
+# Returns
+#   0: Success
+#   1: Failure
 #######################################
-function upgrade_supervisor() {
-    local image=$1
-    local no_docker_host=$2
-    log "Supervisor update start..."
-
-    if [ -z "$target_supervisor_version" ]; then
-        log "No explicit supervisor version was provided, update to default version in target balenaOS..."
-        local DEFAULT_SUPERVISOR_VERSION
-        versioncheck_cmd=("run" "--rm" "${image}" "bash" "-c" "cat /etc/*-supervisor/supervisor.conf | sed -rn 's/SUPERVISOR_(TAG|VERSION)=v(.*)/\\2/p'")
-        if [ -z "$no_docker_host" ]; then
-            DEFAULT_SUPERVISOR_VERSION=$(DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} "${versioncheck_cmd[@]}")
+function _patch_and_update_supervisor() {
+    local target_version="${1}"
+    local current_version="${2}"
+    log "Patchig target state with supervisor version ${target_version}"
+    if _patch_supervisor_version "${target_version}"; then
+        log "Updating supervisor to version ${target_version}"
+        if ! _run_supervisor_update; then
+            if _patch_supervisor_version "${current_version}"; then
+                log "Reverted target state supervisor version to ${current_version}"
+                if ! _run_supervisor_update; then
+                    log WARN "Failed to revert supervisor version"
+                else
+                    log "Reverted supervisor version to ${current_version}"
+                fi
+            else
+                log WARN "Failed to revert target state supervisor version."
+            fi
+            log WARN "Failed to update supervisor version"
         else
-            DEFAULT_SUPERVISOR_VERSION=$(${DOCKER_CMD} "${versioncheck_cmd[@]}")
+            log "Successfully updated supervisor to version ${target_version}"
+            if version_gt "6.5.9" "${target_version}" ; then
+                remove_containers
+                log "Removing supervisor database for migration"
+                rm /resin-data/resin-supervisor/database.sqlite || true
+            fi
         fi
-        if [ -z "$DEFAULT_SUPERVISOR_VERSION" ]; then
-            log ERROR "Could not get the default supervisor version for this balenaOS release, bailing out."
-        else
-            log "Extracted default version is v$DEFAULT_SUPERVISOR_VERSION..."
-            target_supervisor_version="$DEFAULT_SUPERVISOR_VERSION"
-
-        fi
+    else
+        log WARN "Failed to patch supervisor version in target state."
     fi
+}
+
+#######################################
+# Upgrade the supervisor on the device if the provided version is newer than the supervisor running on the device.
+# Globals:
+#   API_ENDPOINT
+#   APIKEY
+#   UUID
+#   SLUG
+# Arguments:
+#   version: supervisor version to update to
+# Returns
+#   0: Success
+#   1: Failure
+#######################################
+function _upgrade_supervisor() {
+    local version=$1
+    local CURRENT_SUPERVISOR_VERSION
+
+    [ -z "${version}" ] && log "Supervisor version is required" && return 1
+    log "Supervisor update start..."
 
     resp=$(CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --header "Authorization: Bearer ${APIKEY}" "${API_ENDPOINT}/v6/device(uuid='${UUID}')?\$select=supervisor_version")
     if CURRENT_SUPERVISOR_VERSION=$(echo "${resp}" | jq -r '.d[0].supervisor_version'); then
         if [ -z "$CURRENT_SUPERVISOR_VERSION" ]; then
-            log ERROR "Could not get current supervisor version from the API, got ${resp}"
+            log WARN "Could not get current supervisor version from the API, got ${resp}"
+            return 1
         else
-            if version_gt "$target_supervisor_version" "$CURRENT_SUPERVISOR_VERSION" ; then
-                log "Supervisor update: will be upgrading from v${CURRENT_SUPERVISOR_VERSION} to v${target_supervisor_version}"
-                UPDATER_SUPERVISOR_TAG="v${target_supervisor_version}"
-                # Get the supervisor id
-                resp=$(CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --header "Authorization: Bearer ${APIKEY}" --silent "${API_ENDPOINT}/v5/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'${UPDATER_SUPERVISOR_TAG}'))")
-                if UPDATER_SUPERVISOR_ID=$(echo "${resp}" | jq -e -r '.d[0].id'); then
-                    log "Extracted supervisor vars: ID: $UPDATER_SUPERVISOR_ID"
-                    log "Setting supervisor version in the API..."
-                    progress 90 "Running supervisor update"
-                    stop_services
-                    _status_code=$(CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --request PATCH --header "Authorization: Bearer ${APIKEY}" --header 'Content-Type: application/json' "${API_ENDPOINT}/v6/device(uuid='${UUID}')" --data-binary "{\"should_be_managed_by__supervisor_release\": \"${UPDATER_SUPERVISOR_ID}\"}" > /dev/null 2>&1)
-                    if [[ "${_status_code}" != 2* ]]; then
-                        log "Unable to set supervisor version in the API"
-                    fi
-                    log "Running supervisor updater..."
-                    # use a transient unit in order to namespace-collide with a potential API-initiated update
-                    supervisor_update="systemd-run --wait --unit run-update-supervisor $(which update-balena-supervisor || which update-resin-supervisor)"
-                    if version_gt "${HOST_OS_VERSION}" "${minimum_supervisor_stop}"; then
-                        supervisor_update+=' -n'
-                    fi
-                    eval "${supervisor_update}" || log WARN "Supervisor couldn't be updated, continuing anyways"
-                    journalctl -a -u run-update-supervisor --no-pager || true
-                    if version_gt "6.5.9" "${target_supervisor_version}" ; then
-                        remove_containers
-                        log "Removing supervisor database for migration"
-                        rm /resin-data/resin-supervisor/database.sqlite || true
-                    fi
-                else
-                    log ERROR "Couldn't extract supervisor vars, got ${resp}"
-                fi
+            if version_gt "$version" "$CURRENT_SUPERVISOR_VERSION" ; then
+                log "Supervisor update: will be upgrading from v${CURRENT_SUPERVISOR_VERSION} to v${version}"
+                stop_services
+                log "Running supervisor updater..."
+                _patch_and_update_supervisor "${version}" "${CURRENT_SUPERVISOR_VERSION}" || return 1
             else
                 log "Supervisor update: no update needed."
             fi
         fi
     else
         log WARN "Could not parse current supervisor version from the API, skipping update (got ${resp})..."
+        return 1
     fi
 
     # Post supervisor update fixes
     persistent_logging_config_var
+}
+
+#######################################
+# Upgrade the supervisor on the device.
+# Arguments:
+#   image: Target docker image to extract the supervisor version from
+# Returns
+#   0: Success
+#   1: Failure
+#######################################
+function update_supervisor() {
+    local image="$1"
+    local supervisor_version
+    supervisor_version=$(_extract_supervisor_version "${image}")
+    [ -z "${supervisor_version}" ] && log "Target supervisor version is required" && return 1
+    progress 30 "Running supervisor update"
+    _upgrade_supervisor "${supervisor_version}" || return 1
 }
 
 function error_handler() {
@@ -1248,6 +1352,7 @@ if version_gt "${HOST_OS_VERSION}" "${minimum_hostapp_target_version}" ||
     [ "${HOST_OS_VERSION}" == "${minimum_hostapp_target_version}" ]; then
     log "hostapp-update command exists, use that for update"
     progress 50 "Running OS update"
+
     images=("${delta_image}" "${target_image}")
     # record the "source" of each image in the array above for clarity during fallback
     image_types=("delta" "balena_registry")
@@ -1256,36 +1361,39 @@ if version_gt "${HOST_OS_VERSION}" "${minimum_hostapp_target_version}" ||
     DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} login "${REGISTRY_ENDPOINT}" -u "d_${UUID}" \
     --password "${APIKEY}" > /dev/null 2>&1 || log WARN "logging into registry failed, proceeding anyway (only required for private device types)"
     for img in "${images[@]}"; do
-        if [ -n "${img}" ] && hostapp_based_update "${img}"; then
-            # once we've updated successfully, set our canonical image
-            image=${img}
-            break
+        if update_supervisor "${img}"; then
+            if [ -n "${img}" ] && hostapp_based_update "${img}"; then
+                finish_up "${img}"
+                # should not reach here
+                exit 0
+            else
+                log "Image type ${image_types[${update_failed}]}, location '${img}' failed or not found, trying another source"
+            fi
         else
-            log "Image type ${image_types[${update_failed}]}, location '${img}' failed or not found, trying another source"
-            update_failed=$(( update_failed + 1 ))
+            log "Image type ${image_types[${update_failed}]}, location '${img}' supervisor update failed, trying another source"
         fi
+        update_failed=$(( update_failed + 1 ))
     done
-    if [ -z "${image}" ]; then
-        log ERROR "all hostapp-update attempts have failed..."
-    fi
-
-    if [ "${LEGACY_UPDATE}" = "yes" ]; then
-        upgrade_supervisor "${image}" no_docker_host
-        finish_up "${image}"
-    else
-        upgrade_supervisor "${image}"
-        finish_up "${image}"
-    fi
+    _patch_and_update_supervisor "${CURRENT_SUPERVISOR_VERSION}" "${CURRENT_SUPERVISOR_VERSION}" && \
+        log "Reverted supervisor version to ${CURRENT_SUPERVISOR_VERSION}"
+    log ERROR "all hostapp-update attempts have failed..."
 
 elif version_gt "${target_version}" "${minimum_hostapp_target_version}" ||
      [ "${target_version}" == "${minimum_hostapp_target_version}" ]; then
     image="${target_image}"
     log "Running update from a non-hostapp-update enabled version to a hostapp-update enabled version..."
     progress 50 "Running OS update"
-    non_hostapp_to_hostapp_update "${image}"
-
-    upgrade_supervisor "${image}" no_docker_host
-    finish_up "${image}"
+    if update_supervisor "${image}"; then
+        if non_hostapp_to_hostapp_update "${image}"; then
+            finish_up "${image}"
+        else
+            _patch_and_update_supervisor "${CURRENT_SUPERVISOR_VERSION}" "${CURRENT_SUPERVISOR_VERSION}" && \
+                log "Reverted supervisor version to ${CURRENT_SUPERVISOR_VERSION}"
+            log ERROR "Failed to update hostapp - bail out."
+        fi
+    else
+        log ERROR "Failed updating supervisor - bailing out."
+    fi
 fi
 
 ### Below here is the regular, non-hostapp balenaOS host update
@@ -1305,11 +1413,11 @@ fi
 trap 'error_handler' ERR
 
 log "Getting new OS image..."
-progress 50 "Downloading OS update"
+progress 40 "Downloading OS update"
 # Create container for new version
 container=$(${DOCKER_CMD} create "${target_image}" echo export)
 
-progress 75 "Running OS update"
+progress 50 "Running OS update"
 
 log "Making new OS filesystem..."
 # Format alternate root partition
@@ -1353,7 +1461,7 @@ cp -a /tmp/resin-boot/* /mnt/boot/
 ${DOCKER_CMD} rm "$container"
 
 # Updating supervisor
-upgrade_supervisor "${target_image}" no_docker_host
+update_supervisor "${target_image}" || log ERROR "Failed to update supervisor from ${target_image}"
 
 # Remove resin-sample to plug security hole
 remove_sample_wifi "/mnt/boot/system-connections/resin-sample"
