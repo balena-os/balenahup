@@ -293,7 +293,7 @@ function remove_sample_wifi {
 function pre_update_pi_bootfiles_removal {
     local boot_files_for_removal=('start_db.elf' 'fixup_db.dat')
     for f in "${boot_files_for_removal[@]}"; do
-        echo "Removing $f from boot partition"
+        log "Removing $f from boot partition"
         rm -f "/mnt/boot/$f"
     done
     sync /mnt/boot
