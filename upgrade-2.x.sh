@@ -108,6 +108,18 @@ Options:
 EOF
 }
 
+function report_update_failed() {
+    perc=100
+    state="OS update failed"
+    while ! compare_device_state "${perc}" "${state}"; do
+        ((c++)) && ((c==60)) && break
+        if resin-device-progress --percentage "${perc}" --state "${state}"; then
+            continue
+        fi
+        sleep 60
+    done
+}
+
 # Log function helper
 function log {
     # Address log levels
@@ -127,13 +139,7 @@ function log {
     endtime=$(date +%s)
     if [ "$loglevel" == "ERROR" ]; then
         printf "[%09d%s%s\n" "$((endtime - starttime))" "][$loglevel]" "$1" >> /dev/stderr
-        perc=100
-        state="OS update failed"
-        while ! compare_device_state "${perc}" "${state}"; do
-            resin-device-progress --percentage "${perc}" --state "${state}"
-            ((c++)) && ((c==60)) && break
-            sleep 60
-        done
+        report_update_failed
         exit 1
     else
         printf "[%09d%s%s\n" "$((endtime - starttime))" "][$loglevel]" "$1"
@@ -993,6 +999,25 @@ mkdir -p "$(dirname "$LOGFILE")"
 echo "================$SCRIPTNAME HEADER START====================" > "$LOGFILE"
 date >> "$LOGFILE"
 
+log "Loading info from config.json"
+if [ -f /mnt/boot/config.json ]; then
+    CONFIGJSON=/mnt/boot/config.json
+else
+    log "Don't know where config.json is." && exit 1
+fi
+# If the user api key exists we use it instead of the deviceApiKey as it means we haven't done the key exchange yet
+APIKEY=$(jq -r '.apiKey // .deviceApiKey' $CONFIGJSON)
+UUID=$(jq -r '.uuid' $CONFIGJSON)
+API_ENDPOINT=$(jq -r '.apiEndpoint' $CONFIGJSON)
+DELTA_ENDPOINT=$(jq -r '.deltaEndpoint' $CONFIGJSON)
+
+[ -z "${APIKEY}" ] && log "Error parsing config.json" && exit 1
+[ -z "${UUID}" ] && log "Error parsing config.json" && exit 1
+[ -z "${API_ENDPOINT}" ] && log "Error parsing config.json" && exit 1
+[ -z "${DELTA_ENDPOINT}" ] && log "Error parsing config.json" && exit 1
+
+trap 'report_update_failed;exit 1' ERR INT TERM
+
 # redirect all logs to the logfile, but also stderr to console (proxy)
 outfifo=$(mktemp -u)
 errfifo=$(mktemp -u)
@@ -1090,17 +1115,6 @@ fi
 
 progress 25 "Preparing OS update"
 
-log "Loading info from config.json"
-if [ -f /mnt/boot/config.json ]; then
-    CONFIGJSON=/mnt/boot/config.json
-else
-    log ERROR "Don't know where config.json is."
-fi
-# If the user api key exists we use it instead of the deviceApiKey as it means we haven't done the key exchange yet
-APIKEY=$(jq -r '.apiKey // .deviceApiKey' $CONFIGJSON)
-UUID=$(jq -r '.uuid' $CONFIGJSON)
-API_ENDPOINT=$(jq -r '.apiEndpoint' $CONFIGJSON)
-DELTA_ENDPOINT=$(jq -r '.deltaEndpoint' $CONFIGJSON)
 
 FETCHED_SLUG=$(CURL_CA_BUNDLE=${TMPCRT} curl -H "Authorization: Bearer ${APIKEY}" --silent --retry 5 \
 "${API_ENDPOINT}/v6/device?\$select=is_of__device_type&\$expand=is_of__device_type(\$select=slug)&\$filter=uuid%20eq%20%27${UUID}%27" 2>/dev/null \
