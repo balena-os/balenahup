@@ -1075,8 +1075,6 @@ else
     log ERROR "No target OS version specified."
 fi
 
-log "OS variant: ${HOST_OS_VERSION}"
-
 # Check host OS version
 case $VERSION in
     [2-9].*|2[0-9][0-9][0-9].*.*)
