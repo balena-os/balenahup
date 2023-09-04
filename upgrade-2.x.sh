@@ -181,6 +181,75 @@ function remove_rec_files() {
 }
 
 #######################################
+# Helper function to run a transient unit to update the supervisor.
+# Returns
+#   0: Success
+#   1: Failure
+#######################################
+function _run_supervisor_update() {
+    local supervisor_update
+    local ret=0
+
+    # use a transient unit in order to namespace-collide with a potential API-initiated update
+    supervisor_update="systemd-run --wait --unit run-update-supervisor $(which update-balena-supervisor || which update-resin-supervisor)"
+    if version_gt "${HOST_OS_VERSION}" "${minimum_supervisor_stop}"; then
+        supervisor_update+=' -n'
+    fi
+    eval "${supervisor_update}" || (log WARN "Supervisor couldn't be updated" && ret=1)
+    journalctl -a -u run-update-supervisor --no-pager || true
+    return "${ret}"
+}
+
+#######################################
+# Helper function to patch the supervisor version in the target state.
+# Globals:
+#   API_ENDPOINT
+#   APIKEY
+#   UUID
+#   SLUG
+# Arguments:
+#   version: supervisor version to update the target state to
+# Returns
+#   0: Success
+#   1: Failure
+#######################################
+function _patch_supervisor_version() {
+    local version=$1
+    local _status_code
+    local _errfile
+    local _outfile
+    local UPDATER_SUPERVISOR_TAG
+    local UPDATER_SUPERVISOR_ID
+
+    [ -z "${version}" ] && log "Supervisor version is required" && return 1
+    UPDATER_SUPERVISOR_TAG="v${version}"
+
+    # Get the supervisor id
+    resp=$(CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --header "Authorization: Bearer ${APIKEY}" --silent "${API_ENDPOINT}/v5/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'${UPDATER_SUPERVISOR_TAG}'))")
+    if UPDATER_SUPERVISOR_ID=$(echo "${resp}" | jq -e -r '.d[0].id'); then
+        log "Extracted supervisor vars: ID: $UPDATER_SUPERVISOR_ID"
+        log "Setting supervisor version in the API..."
+
+        _errfile=$(mktemp)
+        _outfile=$(mktemp)
+        if _status_code=$(CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --request PATCH -w "%{http_code}" --show-error -o "${_outfile}" --header "Authorization: Bearer ${APIKEY}" --header 'Content-Type: application/json' "${API_ENDPOINT}/v6/device(uuid='${UUID}')" --data-binary "{\"should_be_managed_by__supervisor_release\": \"${UPDATER_SUPERVISOR_ID}\"}" 2> "${_errfile}"); then
+            rm -f "${_errfile}"
+            case "${_status_code}" in
+                2*) log "Successfully set supervision version in target state";rm -f "${_outfile}";return 0;;
+                *) log WARN "[${_status_code}]: Request failed: $(cat ${_outfile})";return 1;;
+            esac
+        else
+            log WARN "$(cat "${_errfile}")"
+            rm -f "${_errfile}"
+            return 1
+        fi
+    else
+        log WARN "Failed fetching supervisor id from API: ${resp}"
+        return 1
+    fi
+}
+
+#######################################
 # Upgrade the supervisor on the device.
 # Extract the supervisor version with which the the target hostOS is shipped,
 # and if it's newer than the supervisor running on the device, then fetch the
@@ -228,37 +297,27 @@ function upgrade_supervisor() {
         else
             if version_gt "$target_supervisor_version" "$CURRENT_SUPERVISOR_VERSION" ; then
                 log "Supervisor update: will be upgrading from v${CURRENT_SUPERVISOR_VERSION} to v${target_supervisor_version}"
-                UPDATER_SUPERVISOR_TAG="v${target_supervisor_version}"
-                # Get the supervisor id
-                resp=$(CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --header "Authorization: Bearer ${APIKEY}" --silent "${API_ENDPOINT}/v5/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'${UPDATER_SUPERVISOR_TAG}'))")
-                if UPDATER_SUPERVISOR_ID=$(echo "${resp}" | jq -e -r '.d[0].id'); then
-                    log "Extracted supervisor vars: ID: $UPDATER_SUPERVISOR_ID"
-                    log "Setting supervisor version in the API..."
-                    progress 90 "Running supervisor update"
-                    stop_services
-                    CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --request PATCH --header "Authorization: Bearer ${APIKEY}" --header 'Content-Type: application/json' "${API_ENDPOINT}/v6/device(uuid='${UUID}')" --data-binary "{\"should_be_managed_by__supervisor_release\": \"${UPDATER_SUPERVISOR_ID}\"}" > /dev/null 2>&1
-                    log "Running supervisor updater..."
-                    # use a transient unit in order to namespace-collide with a potential API-initiated update
-                    supervisor_update="systemd-run --wait --unit run-update-supervisor $(which update-balena-supervisor || which update-resin-supervisor)"
-                    if version_gt "${HOST_OS_VERSION}" "${minimum_supervisor_stop}"; then
-                        supervisor_update+=' -n'
-                    fi
-                    eval "${supervisor_update}" || log WARN "Supervisor couldn't be updated, continuing anyways"
-                    journalctl -a -u run-update-supervisor --no-pager || true
-                    if version_gt "6.5.9" "${target_supervisor_version}" ; then
-                        remove_containers
-                        log "Removing supervisor database for migration"
-                        rm /resin-data/resin-supervisor/database.sqlite || true
+                progress 90 "Running supervisor update"
+                if _patch_supervisor_version "$target_supervisor_version"; then
+                    # No need to stop services as supervisor update will do that for us
+                    if _run_supervisor_update; then
+                        if version_gt "6.5.9" "${target_supervisor_version}" ; then
+                            remove_containers
+                            log "Removing supervisor database for migration"
+                            rm /resin-data/resin-supervisor/database.sqlite || true
+                        fi
+                    else
+                        log WARN "Failed to update supervisor to target state version - leave to first boot."
                     fi
                 else
-                    log ERROR "Couldn't extract supervisor vars, got ${resp}"
+                    log ERROR "Failed to patch supervisor version in target state, bailing out."
                 fi
             else
                 log "Supervisor update: no update needed."
             fi
         fi
     else
-        log WARN "Could not parse current supervisor version from the API, skipping update (got ${resp})..."
+        log ERROR "Could not parse current supervisor version from the API (got ${resp})..."
     fi
 
     # Post supervisor update fixes
