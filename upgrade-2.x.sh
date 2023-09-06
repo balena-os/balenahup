@@ -154,9 +154,18 @@ function version_gt() {
 function compare_device_state() {
     perc=$1
     state=$2
+    local resp
+    local remote_perc
+    local remote_state
     resp=$(CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --header "Authorization: Bearer ${APIKEY}" \
         "${API_ENDPOINT}/v6/device(uuid='${UUID}')?\$select=provisioning_state,provisioning_progress" | jq '.d[]')
-    test "${perc}" -eq "$(echo "${resp}" | jq -r '.provisioning_progress')" && test "${state}" = "$(echo "${resp}" | jq -r '.provisioning_state')"
+    remote_perc=$(echo "${resp}" | jq -r '.provisioning_progress')
+    remote_state=$(echo "${resp}" | jq -r '.provisioning_state')
+    if [ -n "${remote_perc}" ] && [ -n "${remote_state}" ]; then
+        test "${perc}" -eq "${remote_perc}" && test "${state}" = "${remote_state}"
+    else
+        return 1
+    fi
 }
 
 function stop_services() {
