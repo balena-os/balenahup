@@ -39,7 +39,7 @@ LOCKFILE="/var/lock/resinhup.lock"
 LOCKFD=99
 ## Private functions
 _lock()             { flock "-$1" $LOCKFD; }
-_no_more_locking()  { _lock u; _lock xn && rm -f $LOCKFILE; }
+_no_more_locking()  { _lock u; _lock xn && rm -f $LOCKFILE;rm -f "${outfifo}";rm -f "${errfifo}"; }
 _prepare_locking()  { eval "exec $LOCKFD>\"$LOCKFILE\""; trap _no_more_locking EXIT; }
 # Public functions
 exlock_now()        { _lock xn; }  # obtain an exclusive lock immediately or fail
@@ -992,9 +992,17 @@ LOGFILE="/mnt/data/balenahup/$SCRIPTNAME.$(date +"%Y%m%d_%H%M%S").log"
 mkdir -p "$(dirname "$LOGFILE")"
 echo "================$SCRIPTNAME HEADER START====================" > "$LOGFILE"
 date >> "$LOGFILE"
+
 # redirect all logs to the logfile, but also stderr to console (proxy)
-exec > >(cat >> "$LOGFILE")
-exec 2> >(tee -a "$LOGFILE" >&2)
+outfifo=$(mktemp -u)
+errfifo=$(mktemp -u)
+mkfifo "${outfifo}" "${errfifo}"
+# Read from the stdout FIFO and append to LOGFILE
+cat "${outfifo}" >> "${LOGFILE}" &
+# Read from the stderr FIFO, append to LOGFILE, and also display to terminal's stderr
+tee -a "${LOGFILE}" < "${errfifo}" >&2 &
+# Redirect script's stdout and stderr to the respective FIFOs
+exec >"${outfifo}" 2>"${errfifo}"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
