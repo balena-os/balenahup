@@ -39,7 +39,7 @@ LOCKFILE="/var/lock/resinhup.lock"
 LOCKFD=99
 ## Private functions
 _lock()             { flock "-$1" $LOCKFD; }
-_no_more_locking()  { _lock u; _lock xn && rm -f $LOCKFILE; }
+_no_more_locking()  { _lock u; _lock xn && rm -f $LOCKFILE;rm -f "${outfifo}";rm -f "${errfifo}"; }
 _prepare_locking()  { eval "exec $LOCKFD>\"$LOCKFILE\""; trap _no_more_locking EXIT; }
 # Public functions
 exlock_now()        { _lock xn; }  # obtain an exclusive lock immediately or fail
@@ -108,6 +108,18 @@ Options:
 EOF
 }
 
+function report_update_failed() {
+    perc=100
+    state="OS update failed"
+    while ! compare_device_state "${perc}" "${state}"; do
+        ((c++)) && ((c==60)) && break
+        if resin-device-progress --percentage "${perc}" --state "${state}"; then
+            continue
+        fi
+        sleep 60
+    done
+}
+
 # Log function helper
 function log {
     # Address log levels
@@ -127,13 +139,7 @@ function log {
     endtime=$(date +%s)
     if [ "$loglevel" == "ERROR" ]; then
         printf "[%09d%s%s\n" "$((endtime - starttime))" "][$loglevel]" "$1" >> /dev/stderr
-        perc=100
-        state="OS update failed"
-        while ! compare_device_state "${perc}" "${state}"; do
-            resin-device-progress --percentage "${perc}" --state "${state}"
-            ((c++)) && ((c==60)) && break
-            sleep 60
-        done
+        report_update_failed
         exit 1
     else
         printf "[%09d%s%s\n" "$((endtime - starttime))" "][$loglevel]" "$1"
@@ -148,9 +154,18 @@ function version_gt() {
 function compare_device_state() {
     perc=$1
     state=$2
+    local resp
+    local remote_perc
+    local remote_state
     resp=$(CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --header "Authorization: Bearer ${APIKEY}" \
         "${API_ENDPOINT}/v6/device(uuid='${UUID}')?\$select=provisioning_state,provisioning_progress" | jq '.d[]')
-    test "${perc}" -eq "$(echo "${resp}" | jq -r '.provisioning_progress')" && test "${state}" = "$(echo "${resp}" | jq -r '.provisioning_state')"
+    remote_perc=$(echo "${resp}" | jq -r '.provisioning_progress')
+    remote_state=$(echo "${resp}" | jq -r '.provisioning_state')
+    if [ -n "${remote_perc}" ] && [ -n "${remote_state}" ]; then
+        test "${perc}" -eq "${remote_perc}" && test "${state}" = "${remote_state}"
+    else
+        return 1
+    fi
 }
 
 function stop_services() {
@@ -178,6 +193,75 @@ function remove_rec_files() {
         rm -f $f
     done
     sync ${boot_dir}
+}
+
+#######################################
+# Helper function to run a transient unit to update the supervisor.
+# Returns
+#   0: Success
+#   1: Failure
+#######################################
+function _run_supervisor_update() {
+    local supervisor_update
+    local ret=0
+
+    # use a transient unit in order to namespace-collide with a potential API-initiated update
+    supervisor_update="systemd-run --wait --unit run-update-supervisor $(which update-balena-supervisor || which update-resin-supervisor)"
+    if version_gt "${HOST_OS_VERSION}" "${minimum_supervisor_stop}"; then
+        supervisor_update+=' -n'
+    fi
+    eval "${supervisor_update}" || (log WARN "Supervisor couldn't be updated" && ret=1)
+    journalctl -a -u run-update-supervisor --no-pager || true
+    return "${ret}"
+}
+
+#######################################
+# Helper function to patch the supervisor version in the target state.
+# Globals:
+#   API_ENDPOINT
+#   APIKEY
+#   UUID
+#   SLUG
+# Arguments:
+#   version: supervisor version to update the target state to
+# Returns
+#   0: Success
+#   1: Failure
+#######################################
+function _patch_supervisor_version() {
+    local version=$1
+    local _status_code
+    local _errfile
+    local _outfile
+    local UPDATER_SUPERVISOR_TAG
+    local UPDATER_SUPERVISOR_ID
+
+    [ -z "${version}" ] && log "Supervisor version is required" && return 1
+    UPDATER_SUPERVISOR_TAG="v${version}"
+
+    # Get the supervisor id
+    resp=$(CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --header "Authorization: Bearer ${APIKEY}" --silent "${API_ENDPOINT}/v5/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'${UPDATER_SUPERVISOR_TAG}'))")
+    if UPDATER_SUPERVISOR_ID=$(echo "${resp}" | jq -e -r '.d[0].id'); then
+        log "Extracted supervisor vars: ID: $UPDATER_SUPERVISOR_ID"
+        log "Setting supervisor version in the API..."
+
+        _errfile=$(mktemp)
+        _outfile=$(mktemp)
+        if _status_code=$(CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --request PATCH -w "%{http_code}" --show-error -o "${_outfile}" --header "Authorization: Bearer ${APIKEY}" --header 'Content-Type: application/json' "${API_ENDPOINT}/v6/device(uuid='${UUID}')" --data-binary "{\"should_be_managed_by__supervisor_release\": \"${UPDATER_SUPERVISOR_ID}\"}" 2> "${_errfile}"); then
+            rm -f "${_errfile}"
+            case "${_status_code}" in
+                2*) log "Successfully set supervision version in target state";rm -f "${_outfile}";return 0;;
+                *) log WARN "[${_status_code}]: Request failed: $(cat ${_outfile})";return 1;;
+            esac
+        else
+            log WARN "$(cat "${_errfile}")"
+            rm -f "${_errfile}"
+            return 1
+        fi
+    else
+        log WARN "Failed fetching supervisor id from API: ${resp}"
+        return 1
+    fi
 }
 
 #######################################
@@ -228,37 +312,27 @@ function upgrade_supervisor() {
         else
             if version_gt "$target_supervisor_version" "$CURRENT_SUPERVISOR_VERSION" ; then
                 log "Supervisor update: will be upgrading from v${CURRENT_SUPERVISOR_VERSION} to v${target_supervisor_version}"
-                UPDATER_SUPERVISOR_TAG="v${target_supervisor_version}"
-                # Get the supervisor id
-                resp=$(CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --header "Authorization: Bearer ${APIKEY}" --silent "${API_ENDPOINT}/v5/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'${UPDATER_SUPERVISOR_TAG}'))")
-                if UPDATER_SUPERVISOR_ID=$(echo "${resp}" | jq -e -r '.d[0].id'); then
-                    log "Extracted supervisor vars: ID: $UPDATER_SUPERVISOR_ID"
-                    log "Setting supervisor version in the API..."
-                    progress 90 "Running supervisor update"
-                    stop_services
-                    CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --request PATCH --header "Authorization: Bearer ${APIKEY}" --header 'Content-Type: application/json' "${API_ENDPOINT}/v6/device(uuid='${UUID}')" --data-binary "{\"should_be_managed_by__supervisor_release\": \"${UPDATER_SUPERVISOR_ID}\"}" > /dev/null 2>&1
-                    log "Running supervisor updater..."
-                    # use a transient unit in order to namespace-collide with a potential API-initiated update
-                    supervisor_update="systemd-run --wait --unit run-update-supervisor $(which update-balena-supervisor || which update-resin-supervisor)"
-                    if version_gt "${HOST_OS_VERSION}" "${minimum_supervisor_stop}"; then
-                        supervisor_update+=' -n'
-                    fi
-                    eval "${supervisor_update}" || log WARN "Supervisor couldn't be updated, continuing anyways"
-                    journalctl -a -u run-update-supervisor --no-pager || true
-                    if version_gt "6.5.9" "${target_supervisor_version}" ; then
-                        remove_containers
-                        log "Removing supervisor database for migration"
-                        rm /resin-data/resin-supervisor/database.sqlite || true
+                progress 90 "Running supervisor update"
+                if _patch_supervisor_version "$target_supervisor_version"; then
+                    # No need to stop services as supervisor update will do that for us
+                    if _run_supervisor_update; then
+                        if version_gt "6.5.9" "${target_supervisor_version}" ; then
+                            remove_containers
+                            log "Removing supervisor database for migration"
+                            rm /resin-data/resin-supervisor/database.sqlite || true
+                        fi
+                    else
+                        log WARN "Failed to update supervisor to target state version - leave to first boot."
                     fi
                 else
-                    log ERROR "Couldn't extract supervisor vars, got ${resp}"
+                    log ERROR "Failed to patch supervisor version in target state, bailing out."
                 fi
             else
                 log "Supervisor update: no update needed."
             fi
         fi
     else
-        log WARN "Could not parse current supervisor version from the API, skipping update (got ${resp})..."
+        log ERROR "Could not parse current supervisor version from the API (got ${resp})..."
     fi
 
     # Post supervisor update fixes
@@ -293,7 +367,7 @@ function remove_sample_wifi {
 function pre_update_pi_bootfiles_removal {
     local boot_files_for_removal=('start_db.elf' 'fixup_db.dat')
     for f in "${boot_files_for_removal[@]}"; do
-        echo "Removing $f from boot partition"
+        log "Removing $f from boot partition"
         rm -f "/mnt/boot/$f"
     done
     sync /mnt/boot
@@ -778,13 +852,23 @@ function get_image_location() {
     image=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent -X GET \
         -H "Content-Type: application/json" \
         -H "Authorization: Bearer ${APIKEY}" \
-        "${API_ENDPOINT}/v6/release?\$select=id&\$expand=contains__image/image&\$filter=(belongs_to__application/any(a:a/is_for__device_type/any(dt:dt/slug%20eq%20'${SLUG}')%20and%20is_host%20eq%20true))%20and%20is_final%20eq%20true%20and%20is_invalidated%20eq%20false%20and%20(release_tag/any(rt:(rt/tag_key%20eq%20'version')%20and%20(rt/value%20eq%20'${version}')))%20and%20((release_tag/any(rt:(rt/tag_key%20eq%20'variant')%20and%20(rt/value%20eq%20'${variant_tag}')))%20or%20not(release_tag/any(rt:rt/tag_key%20eq%20'variant')))" \
+        "${API_ENDPOINT}/v6/release?\$select=id&\$expand=contains__image/image&\$filter=(belongs_to__application/any(a:a/is_for__device_type/any(dt:dt/slug%20eq%20'${SLUG}')%20and%20is_host%20eq%20true))%20and%20is_invalidated%20eq%20false%20and%20raw_version%20eq%20'${version}'" \
         | jq -r "[.d[] | .contains__image[0].image[0] | [.is_stored_at__image_location, .content_hash] | \"\(.[0])@\(.[1])\"]")
     if echo "${image}" | jq -e '. | length == 1' > /dev/null; then
         echo "${image}" | jq -r '.[0]'
     else
-        # we should only get one result, something is wrong
-        echo
+        # Try with version and variant labels for backwards compatibility
+        image=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent -X GET \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${APIKEY}" \
+            "${API_ENDPOINT}/v6/release?\$select=id&\$expand=contains__image/image&\$filter=(belongs_to__application/any(a:a/is_for__device_type/any(dt:dt/slug%20eq%20'${SLUG}')%20and%20is_host%20eq%20true))%20and%20is_invalidated%20eq%20false%20and%20(release_tag/any(rt:(rt/tag_key%20eq%20'version')%20and%20(rt/value%20eq%20'${version}')))%20and%20((release_tag/any(rt:(rt/tag_key%20eq%20'variant')%20and%20(rt/value%20eq%20'${variant_tag}')))%20or%20not(release_tag/any(rt:rt/tag_key%20eq%20'variant')))" \
+            | jq -r "[.d[] | .contains__image[0].image[0] | [.is_stored_at__image_location, .content_hash] | \"\(.[0])@\(.[1])\"]")
+        if echo "${image}" | jq -e '. | length == 1' > /dev/null; then
+            echo "${image}" | jq -r '.[0]'
+        else
+            # we should only get one result, something is wrong
+            echo
+        fi
     fi
 }
 
@@ -923,9 +1007,36 @@ LOGFILE="/mnt/data/balenahup/$SCRIPTNAME.$(date +"%Y%m%d_%H%M%S").log"
 mkdir -p "$(dirname "$LOGFILE")"
 echo "================$SCRIPTNAME HEADER START====================" > "$LOGFILE"
 date >> "$LOGFILE"
+
+log "Loading info from config.json"
+if [ -f /mnt/boot/config.json ]; then
+    CONFIGJSON=/mnt/boot/config.json
+else
+    log "Don't know where config.json is." && exit 1
+fi
+# If the user api key exists we use it instead of the deviceApiKey as it means we haven't done the key exchange yet
+APIKEY=$(jq -r '.apiKey // .deviceApiKey' $CONFIGJSON)
+UUID=$(jq -r '.uuid' $CONFIGJSON)
+API_ENDPOINT=$(jq -r '.apiEndpoint' $CONFIGJSON)
+DELTA_ENDPOINT=$(jq -r '.deltaEndpoint' $CONFIGJSON)
+
+[ -z "${APIKEY}" ] && log "Error parsing config.json" && exit 1
+[ -z "${UUID}" ] && log "Error parsing config.json" && exit 1
+[ -z "${API_ENDPOINT}" ] && log "Error parsing config.json" && exit 1
+[ -z "${DELTA_ENDPOINT}" ] && log "Error parsing config.json" && exit 1
+
+trap 'report_update_failed;exit 1' ERR INT TERM
+
 # redirect all logs to the logfile, but also stderr to console (proxy)
-exec > >(cat >> "$LOGFILE")
-exec 2> >(tee -a "$LOGFILE" >&2)
+outfifo=$(mktemp -u)
+errfifo=$(mktemp -u)
+mkfifo "${outfifo}" "${errfifo}"
+# Read from the stdout FIFO and append to LOGFILE
+cat "${outfifo}" >> "${LOGFILE}" &
+# Read from the stderr FIFO, append to LOGFILE, and also display to terminal's stderr
+tee -a "${LOGFILE}" < "${errfifo}" >&2 &
+# Redirect script's stdout and stderr to the respective FIFOs
+exec >"${outfifo}" 2>"${errfifo}"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -1013,17 +1124,6 @@ fi
 
 progress 25 "Preparing OS update"
 
-log "Loading info from config.json"
-if [ -f /mnt/boot/config.json ]; then
-    CONFIGJSON=/mnt/boot/config.json
-else
-    log ERROR "Don't know where config.json is."
-fi
-# If the user api key exists we use it instead of the deviceApiKey as it means we haven't done the key exchange yet
-APIKEY=$(jq -r '.apiKey // .deviceApiKey' $CONFIGJSON)
-UUID=$(jq -r '.uuid' $CONFIGJSON)
-API_ENDPOINT=$(jq -r '.apiEndpoint' $CONFIGJSON)
-DELTA_ENDPOINT=$(jq -r '.deltaEndpoint' $CONFIGJSON)
 
 FETCHED_SLUG=$(CURL_CA_BUNDLE=${TMPCRT} curl -H "Authorization: Bearer ${APIKEY}" --silent --retry 5 \
 "${API_ENDPOINT}/v6/device?\$select=is_of__device_type&\$expand=is_of__device_type(\$select=slug)&\$filter=uuid%20eq%20%27${UUID}%27" 2>/dev/null \
@@ -1064,8 +1164,6 @@ if [ -n "$target_version" ]; then
 else
     log ERROR "No target OS version specified."
 fi
-
-log "OS variant: ${HOST_OS_VERSION}"
 
 # Check host OS version
 case $VERSION in
