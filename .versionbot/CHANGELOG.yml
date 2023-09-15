@@ -1,4 +1,144 @@
 - commits:
+    - subject: "upgrade-2.x: Remove check for final version"
+      hash: ce70f31ba4bda575fef4fecf0e50ac1eb3a1d8cf
+      body: |
+        This allows to update into draft releases too.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Alex Gonzalez <alexg@balena.io>
+        signed-off-by: Alex Gonzalez <alexg@balena.io>
+      author: Alex Gonzalez
+    - subject: "upgrade-2.x.sh: add input checks to compare_device_state"
+      hash: eedd12b83437bd3da5d2ef6884313dd0e6ef5681
+      body: |
+        Avoid errors on the built-in test command when receiving empty API
+        responses.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Alex Gonzalez <alexg@balena.io>
+        signed-off-by: Alex Gonzalez <alexg@balena.io>
+      author: Alex Gonzalez
+    - subject: "upgrade-2.x.sh: set failure state on sigint and sigterm"
+      hash: f3c67969a6ea033cdda023b41332e4f976eb725a
+      body: |
+        A failed update can be retried, and it's better to communicate failure
+        than to silently fail.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Alex Gonzalez <alexg@balena.io>
+        signed-off-by: Alex Gonzalez <alexg@balena.io>
+      author: Alex Gonzalez
+    - subject: "upgrade-2.x.sh: use POSIX redirects"
+      hash: 67a261a76ff49736fa1c5927e5247362beafb971
+      body: >
+        The script redirects stdout to a log file, and stderr both to a log file
+
+        and to the console. It does so using bash process substituon, which does
+
+        not inherint signal handling from the parent process.
+
+
+        So, by redirecting stdout as:
+
+        ```
+
+        exec 2> >(tee -a "$LOGFILE" >&2)
+
+        ```
+
+
+        The signals that are trapped by the main process are not trapped by
+
+        the spawned processes (tee in this case), and it results on the spawned
+
+        process dying, the pipe being broken, and the main process exiting as
+
+        it can no longer write to stderr, without the corresponding signal
+
+        handlers being run.
+
+
+        This explains the support reported issue of the HUP lock file
+
+        being left around, as the trap EXIT handler is not run.
+
+
+        It also allows for the INT ERR TERM handler to work as expected and should
+
+        result on hostOS updates to report as failed and not progressing when
+
+        the process is interrupted.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Alex Gonzalez <alexg@balena.io>
+        signed-off-by: Alex Gonzalez <alexg@balena.io>
+      author: Alex Gonzalez
+    - subject: "upgrade-2.x: report update failure if supervisor state cannot be
+        updated"
+      hash: 5e811b74d3448bd835acd707cbeebec6b6471653
+      body: >
+        Currently the supervisor is only updated after the hostapp has already
+
+        done so. A failure to patch the target state with the supervisor version
+
+        would leave a mismatch between hostOS and supervisor version which for
+
+        ESR releases cannot be solved by a supervisor self-update.
+
+
+        Reporting a failed update if the supervisor cannot be set in the target
+
+        state allows for a retry before a reboot, avoiding the mismatch. If the
+
+        device is rebooted without a successful update, the mismatch still exists
+
+        as it does today.
+
+
+        A complete resolution of this problem requires the implementation of
+
+        supervisor driven updates as the currently HUP design does not allow to
+
+        implement this improvement.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Alex Gonzalez <alexg@balena.io>
+        signed-off-by: Alex Gonzalez <alexg@balena.io>
+      author: Alex Gonzalez
+    - subject: "upgrade-2.x: use log to output messages"
+      hash: 4e18abada10a2d46e0c19d07658eec5f3660c261
+      body: ""
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Alex Gonzalez <alexg@balena.io>
+        signed-off-by: Alex Gonzalez <alexg@balena.io>
+      author: Alex Gonzalez
+    - subject: "upgrade-2.x.sh: remove confusing log reporting OS variant"
+      hash: 49d91342cb1433d942f5895e1fea973e89683610
+      body: >
+        This message was printing `HOST_OS_VERSION`, which is set to default
+
+        to the meta-balena version, or fallback to the HOST OS revisioned version,
+
+        and passing it as OS variant. What's more, recent balenaOS do not
+
+        release different variants.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Alex Gonzalez <alexg@balena.io>
+        signed-off-by: Alex Gonzalez <alexg@balena.io>
+      author: Alex Gonzalez
+  version: 2.15.7
+  title: ""
+  date: 2023-09-15T19:04:29.033Z
+- commits:
     - subject: "upgrade-2.x: Allow upgrading from balenaOS v3.x"
       hash: 18c5655cc1e80d5ce8cc757e964a9cfe6f519944
       body: |
