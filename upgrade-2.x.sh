@@ -215,6 +215,33 @@ function _run_supervisor_update() {
     return "${ret}"
 }
 
+function _fetch_supervisor_version() {
+    local resp
+    local supervisor_version
+    local scheduled_supervisor_version
+
+      resp=$(CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --header "Authorization: Bearer ${APIKEY}" "${API_ENDPOINT}/v6/device(uuid='${UUID}')?\$select=supervisor_version&\$expand=should_be_managed_by__supervisor_release(\$top=1;\$select=supervisor_version)")
+    if supervisor_version=$(echo "${resp}" | jq -e -r '.d[0].supervisor_version' | tr -d 'v'); then
+        if [ -z "${supervisor_version}" ]; then
+            log ERROR "Could not get current supervisor version from the API, got ${resp}"
+            return 1
+        fi
+        # Make sure there is no scheduled supervisor update
+        scheduled_supervisor_version=$(echo "${resp}" | jq -e -r '.d[0].should_be_managed_by__supervisor_release[0].supervisor_version' | tr -d 'v')
+        if [ -n "${scheduled_supervisor_version}" ] && [ "${scheduled_supervisor_version}" != "null" ]; then
+            if version_gt "${scheduled_supervisor_version}" "${supervisor_version}"; then
+                # The supervisor is scheduled to update - we can't tell what the current version is
+                log ERROR "Device has a scheduled supervisor update to version ${scheduled_supervisor_version}"
+                return 1
+            fi
+        fi
+        echo "${supervisor_version}"
+    else
+        log ERROR "Could not fetch current supervisor version from the API, got ${resp}"
+        return 1
+    fi
+}
+
 #######################################
 # Helper function to patch the supervisor version in the target state.
 # Globals:
@@ -305,34 +332,29 @@ function upgrade_supervisor() {
         fi
     fi
 
-    resp=$(CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --header "Authorization: Bearer ${APIKEY}" "${API_ENDPOINT}/v6/device(uuid='${UUID}')?\$select=supervisor_version")
-    if CURRENT_SUPERVISOR_VERSION=$(echo "${resp}" | jq -r '.d[0].supervisor_version'); then
-        if [ -z "$CURRENT_SUPERVISOR_VERSION" ]; then
-            log ERROR "Could not get current supervisor version from the API, got ${resp}"
-        else
-            if version_gt "$target_supervisor_version" "$CURRENT_SUPERVISOR_VERSION" ; then
-                log "Supervisor update: will be upgrading from v${CURRENT_SUPERVISOR_VERSION} to v${target_supervisor_version}"
-                progress 90 "Running supervisor update"
-                if _patch_supervisor_version "$target_supervisor_version"; then
-                    # No need to stop services as supervisor update will do that for us
-                    if _run_supervisor_update; then
-                        if version_gt "6.5.9" "${target_supervisor_version}" ; then
-                            remove_containers
-                            log "Removing supervisor database for migration"
-                            rm /resin-data/resin-supervisor/database.sqlite || true
-                        fi
-                    else
-                        log WARN "Failed to update supervisor to target state version - leave to first boot."
+    if CURRENT_SUPERVISOR_VERSION=$(_fetch_supervisor_version); then
+        if version_gt "$target_supervisor_version" "$CURRENT_SUPERVISOR_VERSION" ; then
+            log "Supervisor update: will be upgrading from v${CURRENT_SUPERVISOR_VERSION} to v${target_supervisor_version}"
+            progress 90 "Running supervisor update"
+            if _patch_supervisor_version "$target_supervisor_version"; then
+                # No need to stop services as supervisor update will do that for us
+                if _run_supervisor_update; then
+                    if version_gt "6.5.9" "${target_supervisor_version}" ; then
+                        remove_containers
+                        log "Removing supervisor database for migration"
+                        rm /resin-data/resin-supervisor/database.sqlite || true
                     fi
                 else
-                    log ERROR "Failed to patch supervisor version in target state, bailing out."
+                    log WARN "Failed to update supervisor to target state version - leave to first boot."
                 fi
             else
-                log "Supervisor update: no update needed."
+                log ERROR "Failed to patch supervisor version in target state, bailing out."
             fi
+        else
+            log "Supervisor update: no update needed."
         fi
     else
-        log ERROR "Could not parse current supervisor version from the API (got ${resp})..."
+        log ERROR "Failed to fetch current supervisor version from the API."
     fi
 
     # Post supervisor update fixes
