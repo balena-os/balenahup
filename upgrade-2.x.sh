@@ -257,6 +257,7 @@ function _fetch_supervisor_version() {
 #######################################
 function _patch_supervisor_version() {
     local version=$1
+    local current_version
     local _status_code
     local _errfile
     local _outfile
@@ -278,7 +279,8 @@ function _patch_supervisor_version() {
             rm -f "${_errfile}"
             case "${_status_code}" in
                 2*) log "Successfully set supervision version in target state";rm -f "${_outfile}";return 0;;
-                *) log WARN "[${_status_code}]: Request failed: $(cat ${_outfile})";return 1;;
+                4*) log WARN "[${_status_code}]: Bad request: $(cat ${_outfile})"; rm -f "${_outfile}"; if current_version=$(_fetch_supervisor_version); then if version_gt "${current_version}" "${version}"; then return 0; else return 1; fi; else return 1; fi;;
+                *) log WARN "[${_status_code}]: Request failed: $(cat ${_outfile})";rm -f "${_outfile}";return 1;;
             esac
         else
             log WARN "$(cat "${_errfile}")"
