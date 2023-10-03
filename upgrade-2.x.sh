@@ -8,6 +8,7 @@ LEGACY_UPDATE=no
 STOP_ALL=no
 
 set -o errexit
+set -E
 set -o pipefail
 
 preferred_hostos_version=2.0.7
