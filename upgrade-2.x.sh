@@ -18,9 +18,11 @@ minimum_balena_target_version=2.9.0
 minimum_supervisor_stop=2.53.10
 
 # This will set VERSION, SLUG
+# shellcheck disable=SC1091
 . /etc/os-release
 
 # Don't run anything before this source as it sets PATH here
+# shellcheck disable=SC1091
 source /etc/profile
 
 if [ -x "$(command -v balena)" ]; then
@@ -191,9 +193,9 @@ function remove_containers() {
 function remove_rec_files() {
     local boot_dir='/mnt/boot'
     shopt -s nullglob
-    for f in ${boot_dir}/*.REC; do
+    for f in "${boot_dir}"/*.REC; do
         log WARN "Removing $f from boot partition"
-        rm -f $f
+        rm -f "$f"
     done
     sync ${boot_dir}
 }
@@ -213,7 +215,9 @@ function _run_supervisor_update() {
     if version_gt "${HOST_OS_VERSION}" "${minimum_supervisor_stop}"; then
         supervisor_update+=' -n'
     fi
-    eval "${supervisor_update}" || (log WARN "Supervisor couldn't be updated" && ret=1)
+    if ! eval "${supervisor_update}"; then
+        log WARN "Supervisor couldn't be updated" && ret=1
+    fi
     journalctl -a -u run-update-supervisor --no-pager || true
     return "${ret}"
 }
@@ -282,8 +286,8 @@ function _patch_supervisor_version() {
             rm -f "${_errfile}"
             case "${_status_code}" in
                 2*) log "Successfully set supervision version in target state";rm -f "${_outfile}";return 0;;
-                4*) log WARN "[${_status_code}]: Bad request: $(cat ${_outfile})"; rm -f "${_outfile}"; if current_version=$(_fetch_supervisor_version); then if version_gt "${current_version}" "${version}"; then return 0; else return 1; fi; else return 1; fi;;
-                *) log WARN "[${_status_code}]: Request failed: $(cat ${_outfile})";rm -f "${_outfile}";return 1;;
+                4*) log WARN "[${_status_code}]: Bad request: $(cat "${_outfile}")"; rm -f "${_outfile}"; if current_version=$(_fetch_supervisor_version); then if version_gt "${current_version}" "${version}"; then return 0; else return 1; fi; else return 1; fi;;
+                *) log WARN "[${_status_code}]: Request failed: $(cat "${_outfile}")";rm -f "${_outfile}";return 1;;
             esac
         else
             log WARN "$(cat "${_errfile}")"
@@ -869,12 +873,13 @@ function find_partitions {
 #   Registry URL for desired image
 #######################################
 function get_image_location() {
+    local variant_tag
     # we need to strip the target_version's variant tag to query the API properly
     local version=${1/.dev/}
     version=${version/.prod/}
 
     # TODO: Get the target variant from the raw version the user provided
-    local variant_tag=$(echo "${VARIANT:-production}" | tr "[:upper:]" "[:lower:]")
+    variant_tag=$(echo "${VARIANT:-production}" | tr "[:upper:]" "[:lower:]")
 
     image=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} \
         -H "Content-Type: application/json" \
