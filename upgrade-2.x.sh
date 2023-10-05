@@ -8,6 +8,7 @@ LEGACY_UPDATE=no
 STOP_ALL=no
 
 set -o errexit
+set -E
 set -o pipefail
 
 preferred_hostos_version=2.0.7
@@ -17,9 +18,11 @@ minimum_balena_target_version=2.9.0
 minimum_supervisor_stop=2.53.10
 
 # This will set VERSION, SLUG
+# shellcheck disable=SC1091
 . /etc/os-release
 
 # Don't run anything before this source as it sets PATH here
+# shellcheck disable=SC1091
 source /etc/profile
 
 if [ -x "$(command -v balena)" ]; then
@@ -48,6 +51,8 @@ exlock_now()        { _lock xn; }  # obtain an exclusive lock immediately or fai
 TMPCRT=$(mktemp)
 jq -r '.balenaRootCA' < /mnt/boot/config.json | base64 -d > "${TMPCRT}"
 cat /etc/ssl/certs/ca-certificates.crt >> "${TMPCRT}"
+
+CURL="curl --silent --retry 10 --fail --location --compressed"
 
 # Dashboard progress helper
 function progress {
@@ -157,7 +162,7 @@ function compare_device_state() {
     local resp
     local remote_perc
     local remote_state
-    resp=$(CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --header "Authorization: Bearer ${APIKEY}" \
+    resp=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} --header "Authorization: Bearer ${APIKEY}" \
         "${API_ENDPOINT}/v6/device(uuid='${UUID}')?\$select=provisioning_state,provisioning_progress" | jq '.d[]')
     remote_perc=$(echo "${resp}" | jq -r '.provisioning_progress')
     remote_state=$(echo "${resp}" | jq -r '.provisioning_state')
@@ -188,9 +193,9 @@ function remove_containers() {
 function remove_rec_files() {
     local boot_dir='/mnt/boot'
     shopt -s nullglob
-    for f in ${boot_dir}/*.REC; do
+    for f in "${boot_dir}"/*.REC; do
         log WARN "Removing $f from boot partition"
-        rm -f $f
+        rm -f "$f"
     done
     sync ${boot_dir}
 }
@@ -210,9 +215,38 @@ function _run_supervisor_update() {
     if version_gt "${HOST_OS_VERSION}" "${minimum_supervisor_stop}"; then
         supervisor_update+=' -n'
     fi
-    eval "${supervisor_update}" || (log WARN "Supervisor couldn't be updated" && ret=1)
+    if ! eval "${supervisor_update}"; then
+        log WARN "Supervisor couldn't be updated" && ret=1
+    fi
     journalctl -a -u run-update-supervisor --no-pager || true
     return "${ret}"
+}
+
+function _fetch_supervisor_version() {
+    local resp
+    local supervisor_version
+    local scheduled_supervisor_version
+
+      resp=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} --header "Authorization: Bearer ${APIKEY}" "${API_ENDPOINT}/v6/device(uuid='${UUID}')?\$select=supervisor_version&\$expand=should_be_managed_by__supervisor_release(\$top=1;\$select=supervisor_version)")
+    if supervisor_version=$(echo "${resp}" | jq -e -r '.d[0].supervisor_version' | tr -d 'v'); then
+        if [ -z "${supervisor_version}" ]; then
+            log ERROR "Could not get current supervisor version from the API, got ${resp}"
+            return 1
+        fi
+        # Make sure there is no scheduled supervisor update
+        scheduled_supervisor_version=$(echo "${resp}" | jq -e -r '.d[0].should_be_managed_by__supervisor_release[0].supervisor_version' | tr -d 'v')
+        if [ -n "${scheduled_supervisor_version}" ] && [ "${scheduled_supervisor_version}" != "null" ]; then
+            if version_gt "${scheduled_supervisor_version}" "${supervisor_version}"; then
+                # The supervisor is scheduled to update - we can't tell what the current version is
+                log ERROR "Device has a scheduled supervisor update to version ${scheduled_supervisor_version}"
+                return 1
+            fi
+        fi
+        echo "${supervisor_version}"
+    else
+        log ERROR "Could not fetch current supervisor version from the API, got ${resp}"
+        return 1
+    fi
 }
 
 #######################################
@@ -230,6 +264,7 @@ function _run_supervisor_update() {
 #######################################
 function _patch_supervisor_version() {
     local version=$1
+    local current_version
     local _status_code
     local _errfile
     local _outfile
@@ -240,18 +275,19 @@ function _patch_supervisor_version() {
     UPDATER_SUPERVISOR_TAG="v${version}"
 
     # Get the supervisor id
-    resp=$(CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --header "Authorization: Bearer ${APIKEY}" --silent "${API_ENDPOINT}/v5/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'${UPDATER_SUPERVISOR_TAG}'))")
+    resp=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} --header "Authorization: Bearer ${APIKEY}" "${API_ENDPOINT}/v5/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'${UPDATER_SUPERVISOR_TAG}'))")
     if UPDATER_SUPERVISOR_ID=$(echo "${resp}" | jq -e -r '.d[0].id'); then
         log "Extracted supervisor vars: ID: $UPDATER_SUPERVISOR_ID"
         log "Setting supervisor version in the API..."
 
         _errfile=$(mktemp)
         _outfile=$(mktemp)
-        if _status_code=$(CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --request PATCH -w "%{http_code}" --show-error -o "${_outfile}" --header "Authorization: Bearer ${APIKEY}" --header 'Content-Type: application/json' "${API_ENDPOINT}/v6/device(uuid='${UUID}')" --data-binary "{\"should_be_managed_by__supervisor_release\": \"${UPDATER_SUPERVISOR_ID}\"}" 2> "${_errfile}"); then
+        if _status_code=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} --request PATCH -w "%{http_code}" --show-error -o "${_outfile}" --header "Authorization: Bearer ${APIKEY}" --header 'Content-Type: application/json' "${API_ENDPOINT}/v6/device(uuid='${UUID}')" --data-binary "{\"should_be_managed_by__supervisor_release\": \"${UPDATER_SUPERVISOR_ID}\"}" 2> "${_errfile}"); then
             rm -f "${_errfile}"
             case "${_status_code}" in
                 2*) log "Successfully set supervision version in target state";rm -f "${_outfile}";return 0;;
-                *) log WARN "[${_status_code}]: Request failed: $(cat ${_outfile})";return 1;;
+                4*) log WARN "[${_status_code}]: Bad request: $(cat "${_outfile}")"; rm -f "${_outfile}"; if current_version=$(_fetch_supervisor_version); then if version_gt "${current_version}" "${version}"; then return 0; else return 1; fi; else return 1; fi;;
+                *) log WARN "[${_status_code}]: Request failed: $(cat "${_outfile}")";rm -f "${_outfile}";return 1;;
             esac
         else
             log WARN "$(cat "${_errfile}")"
@@ -305,34 +341,29 @@ function upgrade_supervisor() {
         fi
     fi
 
-    resp=$(CURL_CA_BUNDLE=${TMPCRT} curl --silent --retry 10 --header "Authorization: Bearer ${APIKEY}" "${API_ENDPOINT}/v6/device(uuid='${UUID}')?\$select=supervisor_version")
-    if CURRENT_SUPERVISOR_VERSION=$(echo "${resp}" | jq -r '.d[0].supervisor_version'); then
-        if [ -z "$CURRENT_SUPERVISOR_VERSION" ]; then
-            log ERROR "Could not get current supervisor version from the API, got ${resp}"
-        else
-            if version_gt "$target_supervisor_version" "$CURRENT_SUPERVISOR_VERSION" ; then
-                log "Supervisor update: will be upgrading from v${CURRENT_SUPERVISOR_VERSION} to v${target_supervisor_version}"
-                progress 90 "Running supervisor update"
-                if _patch_supervisor_version "$target_supervisor_version"; then
-                    # No need to stop services as supervisor update will do that for us
-                    if _run_supervisor_update; then
-                        if version_gt "6.5.9" "${target_supervisor_version}" ; then
-                            remove_containers
-                            log "Removing supervisor database for migration"
-                            rm /resin-data/resin-supervisor/database.sqlite || true
-                        fi
-                    else
-                        log WARN "Failed to update supervisor to target state version - leave to first boot."
+    if CURRENT_SUPERVISOR_VERSION=$(_fetch_supervisor_version); then
+        if version_gt "$target_supervisor_version" "$CURRENT_SUPERVISOR_VERSION" ; then
+            log "Supervisor update: will be upgrading from v${CURRENT_SUPERVISOR_VERSION} to v${target_supervisor_version}"
+            progress 90 "Running supervisor update"
+            if _patch_supervisor_version "$target_supervisor_version"; then
+                # No need to stop services as supervisor update will do that for us
+                if _run_supervisor_update; then
+                    if version_gt "6.5.9" "${target_supervisor_version}" ; then
+                        remove_containers
+                        log "Removing supervisor database for migration"
+                        rm /resin-data/resin-supervisor/database.sqlite || true
                     fi
                 else
-                    log ERROR "Failed to patch supervisor version in target state, bailing out."
+                    log WARN "Failed to update supervisor to target state version - leave to first boot."
                 fi
             else
-                log "Supervisor update: no update needed."
+                log ERROR "Failed to patch supervisor version in target state, bailing out."
             fi
+        else
+            log "Supervisor update: no update needed."
         fi
     else
-        log ERROR "Could not parse current supervisor version from the API (got ${resp})..."
+        log ERROR "Failed to fetch current supervisor version from the API."
     fi
 
     # Post supervisor update fixes
@@ -377,7 +408,7 @@ function pre_update_fix_bootfiles_hook {
     log "Applying bootfiles hostapp-hook fix"
     local bootfiles_temp
     bootfiles_temp=$(mktemp)
-    CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 -f -s -L -o "$bootfiles_temp" https://raw.githubusercontent.com/balena-os/balenahup/77401f3ecdeddaac843b26827f0a44d3b044efdd/upgrade-patches/0-bootfiles || log ERROR "Couldn't download fixed '0-bootfiles', aborting."
+    CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -o "$bootfiles_temp" https://raw.githubusercontent.com/balena-os/balenahup/77401f3ecdeddaac843b26827f0a44d3b044efdd/upgrade-patches/0-bootfiles || log ERROR "Couldn't download fixed '0-bootfiles', aborting."
     chmod 755 "$bootfiles_temp"
     mount --bind "$bootfiles_temp"  /etc/hostapp-update-hooks.d/0-bootfiles
 }
@@ -470,11 +501,11 @@ function post_update_jetson_fix {
 #   None
 #######################################
 function persistent_logging_config_var {
-    PROBLEMATIC_ENV_VAR=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent -X GET "${API_ENDPOINT}/v5/device_config_variable?\$filter=device/uuid%20eq%20'${UUID}'" -H "Content-Type: application/json" -H "Authorization: Bearer ${APIKEY}" | jq -r '.d[] | select((.name == "RESIN_SUPERVISOR_PERSISTENT_LOGGING") and (.value == "")) | .id')
+    PROBLEMATIC_ENV_VAR=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} "${API_ENDPOINT}/v5/device_config_variable?\$filter=device/uuid%20eq%20'${UUID}'" -H "Content-Type: application/json" -H "Authorization: Bearer ${APIKEY}" | jq -r '.d[] | select((.name == "RESIN_SUPERVISOR_PERSISTENT_LOGGING") and (.value == "")) | .id')
     if [ -n "${PROBLEMATIC_ENV_VAR}" ]; then
         local tmpfile
         log "Updating problematic RESIN_SUPERVISOR_PERSISTENT_LOGGING config variable"
-        CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent -X PATCH \
+        CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -X PATCH \
             "${API_ENDPOINT}/v5/device_config_variable(${PROBLEMATIC_ENV_VAR})" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${APIKEY}" \
@@ -842,14 +873,15 @@ function find_partitions {
 #   Registry URL for desired image
 #######################################
 function get_image_location() {
+    local variant_tag
     # we need to strip the target_version's variant tag to query the API properly
     local version=${1/.dev/}
     version=${version/.prod/}
 
     # TODO: Get the target variant from the raw version the user provided
-    local variant_tag=$(echo "${VARIANT:-production}" | tr "[:upper:]" "[:lower:]")
+    variant_tag=$(echo "${VARIANT:-production}" | tr "[:upper:]" "[:lower:]")
 
-    image=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent -X GET \
+    image=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} \
         -H "Content-Type: application/json" \
         -H "Authorization: Bearer ${APIKEY}" \
         "${API_ENDPOINT}/v6/release?\$select=id&\$expand=contains__image/image&\$filter=(belongs_to__application/any(a:a/is_for__device_type/any(dt:dt/slug%20eq%20'${SLUG}')%20and%20is_host%20eq%20true))%20and%20is_invalidated%20eq%20false%20and%20raw_version%20eq%20'${version}'" \
@@ -858,7 +890,7 @@ function get_image_location() {
         echo "${image}" | jq -r '.[0]'
     else
         # Try with version and variant labels for backwards compatibility
-        image=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent -X GET \
+        image=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${APIKEY}" \
             "${API_ENDPOINT}/v6/release?\$select=id&\$expand=contains__image/image&\$filter=(belongs_to__application/any(a:a/is_for__device_type/any(dt:dt/slug%20eq%20'${SLUG}')%20and%20is_host%20eq%20true))%20and%20is_invalidated%20eq%20false%20and%20(release_tag/any(rt:(rt/tag_key%20eq%20'version')%20and%20(rt/value%20eq%20'${version}')))%20and%20((release_tag/any(rt:(rt/tag_key%20eq%20'variant')%20and%20(rt/value%20eq%20'${variant_tag}')))%20or%20not(release_tag/any(rt:rt/tag_key%20eq%20'variant')))" \
@@ -888,7 +920,7 @@ function get_image_location() {
 function get_delta_token() {
     src=$(echo "${1}" | awk -F@ '{print $1}' | sed -e 's/.*\/v2/v2/g')
     dst=$(echo "${2}" | awk -F@ '{print $1}' | sed -e 's/.*\/v2/v2/g')
-    CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent -X GET \
+    CURL_CA_BUNDLE="${TMPCRT}" ${CURL} \
         -u "d_${UUID}:${APIKEY}" \
         -H "Content-Type: application/json" \
         "${API_ENDPOINT}/auth/v1/token?service=${REGISTRY_ENDPOINT}&scope=repository:${dst}:pull&scope=repository:${src}:pull" \
@@ -917,7 +949,7 @@ function find_delta() {
     else
         # TODO: should we retry this more extensively? deltas may take a while to generate..
         delta_token=$(get_delta_token "${src_image}" "${target_image}")
-        delta=$(CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --silent -X GET \
+        delta=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} \
             "${DELTA_ENDPOINT}/api/v${DELTA_VERSION}/delta?src=${src_image}&dest=${target_image}" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${delta_token}" | jq -r '.name')
@@ -1125,7 +1157,7 @@ fi
 progress 25 "Preparing OS update"
 
 
-FETCHED_SLUG=$(CURL_CA_BUNDLE=${TMPCRT} curl -H "Authorization: Bearer ${APIKEY}" --silent --retry 5 \
+FETCHED_SLUG=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -H "Authorization: Bearer ${APIKEY}" \
 "${API_ENDPOINT}/v6/device?\$select=is_of__device_type&\$expand=is_of__device_type(\$select=slug)&\$filter=uuid%20eq%20%27${UUID}%27" 2>/dev/null \
 | jq -r '.d[0].is_of__device_type[0].slug'
 )
@@ -1196,7 +1228,7 @@ else
     log "Device not delta capable"
 fi
 if [ -n "${delta_image}" ]; then
-    delta_size=$(CURL_CA_BUNDLE=${TMPCRT} curl -H "Authorization: Bearer ${APIKEY}" --silent --retry 10 \
+    delta_size=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -H "Authorization: Bearer ${APIKEY}" \
     "${API_ENDPOINT}/v5/delta?\$filter=((status%20eq%20'success')%20and%20(version%20eq%20'${DELTA_VERSION}')%20and%20(is_stored_at__location%20eq%20'${delta_image}'))" 2>/dev/null \
     | jq -r '.d[0].size|tonumber / (1024.0 * 1024.0) | floor' 2>/dev/null || /bin/true)
     log "Found delta image: ${delta_image}, size: ${delta_size:-unknown} MB"
@@ -1233,7 +1265,7 @@ if ! version_gt "$VERSION" "$preferred_hostos_version" &&
             download_uri=https://github.com/balena-os/balenahup/raw/master/upgrade-binaries/$binary_type
             for binary in $tools_binaries; do
                 log "Installing $binary..."
-                CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 -f -s -L -o $tools_path/$binary $download_uri/$binary || log ERROR "Couldn't download tool from $download_uri/$binary, aborting."
+                CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -o $tools_path/$binary $download_uri/$binary || log ERROR "Couldn't download tool from $download_uri/$binary, aborting."
                 chmod 755 $tools_path/$binary
             done
             ;;
@@ -1255,7 +1287,7 @@ if version_gt "${HOST_OS_VERSION}" "2.0.6" &&
         mkdir -p $tools_path
         export PATH=$tools_path:$PATH
         download_url=https://raw.githubusercontent.com/balena-os/meta-balena/v2.3.0/meta-resin-common/recipes-support/resin-device-progress/resin-device-progress/resin-device-progress
-        CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 -f -s -L -o $tools_path/resin-device-progress $download_url || log WARN "Couldn't download tool from $download_url, progress bar won't work, but not aborting..."
+        CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -o $tools_path/resin-device-progress $download_url || log WARN "Couldn't download tool from $download_url, progress bar won't work, but not aborting..."
         chmod 755 $tools_path/resin-device-progress
 else
     log "No resin-device-progress fix is required..."
@@ -1266,7 +1298,7 @@ fi
 if version_gt "${HOST_OS_VERSION}" "2.0.7" &&
     version_gt "2.7.0" "${HOST_OS_VERSION}"; then
         log "Fixing supervisor updater..."
-        if CURL_CA_BUNDLE=${TMPCRT} curl --retry 10 --fail --silent -o "/tmp/update-resin-supervisor" https://raw.githubusercontent.com/balena-os/meta-balena/40d5a174da6b52d530c978e0cae22aa61f65d203/meta-resin-common/recipes-containers/docker-disk/docker-resin-supervisor-disk/update-resin-supervisor ; then
+        if CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -o "/tmp/update-resin-supervisor" https://raw.githubusercontent.com/balena-os/meta-balena/40d5a174da6b52d530c978e0cae22aa61f65d203/meta-resin-common/recipes-containers/docker-disk/docker-resin-supervisor-disk/update-resin-supervisor ; then
             chmod 755 "/tmp/update-resin-supervisor"
             PATH="/tmp:$PATH"
             log "Added temporary supervisor updater replaced with fixed version..."
