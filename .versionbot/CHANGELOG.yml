@@ -1,4 +1,86 @@
 - commits:
+    - subject: "upgrade-2.x: Fix shellcheck warning"
+      hash: 1effb490f0f784fcee578408f87185ae8f6a3cb1
+      body: ""
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Alex Gonzalez <alexg@balena.io>
+        signed-off-by: Alex Gonzalez <alexg@balena.io>
+      author: Alex Gonzalez
+    - subject: "upgrade-2.x: Centralize curl call and include compression"
+      hash: bf57671c331eceed657fd9ecd530cf728481f821
+      body: |
+        Extract the curl calls into a variable that defines shared common
+        arguments including compression and replace other uses of the command.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Alex Gonzalez <alexg@balena.io>
+        signed-off-by: Alex Gonzalez <alexg@balena.io>
+      author: Alex Gonzalez
+    - subject: "upgrade-2.x: Inherit ERR traps by subshells"
+      hash: 83cb3d80c16097d6e231566ebc8094e80ae035bd
+      body: |
+        This allows failed OS updates caused by failed subshell calls to also
+        be reported to the cloud.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Alex Gonzalez <alexg@balena.io>
+        signed-off-by: Alex Gonzalez <alexg@balena.io>
+      author: Alex Gonzalez
+    - subject: "upgrade-2.x: Continue update if supervisor version is higher than
+        target"
+      hash: ba7ecfdabe562858bdb346fb213c09c38cc29995
+      body: >
+        Before patching the supervisor version in the API, the script checks
+        that
+
+        the existing version is lower than the target version.
+
+
+        However, there can be a race condition between the check and the actual
+
+        patch operation where a self-serve supervisor update could patch the
+
+        target version. In that case, the patch operation returns a bad request
+
+        (400) code that is indistinguishable from other bad request errors.
+
+
+        The script could parse the request output, but that is bad practise and
+
+        likely to break in future. Instead, when a 400 is received from the patch
+
+        operation the script checks that the API supervisor version is still lower
+
+        than the target version before failing the update. If the target supervisor
+
+        version happens to be higher than the target version the update is
+
+        allowed to continue as that is a valid scenario.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Alex Gonzalez <alexg@balena.io>
+        signed-off-by: Alex Gonzalez <alexg@balena.io>
+      author: Alex Gonzalez
+    - subject: "upgrade-2.x.sh: Extract fetching supervisor version from API to
+        function"
+      hash: 1e9096516f1146fe54d9a277cb4360b48f4cad18
+      body: |
+        This allows to re-use the code in other places without repetition.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Alex Gonzalez <alexg@balena.io>
+        signed-off-by: Alex Gonzalez <alexg@balena.io>
+      author: Alex Gonzalez
+  version: 2.15.8
+  title: ""
+  date: 2023-10-05T16:02:00.442Z
+- commits:
     - subject: "upgrade-2.x: Remove check for final version"
       hash: ce70f31ba4bda575fef4fecf0e50ac1eb3a1d8cf
       body: |
