@@ -128,19 +128,23 @@ function report_update_failed() {
 # Log function helper
 function log {
     # Address log levels
+    priority=6
     case $1 in
         ERROR)
             loglevel=ERROR
+            priority=3
             shift
             ;;
         WARN)
             loglevel=WARNING
+            priority=4
             shift
             ;;
         *)
-            loglevel=LOG
+            loglevel=INFO
             ;;
     esac
+    echo "${1}" | systemd-cat --level-prefix=0 --identifier="$(basename "$0")" --priority="${priority}" 2> /dev/null || true
     endtime=$(date +%s)
     if [ "$loglevel" == "ERROR" ]; then
         printf "[%09d%s%s\n" "$((endtime - starttime))" "][$loglevel]" "$1" >> /dev/stderr
