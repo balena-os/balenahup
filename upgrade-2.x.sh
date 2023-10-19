@@ -1005,7 +1005,7 @@ function finish_up() {
         fi
     else
         log "Finished update, not rebooting as requested."
-        progress 100 "Update successful"
+        progress 100 "Update successful pending reboot."
     fi
     rm -f "${TMPCRT}" > /dev/null 2>&1
     exit 0
