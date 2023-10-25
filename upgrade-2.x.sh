@@ -744,7 +744,7 @@ function hostapp_based_update {
             stop_services
             remove_containers
         fi
-        log "Starting hostapp-update"
+        log "Calling hostapp-update for ${update_package}"
         hostapp-update -i "${update_package}" && post_update_fixes
     fi
 }
@@ -1045,7 +1045,7 @@ fi
 # LOGFILE init and header
 LOGFILE="/mnt/data/balenahup/$SCRIPTNAME.$(date +"%Y%m%d_%H%M%S").log"
 mkdir -p "$(dirname "$LOGFILE")"
-echo "================$SCRIPTNAME HEADER START====================" > "$LOGFILE"
+log "================$SCRIPTNAME HEADER START====================" > "$LOGFILE"
 date >> "$LOGFILE"
 
 log "Loading info from config.json"
