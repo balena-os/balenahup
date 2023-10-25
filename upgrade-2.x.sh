@@ -213,9 +213,16 @@ function remove_rec_files() {
 function _run_supervisor_update() {
     local supervisor_update
     local ret=0
+    local update_balena_supervisor_script
 
+    update_balena_supervisor_script="$(command -v update-balena-supervisor || command -v update-resin-supervisor)"
     # use a transient unit in order to namespace-collide with a potential API-initiated update
-    supervisor_update="systemd-run --wait --unit run-update-supervisor $(which update-balena-supervisor || which update-resin-supervisor)"
+    if grep -q "os-helpers-logging" "${update_balena_supervisor_script}"; then
+        #  if the update-balena-supervisor script used os-helpers-logging append stderr to the log file
+        supervisor_update="systemd-run --wait --property=StandardError=append:${LOGFILE} --unit run-update-supervisor ${update_balena_supervisor_script}"
+    else
+        supervisor_update="systemd-run --wait --unit run-update-supervisor ${update_balena_supervisor_script}"
+    fi
     if version_gt "${HOST_OS_VERSION}" "${minimum_supervisor_stop}"; then
         supervisor_update+=' -n'
     fi
@@ -994,7 +1001,7 @@ function finish_up() {
         log "Rebooting into new OS in 5 seconds..."
         progress 100 "Update successful, rebooting"
         if command -v /usr/libexec/safe_reboot > /dev/null; then
-            systemd-run --on-active=5 --quiet --unit=hup-reboot.service /usr/libexec/safe_reboot
+            systemd-run --on-active=5 --property=StandardError=append:"${LOGFILE}" --quiet --unit=hup-reboot.service /usr/libexec/safe_reboot
         else
             systemd-run --on-active=5 --quiet --unit=hup-reboot.service systemctl reboot
             # If the previous reboot command has failed for any reason, let's try differently
