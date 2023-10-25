@@ -989,12 +989,16 @@ function finish_up() {
         # Reboot into new OS
         log "Rebooting into new OS in 5 seconds..."
         progress 100 "Update successful, rebooting"
-        systemd-run --on-active=5 --quiet --unit=hup-reboot.service systemctl reboot
-        # If the previous reboot command has failed for any reason, let's try differently
-        (sleep 300 && nohup bash -c "reboot --force" > /dev/null 2>&1) &
-        # If the previous 2 reboot commands have failed for any reason, try the Magic SysRq
-        # enable and send reboot request
-        (sleep 600 && echo 1 > /proc/sys/kernel/sysrq && echo b > /proc/sysrq-trigger) &
+        if command -v /usr/libexec/safe_reboot > /dev/null; then
+            systemd-run --on-active=5 --quiet --unit=hup-reboot.service /usr/libexec/safe_reboot
+        else
+            systemd-run --on-active=5 --quiet --unit=hup-reboot.service systemctl reboot
+            # If the previous reboot command has failed for any reason, let's try differently
+            (sleep 300 && nohup bash -c "reboot --force" > /dev/null 2>&1) &
+            # If the previous 2 reboot commands have failed for any reason, try the Magic SysRq
+            # enable and send reboot request
+            (sleep 600 && echo 1 > /proc/sys/kernel/sysrq && echo b > /proc/sysrq-trigger) &
+        fi
     else
         log "Finished update, not rebooting as requested."
         progress 100 "Update successful"
