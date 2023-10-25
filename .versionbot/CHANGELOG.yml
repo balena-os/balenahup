@@ -1,4 +1,21 @@
 - commits:
+    - subject: "upgrade-2.x: perform a safe reboot taking locks into account"
+      hash: 9a98532390631a820dfc06696ba0c50dd61159b5
+      body: >
+        When a reboot is requested take into account that user applications
+        might
+
+        be in critical sections and might have requested for the reboot to wait.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Alex Gonzalez <alexg@balena.io>
+        signed-off-by: Alex Gonzalez <alexg@balena.io>
+      author: Alex Gonzalez
+  version: 2.15.9
+  title: ""
+  date: 2023-10-25T10:08:46.052Z
+- commits:
     - subject: "upgrade-2.x: Fix shellcheck warning"
       hash: 1effb490f0f784fcee578408f87185ae8f6a3cb1
       body: ""
