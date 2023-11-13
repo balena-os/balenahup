@@ -128,19 +128,23 @@ function report_update_failed() {
 # Log function helper
 function log {
     # Address log levels
+    priority=6
     case $1 in
         ERROR)
             loglevel=ERROR
+            priority=3
             shift
             ;;
         WARN)
             loglevel=WARNING
+            priority=4
             shift
             ;;
         *)
-            loglevel=LOG
+            loglevel=INFO
             ;;
     esac
+    echo "${1}" | systemd-cat --level-prefix=0 --identifier="$(basename "$0")" --priority="${priority}" 2> /dev/null || true
     endtime=$(date +%s)
     if [ "$loglevel" == "ERROR" ]; then
         printf "[%09d%s%s\n" "$((endtime - starttime))" "][$loglevel]" "$1" >> /dev/stderr
@@ -209,9 +213,16 @@ function remove_rec_files() {
 function _run_supervisor_update() {
     local supervisor_update
     local ret=0
+    local update_balena_supervisor_script
 
+    update_balena_supervisor_script="$(command -v update-balena-supervisor || command -v update-resin-supervisor)"
     # use a transient unit in order to namespace-collide with a potential API-initiated update
-    supervisor_update="systemd-run --wait --unit run-update-supervisor $(which update-balena-supervisor || which update-resin-supervisor)"
+    if grep -q "os-helpers-logging" "${update_balena_supervisor_script}"; then
+        #  if the update-balena-supervisor script used os-helpers-logging append stderr to the log file
+        supervisor_update="systemd-run --wait --property=StandardError=append:${LOGFILE} --unit run-update-supervisor ${update_balena_supervisor_script}"
+    else
+        supervisor_update="systemd-run --wait --unit run-update-supervisor ${update_balena_supervisor_script}"
+    fi
     if version_gt "${HOST_OS_VERSION}" "${minimum_supervisor_stop}"; then
         supervisor_update+=' -n'
     fi
@@ -740,7 +751,7 @@ function hostapp_based_update {
             stop_services
             remove_containers
         fi
-        log "Starting hostapp-update"
+        log "Calling hostapp-update for ${update_package}"
         hostapp-update -i "${update_package}" && post_update_fixes
     fi
 }
@@ -990,7 +1001,7 @@ function finish_up() {
         log "Rebooting into new OS in 5 seconds..."
         progress 100 "Update successful, rebooting"
         if command -v /usr/libexec/safe_reboot > /dev/null; then
-            systemd-run --on-active=5 --quiet --unit=hup-reboot.service /usr/libexec/safe_reboot
+            systemd-run --on-active=5 --property=StandardError=append:"${LOGFILE}" --quiet --unit=hup-reboot.service /usr/libexec/safe_reboot
         else
             systemd-run --on-active=5 --quiet --unit=hup-reboot.service systemctl reboot
             # If the previous reboot command has failed for any reason, let's try differently
@@ -1001,7 +1012,7 @@ function finish_up() {
         fi
     else
         log "Finished update, not rebooting as requested."
-        progress 100 "Update successful"
+        progress 100 "Update successful pending reboot."
     fi
     rm -f "${TMPCRT}" > /dev/null 2>&1
     exit 0
@@ -1041,7 +1052,7 @@ fi
 # LOGFILE init and header
 LOGFILE="/mnt/data/balenahup/$SCRIPTNAME.$(date +"%Y%m%d_%H%M%S").log"
 mkdir -p "$(dirname "$LOGFILE")"
-echo "================$SCRIPTNAME HEADER START====================" > "$LOGFILE"
+log "================$SCRIPTNAME HEADER START====================" > "$LOGFILE"
 date >> "$LOGFILE"
 
 log "Loading info from config.json"
