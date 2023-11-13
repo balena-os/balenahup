@@ -1,4 +1,56 @@
 - commits:
+    - subject: "upgrade-2.x.sh: Avoid logging duplicates in transient systemd units"
+      hash: 1db0d22fb3ddba0d03751ade629ad7f3e019e34c
+      body: |
+        When a transient systemd unit calls into a hostOS script that uses the
+        os-helpers logging functions, the script already logs to systemd
+        and stderr.
+
+        If the script is then run on a systemd unit that also outputs to stderr,
+        messages are duplicated in the journal. This is prevented by specifying
+        to only append stderr output to the log file.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Alex Gonzalez <alexg@balena.io>
+        signed-off-by: Alex Gonzalez <alexg@balena.io>
+      author: Alex Gonzalez
+    - subject: "upgrade-2.x.sh: improve logging"
+      hash: 6c5fa63ca6fcbc1b5c4e94a61b041457a9ba4f70
+      body: |
+        The hostapp-update script is called twice, once for delta and once for
+        full target. This is confusing unless the target is also specified.
+
+        Also, let the start banner appear also in the journal.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Alex Gonzalez <alexg@balena.io>
+        signed-off-by: Alex Gonzalez <alexg@balena.io>
+      author: Alex Gonzalez
+    - subject: "upgrade-2.x.sh: reflect no reboot request on state message"
+      hash: d8e0ffae346a553dae88c352dcae6fae3b4db0a6
+      body: ""
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Alex Gonzalez <alexg@balena.io>
+        signed-off-by: Alex Gonzalez <alexg@balena.io>
+      author: Alex Gonzalez
+    - subject: "upgrade-2.x.sh: log to journal when available"
+      hash: 8b909fa635bce1f076f3e5ea93defe7518de9ca7
+      body: |
+        This will allow to eventually surface the HUP logs to the dashboard.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Alex Gonzalez <alexg@balena.io>
+        signed-off-by: Alex Gonzalez <alexg@balena.io>
+      author: Alex Gonzalez
+  version: 2.15.10
+  title: ""
+  date: 2023-11-13T10:16:51.094Z
+- commits:
     - subject: "upgrade-2.x: perform a safe reboot taking locks into account"
       hash: 9a98532390631a820dfc06696ba0c50dd61159b5
       body: >
