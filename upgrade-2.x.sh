@@ -233,6 +233,18 @@ function _run_supervisor_update() {
     return "${ret}"
 }
 
+# Fetch the current and scheduled supervisor versions from the API
+#
+# Returns:
+#
+#  0: Success
+#  1: Failure
+#
+#  Outputs:
+#
+#  On success, a string separated string of current and scheduled supervisor
+#  versions.
+#
 function _fetch_supervisor_version() {
     local resp
     local supervisor_version
@@ -244,16 +256,15 @@ function _fetch_supervisor_version() {
             log ERROR "Could not get current supervisor version from the API, got ${resp}"
             return 1
         fi
-        # Make sure there is no scheduled supervisor update
         scheduled_supervisor_version=$(echo "${resp}" | jq -e -r '.d[0].should_be_managed_by__supervisor_release[0].supervisor_version' | tr -d 'v')
         if [ -n "${scheduled_supervisor_version}" ] && [ "${scheduled_supervisor_version}" != "null" ]; then
             if version_gt "${scheduled_supervisor_version}" "${supervisor_version}"; then
-                # The supervisor is scheduled to update - we can't tell what the current version is
-                log ERROR "Device has a scheduled supervisor update to version ${scheduled_supervisor_version}"
-                return 1
+		# The supervisor is scheduled to update
+                echo "${supervisor_version} ${scheduled_supervisor_version}"
+                return 0
             fi
         fi
-        echo "${supervisor_version}"
+        echo "${supervisor_version} ${supervisor_version}"
     else
         log ERROR "Could not fetch current supervisor version from the API, got ${resp}"
         return 1
@@ -297,7 +308,7 @@ function _patch_supervisor_version() {
             rm -f "${_errfile}"
             case "${_status_code}" in
                 2*) log "Successfully set supervision version in target state";rm -f "${_outfile}";return 0;;
-                4*) log WARN "[${_status_code}]: Bad request: $(cat "${_outfile}")"; rm -f "${_outfile}"; if current_version=$(_fetch_supervisor_version); then if version_gt "${current_version}" "${version}"; then return 0; else return 1; fi; else return 1; fi;;
+                4*) log WARN "[${_status_code}]: Bad request: $(cat "${_outfile}")"; rm -f "${_outfile}"; if current_version=$(_fetch_supervisor_version | cut -d " " -f1); then if version_gt "${current_version}" "${version}"; then return 0; else return 1; fi; else return 1; fi;;
                 *) log WARN "[${_status_code}]: Request failed: $(cat "${_outfile}")";rm -f "${_outfile}";return 1;;
             esac
         else
@@ -352,26 +363,44 @@ function upgrade_supervisor() {
         fi
     fi
 
-    if CURRENT_SUPERVISOR_VERSION=$(_fetch_supervisor_version); then
-        if version_gt "$target_supervisor_version" "$CURRENT_SUPERVISOR_VERSION" ; then
-            log "Supervisor update: will be upgrading from v${CURRENT_SUPERVISOR_VERSION} to v${target_supervisor_version}"
-            progress 90 "Running supervisor update"
-            if _patch_supervisor_version "$target_supervisor_version"; then
-                # No need to stop services as supervisor update will do that for us
-                if _run_supervisor_update; then
-                    if version_gt "6.5.9" "${target_supervisor_version}" ; then
-                        remove_containers
-                        log "Removing supervisor database for migration"
-                        rm /resin-data/resin-supervisor/database.sqlite || true
-                    fi
-                else
-                    log WARN "Failed to update supervisor to target state version - leave to first boot."
+    if supervisor_target_state_versions=$(_fetch_supervisor_version); then
+        read -r CURRENT_SUPERVISOR_VERSION SCHEDULED_SUPERVISOR_VERSION <<< "${supervisor_target_state_versions}"
+        log "Supervisor state: Target ${target_supervisor_version}, current ${CURRENT_SUPERVISOR_VERSION}, scheduled ${SCHEDULED_SUPERVISOR_VERSION}"
+
+        # If scheduled higher than current and target, update to scheduled
+        # If scheduled not higher than current:
+        #  If target higher than current, patch and update to target
+        #  If target not higher than current, do nothing
+
+        if ! version_gt "${SCHEDULED_SUPERVISOR_VERSION}" "${CURRENT_SUPERVISOR_VERSION}"; then
+            # Supervisor target state current version is higher or equal than the scheduled version.
+            if version_gt "$target_supervisor_version" "$CURRENT_SUPERVISOR_VERSION" ; then
+                # Supervisor target version is higher than current target state version
+                log "Patching supervisor target state from v${CURRENT_SUPERVISOR_VERSION} to v${target_supervisor_version}"
+                progress 90 "Patching supervisor update"
+                if ! _patch_supervisor_version "$target_supervisor_version"; then
+                    log ERROR "Failed to patch supervisor version in target state, bailing out."
                 fi
             else
-                log ERROR "Failed to patch supervisor version in target state, bailing out."
+                log "Supervisor update: no update needed."
+                return 0
             fi
         else
-            log "Supervisor update: no update needed."
+            # Supervisor target state scheduled version is higher than the current version
+            if version_gt "$SCHEDULED_SUPERVISOR_VERSION" "$target_supervisor_version" ; then
+                target_supervisor_version="$SCHEDULED_SUPERVISOR_VERSION"
+            fi
+        fi
+        log "Updating supervisor target state from v${CURRENT_SUPERVISOR_VERSION} to v${target_supervisor_version}"
+        progress 95 "Running supervisor update"
+        if _run_supervisor_update; then
+            if version_gt "6.5.9" "${target_supervisor_version}" ; then
+                remove_containers
+                log "Removing supervisor database for migration"
+                rm /resin-data/resin-supervisor/database.sqlite || true
+            fi
+        else
+            log WARN "Failed to update supervisor version - leave to next boot."
         fi
     else
         log ERROR "Failed to fetch current supervisor version from the API."
