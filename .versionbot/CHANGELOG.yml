@@ -1,4 +1,45 @@
 - commits:
+    - subject: "upgrade-2.x: do not fail update if there is a scheduled SV update"
+      hash: edfc5ce1e3f51940bd341237c5581d8196f414ef
+      body: >
+        Currently, HUP fails if there is a scheduled supervisor update pending
+
+        in the cloud to avoid concurrent updates.
+
+
+        This has caused a race condition as follows:
+
+
+        * Users start both a HUP and a SV update as the buttons are close to each
+          other and it's not that clear HUP will update the SV too
+        * As soon as the SV update is trigerred, the target state is patched by
+          the actions server.
+          target state.
+        * However, the supervisor upgrade is aborted in the actions server as it checks
+          whether the device is idle (and it is not because of HUP):
+          ```
+          actions-backend[8486]: 331a727bc378acf3cd86f305b917bdc16eada2c468fe3a0c41df5ab475be21fe POST actions.balena-devices.com /v1/8412784dc5bf1d5f1a78c5f6d6fbb5e1/supervisorupgrade 500 52 25.528ms
+          ```
+        * HUP fails
+
+        * HUP cannot be retried until the SV updates - which now only happens in a
+          timer once a day or on reboot
+
+        This change modifies the supervisor update logic to take into account
+
+        the provided target version, and the current and scheduled target state
+
+        version and acts accordingly.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Alex Gonzalez <alexg@balena.io>
+        signed-off-by: Alex Gonzalez <alexg@balena.io>
+      author: Alex Gonzalez
+  version: 2.15.11
+  title: ""
+  date: 2023-11-30T14:14:30.183Z
+- commits:
     - subject: "upgrade-2.x.sh: Avoid logging duplicates in transient systemd units"
       hash: 1db0d22fb3ddba0d03751ade629ad7f3e019e34c
       body: |
