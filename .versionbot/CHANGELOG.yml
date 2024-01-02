@@ -1,4 +1,25 @@
 - commits:
+    - subject: "upgrade-2.x: Block draft version upgrades using the release_tag version"
+      hash: 8ff13de4f65cae765f1e789c15ccbd66684045db
+      body: |
+        After this, HUPing to draft-OS releases will
+        only work using the raw_version. The
+        reasoning is to blocks users from accidentally
+        HUPing to a draft release. This also removes
+        the ambiguity that we atm have, where for
+        a draft release 3.2.1-2345, users can perform
+        the same HUP using either 3.2.1-2345 (found
+        via the raw_version field) and also
+        with 3.2.1 (found via the release_tag).
+        Partially reverts commit ce70f31ba4bda575fef4fecf0e50ac1eb3a1d8cf.
+      footer:
+        Change-type: patch
+        change-type: patch
+      author: Thodoris Greasidis
+  version: 2.15.12
+  title: ""
+  date: 2024-01-02T18:02:00.132Z
+- commits:
     - subject: "upgrade-2.x: do not fail update if there is a scheduled SV update"
       hash: edfc5ce1e3f51940bd341237c5581d8196f414ef
       body: >
