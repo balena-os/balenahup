@@ -929,9 +929,9 @@ function get_image_location() {
     if echo "${image}" | jq -e '. | length == 1' > /dev/null; then
         echo "${image}" | jq -r '.[0]'
     else
-        # TODO: Remove this release_tag fallback once the API migrates all hostApp release versions to the `release.semver` field.
-        # See: https://github.com/balena-io/balena-api/pull/4821
-        # Try with version and variant labels for backwards compatibility
+        # We still need to try finding the hostApp release by filtering using the deprecated release_tags,
+        # since the versioning format of balenaOS [2019.10.0.dev, 2022.01.0] was non-semver compliant
+        # and they were not migrated to the release semver fields.
         image=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${APIKEY}" \
