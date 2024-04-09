@@ -994,7 +994,7 @@ function find_delta() {
         delta=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} \
             "${DELTA_ENDPOINT}/api/v${DELTA_VERSION}/delta?src=${src_image}&dest=${target_image}" \
             -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${delta_token}" | jq -r '.name')
+            -H "Authorization: Bearer ${delta_token}" | jq -r '.name') || true
         if [ -n "${delta}" ]; then
             echo "${delta}"
         fi
