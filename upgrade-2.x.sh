@@ -42,8 +42,22 @@ LOCKFILE="/var/lock/resinhup.lock"
 LOCKFD=99
 ## Private functions
 _lock()             { flock "-$1" $LOCKFD; }
+_exit_handler() {
+    _exit_status=$?
+    if [ "${_exit_status}" -ne 0 ]; then
+        log "Exit on error ${_exit_status}"
+        if ! report_update_failed > /dev/null 2>&1; then
+            log "Failed to report progress on exit with status $?"
+        fi
+        if [ "${_exit_status}" -eq 9 ]; then
+           log "No concurrent updates allowed - lock file in place."
+        fi
+    fi
+    _no_more_locking
+    log "Lock removed - end."
+}
 _no_more_locking()  { _lock u; _lock xn && rm -f $LOCKFILE;rm -f "${outfifo}";rm -f "${errfifo}"; }
-_prepare_locking()  { eval "exec $LOCKFD>\"$LOCKFILE\""; trap _no_more_locking EXIT; }
+_prepare_locking()  { eval "exec $LOCKFD>\"$LOCKFILE\""; trap _exit_handler EXIT; }
 # Public functions
 exlock_now()        { _lock xn; }  # obtain an exclusive lock immediately or fail
 
@@ -121,6 +135,7 @@ function report_update_failed() {
         if resin-device-progress --percentage "${perc}" --state "${state}"; then
             continue
         fi
+        log WARN "Retrying failure report - try $c"
         sleep 60
     done
 }
@@ -148,7 +163,6 @@ function log {
     endtime=$(date +%s)
     if [ "$loglevel" == "ERROR" ]; then
         printf "[%09d%s%s\n" "$((endtime - starttime))" "][$loglevel]" "$1" >> /dev/stderr
-        report_update_failed
         exit 1
     else
         printf "[%09d%s%s\n" "$((endtime - starttime))" "][$loglevel]" "$1"
@@ -1103,7 +1117,21 @@ DELTA_ENDPOINT=$(jq -r '.deltaEndpoint' $CONFIGJSON)
 [ -z "${API_ENDPOINT}" ] && log "Error parsing config.json" && exit 1
 [ -z "${DELTA_ENDPOINT}" ] && log "Error parsing config.json" && exit 1
 
-trap 'report_update_failed;exit 1' ERR INT TERM
+_err_handler(){
+    log ERROR "Interrupted on error"
+}
+
+_int_handler(){
+    log ERROR "Interrupted"
+}
+
+_term_handler(){
+    log ERROR "Terminated"
+}
+
+trap '_err_handler' ERR
+trap '_int_handler' INT
+trap '_term_handler' TERM
 
 # redirect all logs to the logfile, but also stderr to console (proxy)
 outfifo=$(mktemp -u)
