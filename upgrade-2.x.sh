@@ -159,13 +159,11 @@ function log {
             loglevel=INFO
             ;;
     esac
-    echo "${1}" | systemd-cat --level-prefix=0 --identifier="$(basename "$0")" --priority="${priority}" 2> /dev/null || true
+    echo "${1}" | systemd-cat --level-prefix=0 --identifier="${SCRIPTNAME}" --priority="${priority}" 2> /dev/null || true
     endtime=$(date +%s)
+    printf "[%s][%09d%s%s\n" "$SCRIPTNAME" "$((endtime - starttime))" "][$loglevel]" "$1"
     if [ "$loglevel" == "ERROR" ]; then
-        printf "[%09d%s%s\n" "$((endtime - starttime))" "][$loglevel]" "$1" >> /dev/stderr
         exit 1
-    else
-        printf "[%09d%s%s\n" "$((endtime - starttime))" "][$loglevel]" "$1"
     fi
 }
 
