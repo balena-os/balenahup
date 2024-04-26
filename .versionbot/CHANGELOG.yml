@@ -1,4 +1,32 @@
 - commits:
+    - subject: "upgrade-2.x: avoid log function blocking execution"
+      hash: 046fd01a79356ada733ffff8c28c661f7ca670a7
+      body: |
+        Appending to /dev/stderr can cause the script to block if the device
+        is not available.
+
+        Also, always include the script name in the logs.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Alex Gonzalez <alexg@balena.io>
+        signed-off-by: Alex Gonzalez <alexg@balena.io>
+      author: Alex Gonzalez
+    - subject: "upgrade-2.x: move error reporting to exit handler"
+      hash: 2ce06a41acf9ec307c8dda9f7c47e0a97d3b6a03
+      body: |
+        By using the exit handler and checking for the error code the script
+        will always attempt to report a failed update.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Alex Gonzalez <alexg@balena.io>
+        signed-off-by: Alex Gonzalez <alexg@balena.io>
+      author: Alex Gonzalez
+  version: 2.15.14
+  title: ""
+  date: 2024-04-26T09:47:49.692Z
+- commits:
     - subject: "Upgrade-2.x.sh: Comment why we still need to use the release_tags"
       hash: 15f4bc62ce538aca173de42a92b1fb819ad20120
       body: ""
