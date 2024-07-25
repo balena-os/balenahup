@@ -1,7 +1,7 @@
 #############
 # Build image
 #############
-FROM resin/raspberrypi3-alpine:3.6 AS build
+FROM resin/raspberrypi3-alpine:3.8 AS build
 
 # Install build requirements
 RUN apk add --no-cache \
@@ -17,7 +17,7 @@ RUN find /usr/lib/ | grep -E "(__pycache__|\.pyc|\.pyo$)" | xargs rm -rf
 ###############
 # Shipped image
 ###############
-FROM resin/raspberrypi3-alpine:3.6
+FROM resin/raspberrypi3-alpine:3.8
 
 WORKDIR /app
 
