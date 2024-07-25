@@ -1,4 +1,4 @@
-urllib3==1.21.1
+urllib3==1.26.19
 sh==1.12.14
 pyparted==3.10.7
 binaryornot==0.4.3
