@@ -392,6 +392,6 @@ cd ${takeover_path}
 # No need to specify config.json path; defaults to /mnt/boot.
 # API check fails on BoB, so disabled
 res=$(./takeover -i balenaos.img.gz \
-   --no-ack --no-nwmgr-check --no-os-check --no-api-check --no-vpn-check \
+   --no-ack --no-nwmgr-check --no-os-check --no-vpn-check \
    --log-level debug -l /dev/sda1 --s2-log-level debug)
 log ERROR "Takeover result ${res}; OS not updated"
