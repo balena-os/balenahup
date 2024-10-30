@@ -693,6 +693,18 @@ function hostapp_based_update {
         storage_driver=$(cat /boot/storage-driver)
     fi
 
+    local active_part_dev
+    local inactive_part_dev
+
+    active_part_dev=$(df -P /mnt/sysroot/active | tail -1 | awk '{print $1}')
+    inactive_part_dev=$(df -P /mnt/sysroot/inactive | tail -1 | awk '{print $1}')
+
+    # Check that the inactive partition is not the same as active.
+    # This avoids any issues with partitions being mislabled leading to a bricked device.
+    if [[ "${active_part_dev}" = "${inactive_part_dev}" ]]; then
+        log ERROR "Active and inactive partitions are the same, bailing out..."
+    fi
+
     # remove REC files on boot partition
     remove_rec_files
 
