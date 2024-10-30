@@ -1,4 +1,19 @@
 - commits:
+    - subject: Check that active and inactive partitions differ
+      hash: c62f93e14440bf22a2cff888faf5706f85fb1c57
+      body: |
+        This avoids any issues with partitions being mislabeled
+        leading to a bricked device.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Kyle Harding <kyle@balena.io>
+        signed-off-by: Kyle Harding <kyle@balena.io>
+      author: Kyle Harding
+  version: 2.15.15
+  title: ""
+  date: 2024-10-30T22:29:37.891Z
+- commits:
     - subject: "upgrade-2.x: avoid log function blocking execution"
       hash: 046fd01a79356ada733ffff8c28c661f7ca670a7
       body: |
