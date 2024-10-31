@@ -696,8 +696,9 @@ function hostapp_based_update {
     local active_part_dev
     local inactive_part_dev
 
-    active_part_dev=$(df -P /mnt/sysroot/active | tail -1 | awk '{print $1}')
-    inactive_part_dev=$(df -P /mnt/sysroot/inactive | tail -1 | awk '{print $1}')
+    # Resolve the active and inactive partition devices and canonicalize links
+    active_part_dev=$(df -P /mnt/sysroot/active | tail -1 | awk '{print $1}' | xargs readlink -f)
+    inactive_part_dev=$(df -P /mnt/sysroot/inactive | tail -1 | awk '{print $1}' | xargs readlink -f)
 
     # Check that the inactive partition is not the same as active.
     # This avoids any issues with partitions being mislabled leading to a bricked device.
