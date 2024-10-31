@@ -1,4 +1,19 @@
 - commits:
+    - subject: Resolve part UUID links returned by df
+      hash: b71e479204a554db7fe18fb7cdb56013dc856064
+      body: |
+        On some device types, the df command will return
+        a part UUID instead of the root device name.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Kyle Harding <kyle@balena.io>
+        signed-off-by: Kyle Harding <kyle@balena.io>
+      author: Kyle Harding
+  version: 2.15.16
+  title: ""
+  date: 2024-10-31T16:37:29.559Z
+- commits:
     - subject: Check that active and inactive partitions differ
       hash: c62f93e14440bf22a2cff888faf5706f85fb1c57
       body: |
