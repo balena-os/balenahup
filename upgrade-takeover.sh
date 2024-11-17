@@ -368,7 +368,7 @@ mkdir -p "${takeover_path}"
 
 # Retrieve image, or let takeover do this?
 # Validate target image version exists?
-if [ "${target_version}" != "5.3.3" ]; then
+if [ "${target_version}" != "6.0.39" ]; then
     log ERROR "Target host OS version ${target_version} not found"
 fi
 # Validate target hostOS image available
