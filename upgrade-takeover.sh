@@ -82,6 +82,9 @@ Options:
   -h, --help
         Display this help and exit.
 
+  --force-slug <SLUG>
+        Override slug detection and force this slug to be used for the script.
+
   --hostos-version <HOSTOS_VERSION>
         Run the updater for this specific HostOS version as semver or ESR, where
         semver is in the format major.minor.patch, like 2.5.1; and ESR is in the
@@ -212,6 +215,40 @@ function download_takeover_binary() {
     rm "${takeover_path}/takeover.tar.gz"
 }
 
+# Download target balenaOS image; expects a public image
+# Requires:
+#   $target_version; already verified
+#   $SLUG; already verified
+#   #takeover_page; already verified
+# Exits script on download failure
+function download_target_image() {
+    log "Downloading target image"
+    # Don't use --fail; we want the status code
+    curl_no_fail="curl --silent --retry 10 --location --compressed"
+
+    status_code=$(\
+        CURL_CA_BUNDLE="${TMPCRT}" ${curl_no_fail} -H "Authorization: Bearer ${APIKEY}" \
+            -H "Content-Type: application/json" -w "%{http_code}" \
+            --output "${takeover_path}/balenaos.img.gz" \
+            "${API_ENDPOINT}/downloa?deviceType=${SLUG}&version=${target_version}&fileType=.gz" \
+             2>/dev/null \
+         )
+    if [ -n "${status_code}" ]; then
+        # expecting 200
+        if [ "${status_code:0:1}" == "2" ]; then
+            log "Download image success; code: ${status_code}"
+        else
+            log ERROR "Download image failed; code: ${status_code}"
+        fi
+    else
+        log WARN "Download image; no status code"
+    fi
+    # sanity check
+    if [ ! -f "${takeover_path}/balenaos.img.gz" ]; then
+        log ERROR "Target image not found"
+    fi
+}
+
 
 ###
 # Script start
@@ -306,6 +343,13 @@ while [[ $# -gt 0 ]]; do
             help
             exit 0
             ;;
+        --force-slug)
+            if [ -z "$2" ]; then
+                log ERROR "\"$1\" argument needs a value."
+            fi
+            FORCED_SLUG=$2
+            shift
+            ;;
         --hostos-version)
             if [ -z "$2" ]; then
                 log ERROR "\"$1\" argument needs a value."
@@ -338,6 +382,15 @@ fi
 
 progress 25 "Preparing OS update"
 
+# Retrieve slug (device type) from API, and use this value if not provided to  the script.
+# Verify this call succeeds?
+FETCHED_SLUG=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -H "Authorization: Bearer ${APIKEY}" \
+    "${API_ENDPOINT}/v6/device?\$select=is_of__device_type&\$expand=is_of__device_type(\$select=slug)&\$filter=uuid%20eq%20%27${UUID}%27" 2>/dev/null \
+    | jq -r '.d[0].is_of__device_type[0].slug'
+    )
+
+SLUG=${FORCED_SLUG:-$FETCHED_SLUG}
+
 # Validate target version in semver (major > 1) or year.month.patch format
 if [ -n "$target_version" ]; then
     case $target_version in
@@ -366,17 +419,14 @@ esac
 takeover_path="/mnt/data/takeover"
 mkdir -p "${takeover_path}"
 
-# Retrieve image, or let takeover do this?
-# Validate target image version exists?
-if [ "${target_version}" != "6.0.39" ]; then
-    log ERROR "Target host OS version ${target_version} not found"
-fi
-# Validate target hostOS image available
+# Download target hostOS image as required
 if [ ! -f "${takeover_path}/balenaos.img.gz" ]; then
-    log ERROR "Target host OS image not found"
+    download_target_image
+else
+    log "balenaOS target image available; download not required"
 fi
 
-# Retrieve takeover binary
+# Download takeover binary as required
 if [ ! -f "${takeover_path}/takeover" ]; then
     download_takeover_binary
 else
