@@ -204,7 +204,7 @@ function download_takeover_binary() {
             log ERROR "Takeover binary for arch: ${architecture} not found"
     esac
 
-    download_url="https://github.com/balena-os/takeover/releases/download/v0.8.3/takeover-${architecture}-unknown-linux-musl.tar.gz"
+    download_url="https://github.com/balena-os/takeover/releases/download/v0.9.0-dev.1/takeover-${architecture}-unknown-linux-musl.tar.gz"
     log "Downloading takeover binary ${download_url}"
 
     ${CURL} -o "${takeover_path}/takeover.tar.gz" $download_url || log ERROR "Could not download takeover binary, aborting."
@@ -230,7 +230,7 @@ function download_target_image() {
         CURL_CA_BUNDLE="${TMPCRT}" ${curl_no_fail} -H "Authorization: Bearer ${APIKEY}" \
             -H "Content-Type: application/json" -w "%{http_code}" \
             --output "${takeover_path}/balenaos.img.gz" \
-            "${API_ENDPOINT}/downloa?deviceType=${SLUG}&version=${target_version}&fileType=.gz" \
+            "${API_ENDPOINT}/download?deviceType=${SLUG}&version=${target_version}&fileType=.gz" \
              2>/dev/null \
          )
     if [ -n "${status_code}" ]; then
