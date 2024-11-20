@@ -9,7 +9,7 @@
 #
 # Outputs:
 #  * Writes log file to /mnt/boot/balenahup
-#  * Notifies balenaAPI by PATCHing the device via /usr/bin resin-device-progress script
+#  * Notifies balenaAPI by PATCHing the device via /usr/bin/resin-device-progress script
 #
 # Results:
 #  * Flashes new OS and reboots into it on success
@@ -19,12 +19,6 @@
 #
 # Notes:
 # This script was derived from upgrade-2.x.sh for traditional balenahup upgrades.
-#
-# Variable SLUG (device type) is read from /etc/os-release, but unused here.
-# The upgrade-2.x.sh script retrieves the slug from the backend API or allows
-# specifying it as an argument to the script. Reinstate those mechanisms if we
-# need that value, for example to change device type (Intel NUC -> Generic amd64).
-#
 
 SCRIPTNAME=upgrade-takeover.sh
 
@@ -90,6 +84,10 @@ Options:
         semver is in the format major.minor.patch, like 2.5.1; and ESR is in the
         format year.month.patch, like 2024.4.0. The version must begin with a
         digit, not a 'v'. This is a mandatory argument.
+
+  --balenaos-registry
+        Unused but accepted for compatibility with upgrade-2.x.sh when called
+        by balena-proxy.
 EOF
 }
 
@@ -155,6 +153,10 @@ function version_gt() {
 
 # Compare the provided percentage and state values with backend device API
 # provisioning_progress and provisioning_state.
+#
+# $1 -- local percentage
+# $2 -- local state
+#
 # Return 0 if the values are equal; otherwise return 1
 function compare_device_state() {
     pct=$1
@@ -193,8 +195,11 @@ function remove_rec_files() {
 
 # Download takeover tool binary for device's architecture
 # Requires $takeover_path
+# $1 -- takeover release, like v0.9.0
 # Exits script on download failure
 function download_takeover_binary() {
+    takeover_release="$1"
+    
     architecture=$(uname -m)
     case ${architecture} in
         aarch64|x86_64)
@@ -204,10 +209,10 @@ function download_takeover_binary() {
             log ERROR "Takeover binary for arch: ${architecture} not found"
     esac
 
-    download_url="https://github.com/balena-os/takeover/releases/download/v0.9.0-dev.1/takeover-${architecture}-unknown-linux-musl.tar.gz"
+    download_url="https://github.com/balena-os/takeover/releases/download/${takeover_release}/takeover-${architecture}-unknown-linux-musl.tar.gz"
     log "Downloading takeover binary ${download_url}"
 
-    ${CURL} -o "${takeover_path}/takeover.tar.gz" $download_url || log ERROR "Could not download takeover binary, aborting."
+    ${CURL} -o "${takeover_path}/takeover.tar.gz" "$download_url" || log ERROR "Could not download takeover binary, aborting."
 
     # Extract and prepare for use
     tar -C "${takeover_path}" -zxvf "${takeover_path}/takeover.tar.gz"
@@ -219,7 +224,7 @@ function download_takeover_binary() {
 # Requires:
 #   $target_version; already verified
 #   $SLUG; already verified
-#   #takeover_page; already verified
+#   $takeover_page; already verified
 # Exits script on download failure
 function download_target_image() {
     log "Downloading target image"
@@ -280,10 +285,10 @@ else
 fi
 # Use the user's api key if it exists rather than deviceApiKey; it means we haven't
 # done the key exchange yet.
-APIKEY=$(jq -r '.apiKey // .deviceApiKey' $CONFIGJSON)
-UUID=$(jq -r '.uuid' $CONFIGJSON)
-API_ENDPOINT=$(jq -r '.apiEndpoint' $CONFIGJSON)
-DELTA_ENDPOINT=$(jq -r '.deltaEndpoint' $CONFIGJSON)
+APIKEY=$(jq -r '.apiKey // .deviceApiKey' "${CONFIGJSON}")
+UUID=$(jq -r '.uuid' "${CONFIGJSON}")
+API_ENDPOINT=$(jq -r '.apiEndpoint' "${CONFIGJSON}")
+DELTA_ENDPOINT=$(jq -r '.deltaEndpoint' "${CONFIGJSON}")
 
 [ -z "${APIKEY}" ] && log "Error parsing config.json" && exit 1
 [ -z "${UUID}" ] && log "Error parsing config.json" && exit 1
@@ -294,7 +299,7 @@ DELTA_ENDPOINT=$(jq -r '.deltaEndpoint' $CONFIGJSON)
 # We create this primarily for use by curl. The OS started integrating this CA
 # with v2.58, but use this variable in case we have an older version.
 TMPCRT=$(mktemp)
-jq -r '.balenaRootCA' < ${CONFIGJSON} | base64 -d > "${TMPCRT}"
+jq -r '.balenaRootCA' < "${CONFIGJSON}" | base64 -d > "${TMPCRT}"
 cat /etc/ssl/certs/ca-certificates.crt >> "${TMPCRT}"
 
 # Set up curl for use within a script, retry many times for reliability, follow
@@ -364,6 +369,12 @@ while [[ $# -gt 0 ]]; do
             esac
             shift
             ;;
+        --balenaos-registry)
+            if [ -z "$2" ]; then
+                log ERROR "\"$1\" argument needs a value."
+            fi
+            shift
+            ;;
         *)
             log WARN "Unrecognized option $1."
             ;;
@@ -428,7 +439,7 @@ fi
 
 # Download takeover binary as required
 if [ ! -f "${takeover_path}/takeover" ]; then
-    download_takeover_binary
+    download_takeover_binary "v0.9.0-dev.1"
 else
     log "Takeover binary available; download not required"
 fi
@@ -441,6 +452,8 @@ cd ${takeover_path}
 
 # No need to specify config.json path; defaults to /mnt/boot.
 # API check fails on BoB, so disabled
+# We do *not* expect takeover to return on success; it flashes the device with
+# the new balenaOS.
 res=$(./takeover -i balenaos.img.gz \
    --no-ack --no-nwmgr-check --no-os-check --no-vpn-check \
    --log-level debug -l /dev/sda1 --s2-log-level debug)
