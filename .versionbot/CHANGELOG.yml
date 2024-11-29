@@ -1,4 +1,17 @@
 - commits:
+    - subject: Add takeover based upgrade script
+      hash: 9997307aab2d583f0b6c9570e6ea44c585ed22fc
+      body: ""
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Ken Bannister <kb2ma@runbox.com>
+        signed-off-by: Ken Bannister <kb2ma@runbox.com>
+      author: Ken Bannister
+  version: 2.15.17
+  title: ""
+  date: 2024-11-29T15:49:32.074Z
+- commits:
     - subject: Resolve part UUID links returned by df
       hash: b71e479204a554db7fe18fb7cdb56013dc856064
       body: |
@@ -632,39 +645,25 @@
 - commits:
     - subject: "upgrade-2.x: apply jetson fix to OS < v2.84.7"
       hash: 26519d2cb37a6967204a5e24f5633b5610df4d0b
-      body: >
+      body: |
         A mistyped path in the hostapp-update hooks in meta-balena caused the
-
         extlinux.conf file to not be persisted across HUP, causing variables set
-
         in the config to be reset by the supervisor, triggering untimely reboots
-
         during upgrades.
 
-
         A fix has been made to meta-balena [0] to properly persist the
-
         configuration across a HUP, but this will require an OS upgrade to take
-
         effect.
 
-
         The supervisor has a similar fix in place to prevent reboots when
-
         healthcheck breadcrumbs are present, but this requires a new supervisor
-
         release.
 
-
         To cover devices that are running older supervisor releases on older OS
-
         versions, extend the version check to apply the Jetson fix to affected
-
         OS versions.
 
-
-        [0]
-        https://github.com/balena-os/meta-balena/commit/096024808224aea2100e2a2a1f95ef75e23493ef
+        [0] https://github.com/balena-os/meta-balena/commit/096024808224aea2100e2a2a1f95ef75e23493ef
       footer:
         Change-type: patch
         change-type: patch
