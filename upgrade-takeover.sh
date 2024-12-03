@@ -186,7 +186,7 @@ function cleanup_work_dir() {
     # Ensure takover path is not just '/' because deletion command is 
     if [[ -n "${work_dir}" && "${#work_dir}" -gt 3 ]]; then
         if [[ -d "${work_dir}" ]]; then
-            rm -rf "${work_dir:?}/*"
+            rm -rf "${work_dir:?}/"*
         fi
     fi
 }
@@ -300,6 +300,11 @@ starttime=$(date +%s)
 if [ -d "/mnt/data/resinhup" ] && [ ! -e "/mnt/data/balenahup" ]; then
     ln -s "/mnt/data/resinhup" "/mnt/data/balenahup"
 fi
+# Directory for downloaded/temporary files. MUST be in data partition since stores
+# sizable downloaded OS image. Conserves memory for takeover binary. Must define
+# before a call to 'log ERROR'.
+work_dir="/mnt/data/takeover"
+
 # LOGFILE init and header
 logtime=$(date +"%Y%m%d_%H%M%S")
 LOGFILE="/mnt/data/balenahup/$SCRIPTNAME.${logtime}.log"
@@ -454,9 +459,6 @@ case $VERSION in
         ;;
 esac
 
-# Ensure working directory is empty; takeover binary does not cleanup on failure.
-cleanup_work_dir
-
 # Verify data partition filesystem/storage is clean. Flashing over bad sectors
 # may brick device.
 data_device=$(mount |grep /mnt/data |awk '{print $1}' |head -n 1)
@@ -467,15 +469,14 @@ if [ -n "${data_device}" ]; then
     fi
 fi
 
-# Ensure takeover environment is prepared. We'll add files here. MUST be in
-# data partition since stores sizable downloaded OS image. Conserves memory for
-# takeover binary.
-work_dir="/mnt/data/takeover"
+# Ensure any already existing working directory is empty; takeover binary does
+# not clean it up on failure.
+cleanup_work_dir
 mkdir -p "${work_dir}"
 
 # Retrieve target hostOS image and takeover binary
 download_target_image
-download_takeover_binary "v0.9.0-dev.1"
+download_takeover_binary latest
 
 progress 50 "Running OS update"
 
@@ -483,12 +484,14 @@ progress 50 "Running OS update"
 # Must run from a writable directory; takeover creates temp files there
 cd ${work_dir}
 
-# No need to specify config.json path; defaults to /mnt/boot.
-# API check fails on BoB, so disabled
-# We do *not* expect takeover to return on success; it flashes the device with
-# the new balenaOS.
-res=$(./takeover -i balenaos.img.gz \
+# Takeover returns '1' on failure in stage 1, so handled by the ERR trap defined
+# above.
+# Takeover reboots on failure in stage 2 and on eventual success, and so does
+# not return here. Takeover itself reports failure/success to balenaCloud when
+# it reboots due to the --report-hup-progress option below.
+# No need to specify config.json path to takeover; defaults to /mnt/boot.
+./takeover -i balenaos.img.gz \
    --no-ack --no-nwmgr-check --no-os-check \
-   --log-level debug --fallback-log --fallback-log-file "advanced.${logtime}.log" \
-   --s2-log-level debug --report-hup-progress)
-log ERROR "Takeover result ${res}; OS not updated"
+   --log-level debug --fallback-log --fallback-log-dir balenahup \
+   --fallback-log-filename "advanced.${logtime}.log" \
+   --s2-log-level debug --report-hup-progress
