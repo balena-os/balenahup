@@ -1,4 +1,20 @@
 - commits:
+    - subject: Fixes to takeover upgrade script in preparation for release
+      hash: 9461800fa010b522cd712143ea930f4d9e3be007
+      body: |
+        * Ensure work dir cleaned up
+        * Update for revised takeover binary options
+        * Use latest release
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Ken Bannister <kb2ma@runbox.com>
+        signed-off-by: Ken Bannister <kb2ma@runbox.com>
+      author: Ken Bannister
+  version: 2.15.18
+  title: ""
+  date: 2024-12-05T13:17:21.031Z
+- commits:
     - subject: Add takeover based upgrade script
       hash: 9997307aab2d583f0b6c9570e6ea44c585ed22fc
       body: ""
