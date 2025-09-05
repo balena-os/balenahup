@@ -309,7 +309,7 @@ function _patch_supervisor_version() {
     UPDATER_SUPERVISOR_TAG="v${version}"
 
     # Get the supervisor id
-    resp=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} --header "Authorization: Bearer ${APIKEY}" "${API_ENDPOINT}/v5/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'${UPDATER_SUPERVISOR_TAG}'))")
+    resp=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} --header "Authorization: Bearer ${APIKEY}" "${API_ENDPOINT}/v5/supervisor_release?\$select=id,image_name&\$filter=device_type%20eq%20'$SLUG'%20and%20supervisor_version%20eq%20'${UPDATER_SUPERVISOR_TAG}'")
     if UPDATER_SUPERVISOR_ID=$(echo "${resp}" | jq -e -r '.d[0].id'); then
         log "Extracted supervisor vars: ID: $UPDATER_SUPERVISOR_ID"
         log "Setting supervisor version in the API..."
@@ -949,7 +949,7 @@ function get_image_location() {
     image=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} \
         -H "Content-Type: application/json" \
         -H "Authorization: Bearer ${APIKEY}" \
-        "${API_ENDPOINT}/v6/release?\$select=id&\$expand=contains__image/image&\$filter=(belongs_to__application/any(a:a/is_for__device_type/any(dt:dt/slug%20eq%20'${SLUG}')%20and%20is_host%20eq%20true))%20and%20is_invalidated%20eq%20false%20and%20raw_version%20eq%20'${version}'" \
+        "${API_ENDPOINT}/v6/release?\$select=id&\$expand=contains__image/image&\$filter=belongs_to__application/any(a:a/is_for__device_type/any(dt:dt/slug%20eq%20'${SLUG}')%20and%20is_host%20eq%20true)%20and%20is_invalidated%20eq%20false%20and%20raw_version%20eq%20'${version}'" \
         | jq -r "[.d[] | .contains__image[0].image[0] | [.is_stored_at__image_location, .content_hash] | \"\(.[0])@\(.[1])\"]")
     if echo "${image}" | jq -e '. | length == 1' > /dev/null; then
         echo "${image}" | jq -r '.[0]'
@@ -960,7 +960,7 @@ function get_image_location() {
         image=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${APIKEY}" \
-            "${API_ENDPOINT}/v6/release?\$select=id&\$expand=contains__image/image&\$filter=(belongs_to__application/any(a:a/is_for__device_type/any(dt:dt/slug%20eq%20'${SLUG}')%20and%20is_host%20eq%20true))%20and%20is_final%20eq%20true%20and%20is_invalidated%20eq%20false%20and%20(release_tag/any(rt:(rt/tag_key%20eq%20'version')%20and%20(rt/value%20eq%20'${version}')))%20and%20((release_tag/any(rt:(rt/tag_key%20eq%20'variant')%20and%20(rt/value%20eq%20'${variant_tag}')))%20or%20not(release_tag/any(rt:rt/tag_key%20eq%20'variant')))" \
+            "${API_ENDPOINT}/v6/release?\$select=id&\$expand=contains__image/image&\$filter=belongs_to__application/any(a:a/is_for__device_type/any(dt:dt/slug%20eq%20'${SLUG}')%20and%20is_host%20eq%20true)%20and%20is_final%20eq%20true%20and%20is_invalidated%20eq%20false%20and%20release_tag/any(rt:rt/tag_key%20eq%20'version'%20and%20rt/value%20eq%20'${version}')%20and%20(release_tag/any(rt:rt/tag_key%20eq%20'variant'%20and%20rt/value%20eq%20'${variant_tag}')%20or%20not%20release_tag/any(rt:rt/tag_key%20eq%20'variant'))" \
             | jq -r "[.d[] | .contains__image[0].image[0] | [.is_stored_at__image_location, .content_hash] | \"\(.[0])@\(.[1])\"]")
         if echo "${image}" | jq -e '. | length == 1' > /dev/null; then
             echo "${image}" | jq -r '.[0]'
@@ -1314,7 +1314,7 @@ else
 fi
 if [ -n "${delta_image}" ]; then
     delta_size=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -H "Authorization: Bearer ${APIKEY}" \
-    "${API_ENDPOINT}/v5/delta?\$filter=((status%20eq%20'success')%20and%20(version%20eq%20'${DELTA_VERSION}')%20and%20(is_stored_at__location%20eq%20'${delta_image}'))" 2>/dev/null \
+    "${API_ENDPOINT}/v5/delta?\$filter=status%20eq%20'success'%20and%20version%20eq%20'${DELTA_VERSION}'%20and%20is_stored_at__location%20eq%20'${delta_image}'" 2>/dev/null \
     | jq -r '.d[0].size|tonumber / (1024.0 * 1024.0) | floor' 2>/dev/null || /bin/true)
     log "Found delta image: ${delta_image}, size: ${delta_size:-unknown} MB"
 
