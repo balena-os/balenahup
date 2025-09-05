@@ -1243,7 +1243,7 @@ progress 25 "Preparing OS update"
 
 
 FETCHED_SLUG=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -H "Authorization: Bearer ${APIKEY}" \
-"${API_ENDPOINT}/v6/device?\$select=is_of__device_type&\$expand=is_of__device_type(\$select=slug)&\$filter=uuid%20eq%20%27${UUID}%27" 2>/dev/null \
+"${API_ENDPOINT}/v6/device(uuid='${UUID}')?\$select=is_of__device_type&\$expand=is_of__device_type(\$select=slug)" 2>/dev/null \
 | jq -r '.d[0].is_of__device_type[0].slug'
 )
 
