@@ -1,5 +1,0 @@
-urllib3==1.21.1
-sh==1.12.14
-pyparted==3.10.7
-binaryornot==0.4.3
-docker-py==1.10.6
