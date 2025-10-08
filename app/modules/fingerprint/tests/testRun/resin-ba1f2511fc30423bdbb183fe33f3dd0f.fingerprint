@@ -1,7 +1,0 @@
-11 11 68b329da9893e34099c7d8ad5cb9c940    ./fingerprint/tests/testRun/root_tree/dir4/file1
-11 11 68b329da9893e34099c7d8ad5cb9c940    ./fingerprint/tests/testRun/root_tree/dir5/dir1/file1
-11 11 d41d8cd98f00b204e9800998ecf8427e    ./fingerprint/tests/testRun/root_tree/dir5/dir1/file2
-11 11 68b329da9893e34099c7d8ad5cb9c940    ./fingerprint/tests/testRun/root_tree/dir5/file1
-11 11 ba1f2511fc30423bdbb183fe33f3dd0f    ./fingerprint/tests/testRun/root_tree/etc/timestamp
-11 11 68b329da9893e34099c7d8ad5cb9c940    ./fingerprint/tests/testRun/root_tree/file1
-11 11 d41d8cd98f00b204e9800998ecf8427e    ./fingerprint/tests/testRun/root_tree/file2
