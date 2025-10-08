@@ -1,4 +1,21 @@
 - commits:
+    - subject: Remove files for obsolete Python based image build
+      hash: 9118bc6407e36d300952af8d5ebed42c25951fb6
+      body: |
+        * Repository in transition to a new distribution mechanism
+        * Upgrade scripts retained pending review
+        * Truncate README to transitional message
+      footer:
+        Change-type: major
+        change-type: major
+        Signed-off-by: Ken Bannister <kb2ma@runbox.com>
+        signed-off-by: Ken Bannister <kb2ma@runbox.com>
+      author: Ken Bannister
+      nested: []
+  version: 3.0.0
+  title: ""
+  date: 2025-10-08T23:00:00.676Z
+- commits:
     - subject: Fixes to takeover upgrade script in preparation for release
       hash: 9461800fa010b522cd712143ea930f4d9e3be007
       body: |
