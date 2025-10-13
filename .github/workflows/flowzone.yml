@@ -26,3 +26,6 @@ jobs:
         github.event_name == 'pull_request_target'
       )
     secrets: inherit
+    with:
+      balena_slugs: |
+        balena_os/balenahup
