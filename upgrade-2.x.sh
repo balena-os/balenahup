@@ -926,7 +926,7 @@ function find_partitions {
 }
 
 #######################################
-# Query public apps for a matching image
+# Query public apps for a matching OS image based on version
 # Globals:
 #   APIKEY
 #   API_ENDPOINT
@@ -937,7 +937,7 @@ function find_partitions {
 # Returns:
 #   Registry URL for desired image
 #######################################
-function get_image_location() {
+function locate_image_for_version {
     local variant_tag
     # we need to strip the target_version's variant tag to query the API properly
     local version=${1/.dev/}
@@ -972,6 +972,30 @@ function get_image_location() {
 }
 
 #######################################
+# Query public apps for a matching OS image based on release
+# Globals:
+#   APIKEY
+#   API_ENDPOINT
+#   SLUG
+# Arguments:
+#   release_id: the release to look for
+# Returns:
+#   Registry URL for desired image
+#######################################
+function locate_image_for_release {
+    local release_id=${1}
+
+    # Include filters in query like locate_image_for_version() to confirm
+    # expected device type, is a hostapp, and not invalidated.
+    image=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer ${APIKEY}" \
+        "${API_ENDPOINT}/v6/release(${release_id})?\$select=id&\$expand=contains__image/image&\$filter=(belongs_to__application/any(a:a/is_for__device_type/any(dt:dt/slug%20eq%20'${SLUG}')%20and%20is_host%20eq%20true))%20and%20is_invalidated%20eq%20false" \
+        | jq -r "[.d[] | .contains__image[0].image[0] | [.is_stored_at__image_location, .content_hash] | \"\(.[0])@\(.[1])\"]")
+    echo "${image}"
+}
+
+#######################################
 # Get a delta token
 # Globals:
 #   APIKEY
@@ -995,7 +1019,7 @@ function get_delta_token() {
 }
 
 #######################################
-# Find a delta in the registry between two hostapp versions using the API
+# Find a delta in the registry between current hostapp image and target image
 # Globals:
 #   APIKEY
 #   DELTA_ENDPOINT
@@ -1010,7 +1034,7 @@ function find_delta() {
     local target_image=${1}
     local src_image
     # shellcheck disable=SC2153
-    src_image=$(get_image_location "${VERSION}")
+    src_image=$(locate_image_for_version "${VERSION}")
     if [ -z "${src_image}" ]; then
         return
     else
@@ -1185,6 +1209,14 @@ while [[ $# -gt 0 ]]; do
             esac
             shift
             ;;
+        --release-id)
+            if [ -z "$2" ]; then
+                log ERROR "\"$1\" argument needs a value."
+            fi
+            target_release=$2
+            log "Target release ID: ${target_release}"
+            shift
+            ;;
         --resinos-registry | --balenaos-registry)
             if [ -z "$2" ]; then
                 log ERROR "\"$1\" argument needs a value."
@@ -1231,8 +1263,11 @@ _prepare_locking
 # Try to get lock, and exit if cannot, meaning another instance is running already
 exlock_now || exit 9
 
-if [ -z "$target_version" ]; then
-    log ERROR "--hostos-version is required."
+if [ -z "$target_version" ] && [ -z "$target_release" ]; then
+    log ERROR "Either --hostos-version or --release-id is required."
+fi
+if [ -n "$target_version" ] && [ -n "$target_release" ]; then
+    log ERROR "Specify either --hostos-version or --release-id but not both."
 fi
 
 if [ -z "${REGISTRY_ENDPOINT}" ]; then
@@ -1249,6 +1284,18 @@ FETCHED_SLUG=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -H "Authorization: Bearer ${AP
 
 SLUG=${FORCED_SLUG:-$FETCHED_SLUG}
 HOST_OS_VERSION=${META_BALENA_VERSION:-${VERSION_ID}}
+
+# Must determine target_version since used extensively.
+if [ -n "$target_release" ]; then
+    target_version=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer ${APIKEY}" \
+        "${API_ENDPOINT}/v6/release(${target_release})?\$select=semver" \
+        | jq -r ".d[] | .semver")
+    if [ -z "$target_version" ]; then
+        log ERROR "Release ID does not identify a valid target OS version"
+    fi
+fi
 
 if version_gt "${target_version}" "${minimum_hostapp_target_version}" || [ "${target_version}" == "${minimum_hostapp_target_version}" ]; then
     log "Target version supports hostapps, no device type support check required."
@@ -1300,7 +1347,11 @@ if [ "${SLUG}" = "raspberrypi4-64" ] && \
     fi
 fi
 
-target_image=$(get_image_location "${target_version}")
+if [ -n "$release_id" ]; then
+    target_image=$(locate_image_for_release "${target_release}")
+else
+    target_image=$(locate_image_for_version "${target_version}")
+fi
 if [ -z "${target_image}" ]; then
     log ERROR "Zero or multiple matching target hostapp releases found, update attempt has failed..."
 fi
