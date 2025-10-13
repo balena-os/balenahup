@@ -1,4 +1,19 @@
 - commits:
+    - subject: Publish upgrade-2.x.sh script as a balenaBlock
+      hash: 83c864be3ba4bebe88eada0695f17b8bb9395a5f
+      body: |
+        * Provides access via registry
+      footer:
+        Change-type: minor
+        change-type: minor
+        Signed-off-by: Ken Bannister <kb2ma@runbox.com>
+        signed-off-by: Ken Bannister <kb2ma@runbox.com>
+      author: Ken Bannister
+      nested: []
+  version: 3.1.0
+  title: ""
+  date: 2025-10-13T16:05:47.335Z
+- commits:
     - subject: Remove files for obsolete Python based image build
       hash: 9118bc6407e36d300952af8d5ebed42c25951fb6
       body: |
