@@ -1091,6 +1091,14 @@ function post_update_fixes() {
 
 ###
 # Script start
+#
+# There are two patterns of required input arguments to invoke this script:
+# --hostos-version, --balenaos-registry
+#   Used by balenaProxy push to device. Queries for target URI.
+#
+# --target-image-uri
+#   Used by Supervisor pull from balenaCloud. Parses registry from target-image-uri,
+#   and queries for target version.
 ###
 
 # If no arguments passed, just display the help
@@ -1216,6 +1224,13 @@ while [[ $# -gt 0 ]]; do
         --stop-all)
             STOP_ALL="yes"
             ;;
+        --target-image-uri)
+            if [ -z "$2" ]; then
+                log ERROR "\"$1\" argument needs a value."
+            fi
+            target_image=$2
+            shift
+            ;;
         --assume-supported)
             log WARN "The --assume-supported flag is deprecated, and has no effect."
             ;;
@@ -1231,12 +1246,17 @@ _prepare_locking
 # Try to get lock, and exit if cannot, meaning another instance is running already
 exlock_now || exit 9
 
-if [ -z "$target_version" ]; then
-    log ERROR "--hostos-version is required."
+# Enforce required arguments. See comment above at 'Script start'.
+if [ -z "$target_image" ] && [ -z "$target_version" ]; then
+    log ERROR "Either --target-image-uri or --hostos-version is required."
 fi
-
-if [ -z "${REGISTRY_ENDPOINT}" ]; then
-    log ERROR "--balenaos-registry is required."
+if [ -n "$target_image" ] && [ -n "$target_version" ]; then
+    log ERROR "Only one of --target-image-uri and --hostos-version may be specified."
+fi
+if [ -n "$target_version" ]; then
+    if [ -z "${REGISTRY_ENDPOINT}" ]; then
+        log ERROR "--balenaos-registry is required."
+    fi
 fi
 
 progress 25 "Preparing OS update"
@@ -1249,6 +1269,25 @@ FETCHED_SLUG=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -H "Authorization: Bearer ${AP
 
 SLUG=${FORCED_SLUG:-$FETCHED_SLUG}
 HOST_OS_VERSION=${META_BALENA_VERSION:-${VERSION_ID}}
+
+# Must parse registry host and query for target_version if started from target image URI.
+if [ -n "$target_image" ]; then
+    # Not expecting a backslash in domain name, so:
+    # shellcheck disable=SC2162
+    read -d "/" REGISTRY_ENDPOINT <<<"$target_image"
+    if [ -z "${REGISTRY_ENDPOINT}" ] || [ "${REGISTRY_ENDPOINT}" = "${target_image}" ]; then
+        log ERROR "--target-image-uri expected '/': ${target_image}"
+    fi
+    log "Registry endpoint: ${REGISTRY_ENDPOINT}"
+
+    target_version=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} \
+        -H "Content-Type: application/json" -H "Authorization: Bearer ${APIKEY}" \
+        "${API_ENDPOINT}/v6/release?\$select=raw_version&\$filter=(contains__image/any(a:a/image/any(b:b/is_stored_at__image_location%20eq%20%27${target_image}%27)))%20and%20(belongs_to__application/any(a:a/is_for__device_type/any(dt:dt/slug%20eq%20%27${SLUG}%27)%20and%20is_host%20eq%20true))%20and%20(is_invalidated%20eq%20false)" \
+        | jq -r ".d[] | .raw_version")
+    if [ -z "$target_version" ]; then
+        log ERROR "Target image URI does not identify a valid target OS version"
+    fi
+fi
 
 if version_gt "${target_version}" "${minimum_hostapp_target_version}" || [ "${target_version}" == "${minimum_hostapp_target_version}" ]; then
     log "Target version supports hostapps, no device type support check required."
@@ -1300,9 +1339,12 @@ if [ "${SLUG}" = "raspberrypi4-64" ] && \
     fi
 fi
 
-target_image=$(get_image_location "${target_version}")
+# --target-image-uri argument already provides this value.
 if [ -z "${target_image}" ]; then
-    log ERROR "Zero or multiple matching target hostapp releases found, update attempt has failed..."
+    target_image=$(get_image_location "${target_version}")
+    if [ -z "${target_image}" ]; then
+        log ERROR "Zero or multiple matching target hostapp releases found, update attempt has failed..."
+    fi
 fi
 
 # starting with the balena engine, we can use native deltas
