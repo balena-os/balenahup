@@ -1098,7 +1098,11 @@ function post_update_fixes() {
 #
 # --target-image-uri
 #   Used by Supervisor pull from balenaCloud. Parses registry from target-image-uri,
-#   and queries for target version.
+#   and queries for target version. The argument must include the '/' separated
+#   image location as well as the '@sha256:' content hash if available, like the
+#   example below.
+#
+#   registry2.balena-cloud.com/v2/760ad187...@sha256:fcb7da3...
 ###
 
 # If no arguments passed, just display the help
@@ -1280,9 +1284,14 @@ if [ -n "$target_image" ]; then
     fi
     log "Registry endpoint: ${REGISTRY_ENDPOINT}"
 
+    # Query filter on image location does not include content hash.
+    read -d "@sha256:" image_no_hash <<<"$target_image"
+
+    # Find release with image's registry location. Verify that the (host)app
+    # device type matches this device, and hostapp is final and not invalidated.
     target_version=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} \
         -H "Content-Type: application/json" -H "Authorization: Bearer ${APIKEY}" \
-        "${API_ENDPOINT}/v6/release?\$select=raw_version&\$filter=(contains__image/any(a:a/image/any(b:b/is_stored_at__image_location%20eq%20%27${target_image}%27)))%20and%20(belongs_to__application/any(a:a/is_for__device_type/any(dt:dt/slug%20eq%20%27${SLUG}%27)%20and%20is_host%20eq%20true))%20and%20(is_invalidated%20eq%20false)" \
+        "${API_ENDPOINT}/v6/release?\$select=raw_version&\$filter=contains__image/any(a:a/image/any(b:b/is_stored_at__image_location%20eq%20%27${image_no_hash}%27))%20and%20belongs_to__application/any(a:a/is_for__device_type/any(dt:dt/slug%20eq%20%27${SLUG}%27)%20and%20is_host)%20and%20is_final%20and%20is_invalidated%20eq%20false" \
         | jq -r ".d[] | .raw_version")
     if [ -z "$target_version" ]; then
         log ERROR "Target image URI does not identify a valid target OS version"
