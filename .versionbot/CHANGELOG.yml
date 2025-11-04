@@ -1,4 +1,18 @@
 - commits:
+    - subject: Add Apache 2.0 license file
+      hash: 458e88a497989579b8f0dbb22a883bc1cd4bc786
+      body: ""
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Ken Bannister <kb2ma@runbox.com>
+        signed-off-by: Ken Bannister <kb2ma@runbox.com>
+      author: Ken Bannister
+      nested: []
+  version: 3.1.1
+  title: ""
+  date: 2025-11-04T17:24:55.572Z
+- commits:
     - subject: Publish upgrade-2.x.sh script as a balenaBlock
       hash: 83c864be3ba4bebe88eada0695f17b8bb9395a5f
       body: |
