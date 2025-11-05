@@ -1,4 +1,19 @@
 - commits:
+    - subject: Add entry.sh wrapper for use with Supervisor managed updates
+      hash: 317d56c9e1a22641886767676b4b842fce39fa0f
+      body: |
+        * Also document use of /app directory in upgrade script image.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Ken Bannister <kb2ma@runbox.com>
+        signed-off-by: Ken Bannister <kb2ma@runbox.com>
+      author: Ken Bannister
+      nested: []
+  version: 3.1.2
+  title: ""
+  date: 2025-11-05T14:20:55.577Z
+- commits:
     - subject: Add Apache 2.0 license file
       hash: 458e88a497989579b8f0dbb22a883bc1cd4bc786
       body: ""

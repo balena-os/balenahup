@@ -6,4 +6,4 @@ post-provisioning: >-
   Balena host OS upgrade script packaged for retrieval via registry.
 
   This block is for host OS system level use, not for user applications.
-version: 3.1.1
+version: 3.1.2
