@@ -183,7 +183,7 @@ function stop_services() {
 
 # Remove contents of work directory
 function cleanup_work_dir() {
-    # Ensure takover path is not just '/' because deletion command is 
+    # Ensure takover path is not just '/' because deletion command is
     if [[ -n "${work_dir}" && "${#work_dir}" -gt 3 ]]; then
         if [[ -d "${work_dir}" ]]; then
             rm -rf "${work_dir:?}/"*
@@ -197,7 +197,7 @@ function cleanup_work_dir() {
 # Exits script on download failure
 function download_takeover_binary() {
     release_version="$1"
-    
+
     architecture=$(uname -m)
     case ${architecture} in
         aarch64|x86_64)
@@ -430,7 +430,7 @@ progress 25 "Preparing OS update"
 
 # Retrieve slug (device type) from API, and use this value if not provided to the script.
 FETCHED_SLUG=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -H "Authorization: Bearer ${APIKEY}" \
-    "${API_ENDPOINT}/v6/device?\$select=is_of__device_type&\$expand=is_of__device_type(\$select=slug)&\$filter=uuid%20eq%20%27${UUID}%27" 2>/dev/null \
+    "${API_ENDPOINT}/v6/device(uuid='${UUID}')?\$select=is_of__device_type&\$expand=is_of__device_type(\$select=slug)" 2>/dev/null \
     | jq -r '.d[0].is_of__device_type[0].slug'
     )
 SLUG=${FORCED_SLUG:-$FETCHED_SLUG}
