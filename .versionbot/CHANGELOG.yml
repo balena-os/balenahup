@@ -1,4 +1,20 @@
 - commits:
+    - subject: Add option to specify target OS by App UUID and release commit
+      hash: 75643349ffcb16fa131140e0dc573c0c4d7cb2b8
+      body: |
+        * Also allow optional target image URI
+        * Required for Supervisor managed OS updates
+      footer:
+        Change-type: minor
+        change-type: minor
+        Signed-off-by: Ken Bannister <kb2ma@runbox.com>
+        signed-off-by: Ken Bannister <kb2ma@runbox.com>
+      author: Ken Bannister
+      nested: []
+  version: 3.2.0
+  title: ""
+  date: 2025-11-06T20:09:17.471Z
+- commits:
     - subject: Add entry.sh wrapper for use with Supervisor managed updates
       hash: 317d56c9e1a22641886767676b4b842fce39fa0f
       body: |
