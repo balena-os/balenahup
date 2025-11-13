@@ -734,6 +734,8 @@ function hostapp_based_update {
             balena_migration="yes"
     fi
 
+    # Check integrity
+    fsck.ext4 -y "${inactive:?}" || log ERROR "Filesystem check failed on inactive partition ${inactive_part_dev}, bailing out..."
     if ! [ -S "/var/run/${DOCKER_CMD}-host.sock" ]; then
         ## Happens on devices booting after a regular HUP update onto a hostapps enabled balenaOS
         log "Do not have ${DOCKER_CMD}-host running; legacy mode"
