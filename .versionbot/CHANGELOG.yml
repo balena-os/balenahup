@@ -1,4 +1,18 @@
 - commits:
+    - subject: Rename license file to reflect content format
+      hash: d83add9ae30a211d533aa51701ca2c0c1423a3fb
+      body: ""
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Ken Bannister <kb2ma@runbox.com>
+        signed-off-by: Ken Bannister <kb2ma@runbox.com>
+      author: Ken Bannister
+      nested: []
+  version: 3.2.1
+  title: ""
+  date: 2025-11-19T12:59:50.815Z
+- commits:
     - subject: Add option to specify target OS by App UUID and release commit
       hash: 75643349ffcb16fa131140e0dc573c0c4d7cb2b8
       body: |
