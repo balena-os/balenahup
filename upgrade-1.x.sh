@@ -370,7 +370,7 @@ function getSupervisorVersionFromRelease() {
                 log "Supervisor update: will be upgrading from v${CURRENT_SUPERVISOR_VERSION} to v${DEFAULT_SUPERVISOR_VERSION}"
                 UPDATER_SUPERVISOR_TAG="v${DEFAULT_SUPERVISOR_VERSION}"
                 # Get the supervisor id and image name
-                if data=$(curl --retry 10 -s "${API_ENDPOINT}/v2/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'$UPDATER_SUPERVISOR_TAG'))&apikey=${APIKEY}" | jq -e -r '.d[0].id,.d[0].image_name'); then
+                if data=$(curl --retry 10 -s "${API_ENDPOINT}/v2/supervisor_release?\$select=id,image_name&\$filter=device_type%20eq%20'$SLUG'%20and%20supervisor_version%20eq%20'$UPDATER_SUPERVISOR_TAG'&apikey=${APIKEY}" | jq -e -r '.d[0].id,.d[0].image_name'); then
                     read UPDATER_SUPERVISOR_ID UPDATER_SUPERVISOR_IMAGE_NAME <<<$data
                     log "Extracted supervisor vars: ID: $UPDATER_SUPERVISOR_ID; Image Name: $UPDATER_SUPERVISOR_IMAGE_NAME"
                 fi
@@ -471,7 +471,7 @@ function updateSupervisor() {
 
     log "Setting supervisor version in the API"
     if [ -z "$UPDATER_SUPERVISOR_ID" ]; then
-        UPDATER_SUPERVISOR_ID=$(curl --retry 10 -s "${API_ENDPOINT}/v2/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'$UPDATER_SUPERVISOR_TAG'))&apikey=${APIKEY}" | jq -e -r '.d[0].id')
+        UPDATER_SUPERVISOR_ID=$(curl --retry 10 -s "${API_ENDPOINT}/v2/supervisor_release?\$select=id,image_name&\$filter=device_type%20eq%20'$SLUG'%20and%20supervisor_version%20eq%20'$UPDATER_SUPERVISOR_TAG'&apikey=${APIKEY}" | jq -e -r '.d[0].id')
     fi
     curl --retry 10 -s "${API_ENDPOINT}/v2/device?\$filter=uuid%20eq%20'${UUID}'&apikey=$APIKEY" -X PATCH -H 'Content-Type: application/json;charset=UTF-8' --data-binary "{\"supervisor_release\": \"$UPDATER_SUPERVISOR_ID\"}" > /dev/null 2>&1
 }
