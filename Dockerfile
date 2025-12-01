@@ -1,7 +1,6 @@
 FROM scratch
 
-# Copies the update scripts to the app subdirectory to allow for future use of
-# other subdirectories.
-WORKDIR /app
+# Copy scripts to the root dir
+WORKDIR /
 COPY ./entry.sh ./entry.sh
 COPY ./upgrade-2.x.sh ./upgrade-2.x.sh
