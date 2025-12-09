@@ -29,3 +29,5 @@ jobs:
     with:
       balena_slugs: |
         balena_os/balenahup
+      custom_publish_matrix: balena_os/balenahup
+      custom_finalize_matrix: balena_os/balenahup
