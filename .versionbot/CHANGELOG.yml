@@ -1,4 +1,18 @@
 - commits:
+    - subject: Publish the block on staging as well
+      hash: 9f93b339be4c55e386745abe2c90add8b5323295
+      body: ""
+      footer:
+        Change-type: patch
+        change-type: patch
+        See: https://balena.fibery.io/Work/Project/1736
+        see: https://balena.fibery.io/Work/Project/1736
+      author: Thodoris Greasidis
+      nested: []
+  version: 3.2.2
+  title: ""
+  date: 2025-12-09T14:23:58.470Z
+- commits:
     - subject: Rename license file to reflect content format
       hash: d83add9ae30a211d533aa51701ca2c0c1423a3fb
       body: ""
