@@ -550,90 +550,6 @@ function persistent_logging_config_var {
 # Includes pre-update fixes and balena migration
 # Globals:
 #   DOCKER_CMD
-#   target_version
-# Arguments:
-#   update_package: the docker image to use for the update
-#   tmp_inactive: host path to the directory that will be bind-mounted to /mnt/sysroot/inactive inside the container
-# Returns:
-#   None
-#######################################
-function in_container_hostapp_update {
-    local update_package=$1
-    local tmp_inactive=$2
-    local inactive="/mnt/sysroot/inactive"
-    local hostapp_update_extra_args=""
-    local target_docker_cmd
-    local target_dockerd
-    local volumes_args=()
-    local -i retrycount=0
-    local tmp_image
-
-    stop_services
-    if [ "${STOP_ALL}" == "yes" ]; then
-        remove_containers
-    fi
-
-    # Disable rollbacks when doing migration to rollback enabled system, as couldn't roll back anyways
-    if version_gt "${target_version}" "2.9.3"; then
-        hostapp_update_extra_args="-x"
-    fi
-    # Set the name of the docker/balena command within the target image
-    target_docker_cmd="balena"
-    target_dockerd="balenad"
-
-    while true ; do
-        if ${DOCKER_CMD} pull "${update_package}"; then
-            break
-        else
-            log WARN "Couldn't pull docker image, was try #${retrycount}..."
-        fi
-        retrycount+=1
-        if [ $retrycount -ge 10 ]; then
-            log ERROR "Couldn't pull docker image, giving up..."
-        else
-            sleep 10
-        fi
-    done
-
-    tmp_image=$(mktemp -u "/tmp/hupfile.XXXXXXXX")
-    log "Using ${tmp_image} for update image transfer into container"
-    mkfifo "${tmp_image}"
-    ${DOCKER_CMD} save "${update_package}" > "${tmp_image}" &
-    mkdir -p /mnt/data/balenahup/tmp
-
-    # The setting up the required volumes
-    volumes_args+=("-v" "/dev/disk:/dev/disk")
-    volumes_args+=("-v" "/mnt/boot:/mnt/boot")
-    volumes_args+=("-v" "/mnt/data/balenahup/tmp:/mnt/data/balenahup/tmp")
-    if mountpoint "/mnt/sysroot/active"; then
-        volumes_args+=("-v" "/mnt/sysroot/active:/mnt/sysroot/active")
-    else
-        volumes_args+=("-v" "/:/mnt/sysroot/active")
-    fi
-    volumes_args+=("-v" "${tmp_inactive}:${inactive}")
-    volumes_args+=("-v" "${tmp_image}:/balenaos-image.docker")
-
-    log "Starting hostapp-update within a container"
-    # Note that the following docker daemon is started with a different --bip and --fixed-cidr
-    # setting, otherwise it is clashing with the system docker on balenaOS >=2.3.0 || <2.5.1
-    # and then docker pull would not succeed
-    # shellcheck disable=SC2016
-    ${DOCKER_CMD} run \
-      --rm \
-      --name balenahup \
-      --privileged \
-      "${volumes_args[@]}" \
-      "${update_package}" \
-      /bin/bash -c 'storage_driver=$(cat /boot/storage-driver) ; DOCKER_TMPDIR=/mnt/data/balenahup/tmp/ '"${target_dockerd}"' --storage-driver=$storage_driver --data-root='"${inactive}"'/'"${target_docker_cmd}"' --host=unix:///var/run/'"${target_docker_cmd}"'-host.sock --pidfile=/var/run/'"${target_docker_cmd}"'-host.pid --exec-root=/var/run/'"${target_docker_cmd}"'-host --bip=10.114.201.1/24 --fixed-cidr=10.114.201.128/25 --iptables=false & timeout_iterations=0; until DOCKER_HOST="unix:///var/run/'"${target_docker_cmd}"'-host.sock" '"${target_docker_cmd}"' ps &> /dev/null; do sleep 0.2; if [ $((timeout_iterations++)) -ge 1500 ]; then echo "'"${target_docker_cmd}"'-host did not come up before check timed out..."; exit 1; fi; done; echo "Starting hostapp-update"; hostapp-update -f /balenaos-image.docker '"${hostapp_update_extra_args}"'' \
-    || log ERROR "Update based on hostapp-update has failed..."
-
-}
-
-#######################################
-# Prepares and runs update based on hostapp-update
-# Includes pre-update fixes and balena migration
-# Globals:
-#   DOCKER_CMD
 #   DOCKERD
 #   LEGACY_UPDATE
 #   SLUG
@@ -648,7 +564,6 @@ function hostapp_based_update {
     local update_package=$1
     local storage_driver
     local inactive="/mnt/sysroot/inactive"
-    local balena_migration=no
     local inactive_used
     local hostapp_image_count
     storage_driver=overlay2
@@ -698,12 +613,10 @@ function hostapp_based_update {
         LEGACY_UPDATE=yes
         log "Clean inactive partition"
         rm -rf "${inactive:?}/"*
-        if [ "$balena_migration" = "no" ]; then
-            log "Starting ${DOCKER_CMD}-host with ${storage_driver} storage driver"
-            ${DOCKERD} --log-driver=journald --storage-driver="${storage_driver}" --data-root="${inactive}/${DOCKER_CMD}" --host="unix:///var/run/${DOCKER_CMD}-host.sock" --pidfile="/var/run/${DOCKER_CMD}-host.pid" --exec-root="/var/run/${DOCKER_CMD}-host" --bip=10.114.101.1/24 --fixed-cidr=10.114.101.128/25 --iptables=false &
-            local timeout_iterations=0
-            until DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} ps &> /dev/null; do sleep 0.2; if [ $((timeout_iterations++)) -ge 1500 ]; then log ERROR "${DOCKER_CMD}-host did not come up before check timed out..."; fi; done
-        fi
+        log "Starting ${DOCKER_CMD}-host with ${storage_driver} storage driver"
+        ${DOCKERD} --log-driver=journald --storage-driver="${storage_driver}" --data-root="${inactive}/${DOCKER_CMD}" --host="unix:///var/run/${DOCKER_CMD}-host.sock" --pidfile="/var/run/${DOCKER_CMD}-host.pid" --exec-root="/var/run/${DOCKER_CMD}-host" --bip=10.114.101.1/24 --fixed-cidr=10.114.101.128/25 --iptables=false &
+        local timeout_iterations=0
+        until DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} ps &> /dev/null; do sleep 0.2; if [ $((timeout_iterations++)) -ge 1500 ]; then log ERROR "${DOCKER_CMD}-host did not come up before check timed out..."; fi; done
     else
         if [ -f "$inactive/resinos.fingerprint" ]; then
             # Happens on a device, which has HUP'd from a non-hostapp balenaOS to
@@ -742,30 +655,12 @@ function hostapp_based_update {
         fi
     fi
 
-    if [ "$balena_migration" = "yes" ]; then
-            # Migrating to balena and hostapp-update hooks run inside the target container
-            log "Balena migration"
-            systemctl stop docker-host || true
-            if  [ -d "${inactive}/docker" ] &&
-                [ ! -L "${inactive}/docker" ] ; then
-                    log "Need to move docker folder on the inactive partition"
-                    rm -rf "${inactive}/balena" || true
-                    mv "${inactive}/"{docker,balena} && ln -s "${inactive}/"{balena,docker}
-            fi
-
-            in_container_hostapp_update "${update_package}" "${inactive}"
-
-            if [ "${LEGACY_UPDATE}" != "yes" ]; then
-                systemctl start docker-host
-            fi
-    else
-        if [ "$STOP_ALL" = "yes" ]; then
-            stop_services
-            remove_containers
-        fi
-        log "Calling hostapp-update for ${update_package}"
-        hostapp-update -i "${update_package}" && post_update_fixes
+    if [ "$STOP_ALL" = "yes" ]; then
+        stop_services
+        remove_containers
     fi
+    log "Calling hostapp-update for ${update_package}"
+    hostapp-update -i "${update_package}" && post_update_fixes
 }
 
 #######################################
