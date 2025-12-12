@@ -794,121 +794,6 @@ function hostapp_based_update {
 }
 
 #######################################
-# Upgrade from a non-hostapp (<2.7.0) to a hostapp-enabled balenaOS version
-# Handles both pre-balena and balena updates
-# Globals:
-#   SLUG
-#   minimum_balena_target_version
-#   target_version
-# Arguments:
-#   update_package: the docker image to use for the update
-# Returns:
-#   None
-#######################################
-function non_hostapp_to_hostapp_update {
-    local update_package=$1
-    local tmp_inactive
-
-    # Mount spare root partition
-    find_partitions
-    umount "${update_part}" || true
-    mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0 -i 8192 -L "${update_label}" "${update_part}"
-    tmp_inactive=$(mktemp -d "/tmp/hupinactive.XXXXXXXX")
-    log "Mounting inactive partition ${update_part} to ${tmp_inactive}..."
-    mount "${update_part}" "${tmp_inactive}" || log ERROR "Cannot mount inactive partition..."
-    # remove REC files on boot partition
-    remove_rec_files
-
-    case "${SLUG}" in
-        raspberry*)
-            log "Running pre-update fixes for ${SLUG}"
-            pre_update_pi_bootfiles_removal
-            ;;
-        *)
-            log "No device-specific pre-update fix for ${SLUG}"
-    esac
-
-    in_container_hostapp_update "${update_package}" "${tmp_inactive}"
-}
-
-function find_partitions {
-    # Find which partition is / and which we should write the update to
-    # This function is only used in pre-hostapp-update-enabled 2.x devices
-    root_part=$(findmnt -n --raw --evaluate --output=source /)
-    log "Found root at ${root_part}..."
-    case ${root_part} in
-        # on 2.x the following device types have these kinds of results for $root_part, examples
-        # raspberrypi: /dev/mmcblk0p2
-        # beaglebone: /dev/disk/by-partuuid/93956da0-02
-        # edison: /dev/disk/by-partuuid/012b3303-34ac-284d-99b4-34e03a2335f4
-        # NUC: /dev/disk/by-label/resin-rootA and underlying /dev/sda2
-        # up-board: /dev/disk/by-label/resin-rootA and underlying /dev/mmcblk0p2
-        /dev/disk/by-partuuid/*)
-            # reread the physical device that that part refers to
-            root_part=$(readlink -f "${root_part}")
-            case ${root_part} in
-                *p2)
-                    root_dev=${root_part%p2}
-                    update_part=${root_dev}p3
-                    update_part_no=3
-                    update_label=resin-rootB
-                    ;;
-                *p3)
-                    root_dev=${root_part%p3}
-                    update_part=${root_dev}p2
-                    update_part_no=2
-                    update_label=resin-rootA
-                    ;;
-                *p8)
-                    root_dev=${root_part%p8}
-                    update_part=${root_dev}p9
-                    update_part_no=9
-                    update_label=resin-rootB
-                    ;;
-                *p9)
-                    root_dev=${root_part%p9}
-                    update_part=${root_dev}p8
-                    update_part_no=8
-                    update_label=resin-rootA
-                    ;;
-                *)
-                    log ERROR "Couldn't get the root partition from the part-uuid..."
-            esac
-            ;;
-        /dev/disk/by-label/resin-rootA)
-            old_label=resin-rootA
-            update_label=resin-rootB
-            root_part_dev=$(readlink -f /dev/disk/by-label/${old_label})
-            update_part=${root_part_dev%2}3
-            ;;
-        /dev/disk/by-label/resin-rootB)
-            old_label=resin-rootB
-            update_label=resin-rootA
-            root_part_dev=$(readlink -f /dev/disk/by-label/${old_label})
-            update_part=${root_part_dev%3}2
-            ;;
-        *2)
-            root_dev=${root_part%2}
-            update_part=${root_dev}3
-            update_part_no=3
-            update_label=resin-rootB
-            ;;
-        *3)
-            root_dev=${root_part%3}
-            update_part=${root_dev}2
-            update_part_no=2
-            update_label=resin-rootA
-            ;;
-        *)
-            log ERROR "Unknown root partition ${root_part}."
-    esac
-    if [ ! -b "${update_part}" ]; then
-        log ERROR "Update partition detected as ${update_part} but it's not a block device."
-    fi
-    log "Update partition: ${update_part}"
-}
-
-#######################################
 # Query public apps for a matching image
 # Globals:
 #   APIKEY
@@ -1511,48 +1396,33 @@ if [ "$SLUG" = "raspberry-pi" ] && \
         fi
 fi
 
-### hostapp-update based updater
-
-if version_gt "${HOST_OS_VERSION}" "${minimum_hostapp_target_version}" ||
-    [ "${HOST_OS_VERSION}" == "${minimum_hostapp_target_version}" ]; then
-    log "hostapp-update command exists, use that for update"
-    progress 50 "Running OS update"
-    images=("${delta_image}" "${target_image}")
-    # record the "source" of each image in the array above for clarity during fallback
-    image_types=("delta" "balena_registry")
-    update_failed=0
-    # login for private device types
-    DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} login "${REGISTRY_ENDPOINT}" -u "d_${UUID}" \
-    --password "${APIKEY}" > /dev/null 2>&1 || log WARN "logging into registry failed, proceeding anyway (only required for private device types)"
-    for img in "${images[@]}"; do
-        if [ -n "${img}" ] && hostapp_based_update "${img}"; then
-            # once we've updated successfully, set our canonical image
-            image=${img}
-            break
-        else
-            log "Image type ${image_types[${update_failed}]}, location '${img}' failed or not found, trying another source"
-            update_failed=$(( update_failed + 1 ))
-        fi
-    done
-    if [ -z "${image}" ]; then
-        log ERROR "all hostapp-update attempts have failed..."
-    fi
-
-    if [ "${LEGACY_UPDATE}" = "yes" ]; then
-        upgrade_supervisor "${image}" no_docker_host
-        finish_up "${image}"
+log "hostapp-update command exists, use that for update"
+progress 50 "Running OS update"
+images=("${delta_image}" "${target_image}")
+# record the "source" of each image in the array above for clarity during fallback
+image_types=("delta" "balena_registry")
+update_failed=0
+# login for private device types
+DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} login "${REGISTRY_ENDPOINT}" -u "d_${UUID}" \
+--password "${APIKEY}" > /dev/null 2>&1 || log WARN "logging into registry failed, proceeding anyway (only required for private device types)"
+for img in "${images[@]}"; do
+    if [ -n "${img}" ] && hostapp_based_update "${img}"; then
+        # once we've updated successfully, set our canonical image
+        image=${img}
+        break
     else
-        upgrade_supervisor "${image}"
-        finish_up "${image}"
+        log "Image type ${image_types[${update_failed}]}, location '${img}' failed or not found, trying another source"
+        update_failed=$(( update_failed + 1 ))
     fi
+done
+if [ -z "${image}" ]; then
+    log ERROR "all hostapp-update attempts have failed..."
+fi
 
-elif version_gt "${target_version}" "${minimum_hostapp_target_version}" ||
-     [ "${target_version}" == "${minimum_hostapp_target_version}" ]; then
-    image="${target_image}"
-    log "Running update from a non-hostapp-update enabled version to a hostapp-update enabled version..."
-    progress 50 "Running OS update"
-    non_hostapp_to_hostapp_update "${image}"
-
+if [ "${LEGACY_UPDATE}" = "yes" ]; then
     upgrade_supervisor "${image}" no_docker_host
+    finish_up "${image}"
+else
+    upgrade_supervisor "${image}"
     finish_up "${image}"
 fi
