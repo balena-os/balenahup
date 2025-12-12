@@ -13,7 +13,6 @@ set -o pipefail
 
 preferred_hostos_version=2.0.7
 minimum_target_version=2.0.7
-minimum_balena_target_version=2.9.0
 minimum_supervisor_stop=2.53.10
 
 # This will set VERSION, SLUG
@@ -24,13 +23,8 @@ minimum_supervisor_stop=2.53.10
 # shellcheck disable=SC1091
 source /etc/profile
 
-if [ -x "$(command -v balena)" ]; then
-    DOCKER_CMD="balena"
-    DOCKERD="balenad"
-else
-    DOCKER_CMD="docker"
-    DOCKERD="dockerd"
-fi
+DOCKER_CMD="balena"
+DOCKERD="balenad"
 
 ###
 # Helper functions
@@ -557,7 +551,6 @@ function persistent_logging_config_var {
 # Globals:
 #   DOCKER_CMD
 #   target_version
-#   minimum_balena_target_version
 # Arguments:
 #   update_package: the docker image to use for the update
 #   tmp_inactive: host path to the directory that will be bind-mounted to /mnt/sysroot/inactive inside the container
@@ -584,14 +577,9 @@ function in_container_hostapp_update {
     if version_gt "${target_version}" "2.9.3"; then
         hostapp_update_extra_args="-x"
     fi
-    # Set the name of the docker/balena command within the target image to the appropriate one
-    if version_gt "${target_version}" "${minimum_balena_target_version}"; then
-        target_docker_cmd="balena"
-        target_dockerd="balenad"
-    else
-        target_docker_cmd="docker"
-        target_dockerd="dockerd"
-    fi
+    # Set the name of the docker/balena command within the target image
+    target_docker_cmd="balena"
+    target_dockerd="balenad"
 
     while true ; do
         if ${DOCKER_CMD} pull "${update_package}"; then
@@ -651,7 +639,6 @@ function in_container_hostapp_update {
 #   SLUG
 #   HOST_OS_VERSION
 #   target_version
-#   minimum_balena_target_version
 # Arguments:
 #   update_package: the docker image to use for the update
 # Returns:
@@ -704,11 +691,6 @@ function hostapp_based_update {
             log "No device-specific pre-update fix for ${SLUG}"
     esac
 
-
-    if [ "${DOCKER_CMD}" = "docker" ] &&
-        version_gt "${target_version}" "${minimum_balena_target_version}" ; then
-            balena_migration="yes"
-    fi
 
     if ! [ -S "/var/run/${DOCKER_CMD}-host.sock" ]; then
         ## Happens on devices booting after a regular HUP update onto a hostapps enabled balenaOS
@@ -1233,13 +1215,9 @@ if [ -z "${target_image}" ]; then
     fi
 fi
 
-# starting with the balena engine, we can use native deltas
-if version_gt "${HOST_OS_VERSION}" "${minimum_balena_target_version}"; then
-    log "Attempting host OS update using deltas"
-    delta_image=$(find_delta "${target_image}")
-else
-    log "Device not delta capable"
-fi
+log "Attempting host OS update using deltas"
+delta_image=$(find_delta "${target_image}")
+
 if [ -n "${delta_image}" ]; then
     delta_size=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -H "Authorization: Bearer ${APIKEY}" \
     "${API_ENDPOINT}/v5/delta?\$filter=((status%20eq%20'success')%20and%20(version%20eq%20'${DELTA_VERSION}')%20and%20(is_stored_at__location%20eq%20'${delta_image}'))" 2>/dev/null \
