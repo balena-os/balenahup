@@ -97,15 +97,6 @@ Options:
   --balenaos-registry
         Upstream registry to use for host OS applications.
 
-  --balenaos-repo
-        No op
-
-  --balenaos-tag
-        No op
-
-  --staging
-        No op
-
   --stop-all
         Request the updater to stop all containers (including user application)
         before the update.
@@ -418,15 +409,6 @@ function pre_update_pi_bootfiles_removal {
     sync /mnt/boot
 }
 
-function pre_update_fix_bootfiles_hook {
-    log "Applying bootfiles hostapp-hook fix"
-    local bootfiles_temp
-    bootfiles_temp=$(mktemp)
-    CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -o "$bootfiles_temp" https://raw.githubusercontent.com/balena-os/balenahup/77401f3ecdeddaac843b26827f0a44d3b044efdd/upgrade-patches/0-bootfiles || log ERROR "Couldn't download fixed '0-bootfiles', aborting."
-    chmod 755 "$bootfiles_temp"
-    mount --bind "$bootfiles_temp"  /etc/hostapp-update-hooks.d/0-bootfiles
-}
-
 function pre_update_jetson_fix {
     log "Caching current extlinux.conf for ${SLUG} fix"
     extlinux_root_path="boot/extlinux"
@@ -575,9 +557,6 @@ function hostapp_based_update {
         raspberry*)
             log "Running pre-update fixes for ${SLUG}"
             pre_update_pi_bootfiles_removal
-            if ! version_gt "${HOST_OS_VERSION}" "2.7.6" ; then
-                pre_update_fix_bootfiles_hook
-            fi
             ;;
         jetson-tx2)
             log "Running pre-update fixes for ${SLUG}"
@@ -927,14 +906,6 @@ while [[ $# -gt 0 ]]; do
             REGISTRY_ENDPOINT=$2
             shift
             ;;
-        --resinos-repo | --balenaos-repo)
-            # no op
-            shift
-            ;;
-        --resinos-tag | --balenaos-tag)
-            # no op
-            shift
-            ;;
         --supervisor-version)
             if [ -z "$2" ]; then
                 log ERROR "\"$1\" argument needs a value."
@@ -944,9 +915,6 @@ while [[ $# -gt 0 ]]; do
             ;;
         --no-reboot)
             NOREBOOT="yes"
-            ;;
-        --staging)
-            # no op
             ;;
         --stop-all)
             STOP_ALL="yes"
@@ -1096,87 +1064,6 @@ if [ -n "${delta_image}" ]; then
 
 else
     log "No delta found, falling back to regular pull"
-fi
-
-# fix resin-device-progress, between version 2.0.6 and 2.3.0
-# the script does not work using deviceApiKey
-if version_gt "${HOST_OS_VERSION}" "2.0.6" &&
-    version_gt "2.3.0" "${HOST_OS_VERSION}"; then
-        log "Fixing resin-device-progress is required..."
-        tools_path=/tmp/upgrade_tools_extra
-        mkdir -p $tools_path
-        export PATH=$tools_path:$PATH
-        download_url=https://raw.githubusercontent.com/balena-os/meta-balena/v2.3.0/meta-resin-common/recipes-support/resin-device-progress/resin-device-progress/resin-device-progress
-        CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -o $tools_path/resin-device-progress $download_url || log WARN "Couldn't download tool from $download_url, progress bar won't work, but not aborting..."
-        chmod 755 $tools_path/resin-device-progress
-else
-    log "No resin-device-progress fix is required..."
-fi
-
-# Fix for issue: https://github.com/balena-os/meta-balena/pull/864
-# Also includes change from: https://github.com/balena-os/meta-balena/pull/882
-if version_gt "${HOST_OS_VERSION}" "2.0.7" &&
-    version_gt "2.7.0" "${HOST_OS_VERSION}"; then
-        log "Fixing supervisor updater..."
-        if CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -o "/tmp/update-resin-supervisor" https://raw.githubusercontent.com/balena-os/meta-balena/40d5a174da6b52d530c978e0cae22aa61f65d203/meta-resin-common/recipes-containers/docker-disk/docker-resin-supervisor-disk/update-resin-supervisor ; then
-            chmod 755 "/tmp/update-resin-supervisor"
-            PATH="/tmp:$PATH"
-            log "Added temporary supervisor updater replaced with fixed version..."
-        else
-            log ERROR "Could not download temporary supervisor updater..."
-        fi
-else
-    log "No supervisor updater fix is required..."
-fi
-
-# Fix issue with `read` on 2.10.x/2.11.0 balenaOS versions
-if version_gt "${HOST_OS_VERSION}" "2.9.7" &&
-    version_gt "2.11.1" "${HOST_OS_VERSION}"; then
-        log "Fixing supervisor updater if needed..."
-        #shellcheck disable=SC2016
-        sed 's/read tag image_name <<<$data/read tag <<<"$(echo "$data" | head -n 1)" ; read image_name <<<"$(echo "$data" | tail -n 1)"/' /usr/bin/update-resin-supervisor > /tmp/fixed-update-resin-supervisor && \
-          chmod +x /tmp/fixed-update-resin-supervisor && \
-          mount -o bind /tmp/fixed-update-resin-supervisor /usr/bin/update-resin-supervisor
-fi
-
-# The timesyncd.conf lives on the state partition starting from balenaOS 2.1.0 up to 2.13.1
-# For devices that were updated before this fix came to effect, fix things up, otherwise migrate when updating
-if [ -d "/mnt/state/root-overlay/etc/systemd/timesyncd.conf" ] \
-   && [ -f "/etc/systemd/timesyncd.conf" ]; then
-    rm -rf "/mnt/state/root-overlay/etc/systemd/timesyncd.conf"
-    cp "/etc/systemd/timesyncd.conf" "/mnt/state/root-overlay/etc/systemd/timesyncd.conf"
-    systemctl restart etc-systemd-timesyncd.conf.mount
-    log "timesyncd.conf mount service fixed up"
-elif [ ! -f "/mnt/state/root-overlay/etc/systemd/timesyncd.conf" ] \
-   && [ -f "/etc/systemd/timesyncd.conf" ] \
-   && version_gt "$target_version" "2.1.0" \
-   && version_gt "2.13.1" "$target_version"; then
-    cp "/etc/systemd/timesyncd.conf" "/mnt/state/root-overlay/etc/systemd/timesyncd.conf"
-    log "timesyncd.conf migrated to the state partition"
-fi
-
-# Raspberry Pi 1 and certain docker versions (in balenaOS <2.5.0) cannot run multilayer
-# docker pulls from Docker Hub. Workaround is limiting concurrent downloads
-# Apply this fix only to balenaOS version >=2.0.7, though, as docker in earlier
-# versions does not have that flag, and would not run properly
-if [ "$SLUG" = "raspberry-pi" ] && \
-    version_gt "${HOST_OS_VERSION}" "2.0.7" && \
-    version_gt "2.5.1" "${HOST_OS_VERSION}"; then
-        if [ -f "/etc/systemd/system/docker.service.d/docker.conf" ]; then
-            # development device have this config
-            service_file="/etc/systemd/system/docker.service.d/docker.conf"
-        else
-            service_file="/lib/systemd/system/docker.service"
-        fi
-        if ! grep -q "^ExecStart=.*--max-concurrent-downloads.*" "${service_file}"; then
-            log "Docker fix is needed for correct multilayer pulls..."
-            tmp_service_file="/tmp/$(basename $service_file)"
-            cp "${service_file}" "${tmp_service_file}"
-            sed -i 's/^ExecStart=\/usr\/bin\/docker.*/& --max-concurrent-downloads 1/g' "${tmp_service_file}"
-            mount -o bind "${tmp_service_file}" "${service_file}"
-            systemctl daemon-reload && systemctl stop docker  && systemctl start docker
-            log "Docker service file updated and docker restarted."
-        fi
 fi
 
 log "hostapp-update command exists, use that for update"
