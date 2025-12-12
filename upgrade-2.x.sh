@@ -10,7 +10,6 @@ set -o errexit
 set -E
 set -o pipefail
 
-preferred_hostos_version=2.0.7
 minimum_target_version=2.0.7
 minimum_supervisor_stop=2.53.10
 
@@ -1093,47 +1092,6 @@ if [ -n "${delta_image}" ]; then
 
 else
     log "No delta found, falling back to regular pull"
-fi
-
-# Check if we need to install some more extra tools
-if ! version_gt "$VERSION" "$preferred_hostos_version" &&
-    ! [ "$VERSION" == "$preferred_hostos_version" ]; then
-    log "Host OS version $VERSION is less than $preferred_hostos_version, installing tools..."
-
-    tools_path=/tmp/upgrade_tools
-    tools_binaries="tar"
-    mkdir -p $tools_path
-    export PATH=$tools_path:$PATH
-
-    architecture=$(uname -m)
-    case ${architecture} in
-        arm*|aarch64)
-            binary_type="arm"
-            ;;
-        i*86|x86_64)
-            binary_type="x86"
-            ;;
-        *)
-            log WARN "Not explicitly known architecture: ${architecture}"
-            binary_type=""
-    esac
-
-    case $binary_type in
-        arm|x86)
-            download_uri=https://github.com/balena-os/balenahup/raw/master/upgrade-binaries/$binary_type
-            for binary in $tools_binaries; do
-                log "Installing $binary..."
-                CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -o $tools_path/$binary $download_uri/$binary || log ERROR "Couldn't download tool from $download_uri/$binary, aborting."
-                chmod 755 $tools_path/$binary
-            done
-            ;;
-        "")
-            log "No extra tooling fetched..."
-            ;;
-        *)
-            log ERROR "Binary type $binary_type not supported."
-            ;;
-    esac
 fi
 
 # fix resin-device-progress, between version 2.0.6 and 2.3.0
