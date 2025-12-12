@@ -11,7 +11,8 @@ set -o errexit
 set -E
 set -o pipefail
 
-minimum_target_version=2.0.7
+minimum_hostos_version=2.9.0
+minimum_target_version=2.16.0
 minimum_supervisor_stop=2.53.10
 
 # This will set VERSION, SLUG
@@ -1016,6 +1017,23 @@ FETCHED_SLUG=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -H "Authorization: Bearer ${AP
 SLUG=${FORCED_SLUG:-$FETCHED_SLUG}
 HOST_OS_VERSION=${META_BALENA_VERSION:-${VERSION_ID}}
 
+# Check host OS version
+case $VERSION in
+    [2-9].*|2[0-9][0-9][0-9].*.*)
+        if ! version_gt "$target_version" "$minimum_hostos_version" &&
+            ! [ "$target_version" == "$minimum_hostos_version" ]; then
+                log ERROR "Host OS version \"$VERSION\" too low, not supported."
+                else
+                log "Host OS version \"$VERSION\" OK."
+        fi
+
+        log "Host OS version \"$VERSION\" OK."
+        ;;
+    *)
+        log ERROR "Host OS version \"$VERSION\" not supported."
+        ;;
+esac
+
 # Must query for target version and perhaps for target image, which includes registry
 # endpoint, if started from app UUID.
 if [ -n "$app_uuid" ]; then
@@ -1073,16 +1091,6 @@ if [ -n "$target_version" ]; then
 else
     log ERROR "No target OS version specified."
 fi
-
-# Check host OS version
-case $VERSION in
-    [2-9].*|2[0-9][0-9][0-9].*.*)
-        log "Host OS version \"$VERSION\" OK."
-        ;;
-    *)
-        log ERROR "Host OS version \"$VERSION\" not supported."
-        ;;
-esac
 
 if [ "${SLUG}" = "raspberrypi4-64" ] && \
     [ "${target_version}" = "2.83.10+rev1" ] ; then
