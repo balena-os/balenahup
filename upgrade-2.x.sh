@@ -607,51 +607,39 @@ function hostapp_based_update {
     esac
 
 
-    if ! [ -S "/var/run/${DOCKER_CMD}-host.sock" ]; then
-        ## Happens on devices booting after a regular HUP update onto a hostapps enabled balenaOS
-        log "Do not have ${DOCKER_CMD}-host running; legacy mode"
-        LEGACY_UPDATE=yes
+    if [ -f "$inactive/resinos.fingerprint" ]; then
+        # Happens on a device, which has HUP'd from a non-hostapp balenaOS to
+        # a hostapp version. The previous "active", partition now inactive,
+        # and still has leftover data
+        log "Have ${DOCKER_CMD}-host running, with dirty inactive partition"
+        systemctl stop "${DOCKER_CMD}-host"
         log "Clean inactive partition"
         rm -rf "${inactive:?}/"*
-        log "Starting ${DOCKER_CMD}-host with ${storage_driver} storage driver"
-        ${DOCKERD} --log-driver=journald --storage-driver="${storage_driver}" --data-root="${inactive}/${DOCKER_CMD}" --host="unix:///var/run/${DOCKER_CMD}-host.sock" --pidfile="/var/run/${DOCKER_CMD}-host.pid" --exec-root="/var/run/${DOCKER_CMD}-host" --bip=10.114.101.1/24 --fixed-cidr=10.114.101.128/25 --iptables=false &
+        systemctl start "${DOCKER_CMD}-host"
         local timeout_iterations=0
         until DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} ps &> /dev/null; do sleep 0.2; if [ $((timeout_iterations++)) -ge 1500 ]; then log ERROR "${DOCKER_CMD}-host did not come up before check timed out..."; fi; done
-    else
-        if [ -f "$inactive/resinos.fingerprint" ]; then
-            # Happens on a device, which has HUP'd from a non-hostapp balenaOS to
-            # a hostapp version. The previous "active", partition now inactive,
-            # and still has leftover data
-            log "Have ${DOCKER_CMD}-host running, with dirty inactive partition"
+    fi
+    if [ "${DOCKER_CMD}" = "balena" ] &&
+        [ -d "$inactive/docker" ]; then
+            log "Removing leftover docker folder on a balena device"
+            rm -rf "$inactive/docker"
+    fi
+
+    # Check leftover data on the Inactive partition, and clean up when found
+    inactive_used=$(df "${inactive}" | grep "${inactive}" | awk '{ print $3}')
+    # The empty/default storage space use is about 2200kb, so if more than that is in use, trigger cleanup
+    if [ "$inactive_used" -gt "5000" ]; then
+        hostapp_image_count=$(DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} images -q | wc -l)
+        if [ "$hostapp_image_count" -eq "0" ]; then
+            # There are no hostapp images, but space is still taken up
+            local target_folder="${inactive}/${DOCKER_CMD}/"
+            log "Found potential leftover data, cleaning ${target_folder}"
             systemctl stop "${DOCKER_CMD}-host"
-            log "Clean inactive partition"
-            rm -rf "${inactive:?}/"*
+            find "$target_folder" -mindepth 1 -maxdepth 1 -exec rm -r "{}" \; || true
+            log "Inactive partition usage after cleanup: $(df -h "${inactive}" | grep "${inactive}" | awk '{ print $3}')"
             systemctl start "${DOCKER_CMD}-host"
             local timeout_iterations=0
             until DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} ps &> /dev/null; do sleep 0.2; if [ $((timeout_iterations++)) -ge 1500 ]; then log ERROR "${DOCKER_CMD}-host did not come up before check timed out..."; fi; done
-        fi
-        if [ "${DOCKER_CMD}" = "balena" ] &&
-            [ -d "$inactive/docker" ]; then
-                log "Removing leftover docker folder on a balena device"
-                rm -rf "$inactive/docker"
-        fi
-
-        # Check leftover data on the Inactive partition, and clean up when found
-        inactive_used=$(df "${inactive}" | grep "${inactive}" | awk '{ print $3}')
-        # The empty/default storage space use is about 2200kb, so if more than that is in use, trigger cleanup
-        if [ "$inactive_used" -gt "5000" ]; then
-            hostapp_image_count=$(DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} images -q | wc -l)
-            if [ "$hostapp_image_count" -eq "0" ]; then
-                # There are no hostapp images, but space is still taken up
-                local target_folder="${inactive}/${DOCKER_CMD}/"
-                log "Found potential leftover data, cleaning ${target_folder}"
-                systemctl stop "${DOCKER_CMD}-host"
-                find "$target_folder" -mindepth 1 -maxdepth 1 -exec rm -r "{}" \; || true
-                log "Inactive partition usage after cleanup: $(df -h "${inactive}" | grep "${inactive}" | awk '{ print $3}')"
-                systemctl start "${DOCKER_CMD}-host"
-                local timeout_iterations=0
-                until DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} ps &> /dev/null; do sleep 0.2; if [ $((timeout_iterations++)) -ge 1500 ]; then log ERROR "${DOCKER_CMD}-host did not come up before check timed out..."; fi; done
-            fi
         fi
     fi
 
