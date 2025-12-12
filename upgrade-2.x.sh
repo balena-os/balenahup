@@ -426,15 +426,6 @@ function pre_update_pi_bootfiles_removal {
     sync /mnt/boot
 }
 
-function pre_update_fix_bootfiles_hook {
-    log "Applying bootfiles hostapp-hook fix"
-    local bootfiles_temp
-    bootfiles_temp=$(mktemp)
-    CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -o "$bootfiles_temp" https://raw.githubusercontent.com/balena-os/balenahup/77401f3ecdeddaac843b26827f0a44d3b044efdd/upgrade-patches/0-bootfiles || log ERROR "Couldn't download fixed '0-bootfiles', aborting."
-    chmod 755 "$bootfiles_temp"
-    mount --bind "$bootfiles_temp"  /etc/hostapp-update-hooks.d/0-bootfiles
-}
-
 function pre_update_jetson_fix {
     log "Caching current extlinux.conf for ${SLUG} fix"
     extlinux_root_path="boot/extlinux"
@@ -591,9 +582,6 @@ function hostapp_based_update {
         raspberry*)
             log "Running pre-update fixes for ${SLUG}"
             pre_update_pi_bootfiles_removal
-            if ! version_gt "${HOST_OS_VERSION}" "2.7.6" ; then
-                pre_update_fix_bootfiles_hook
-            fi
             ;;
         jetson-tx2)
             log "Running pre-update fixes for ${SLUG}"
@@ -1121,21 +1109,6 @@ else
     log "No delta found, falling back to regular pull"
 fi
 
-# fix resin-device-progress, between version 2.0.6 and 2.3.0
-# the script does not work using deviceApiKey
-if version_gt "${HOST_OS_VERSION}" "2.0.6" &&
-    version_gt "2.3.0" "${HOST_OS_VERSION}"; then
-        log "Fixing resin-device-progress is required..."
-        tools_path=/tmp/upgrade_tools_extra
-        mkdir -p $tools_path
-        export PATH=$tools_path:$PATH
-        download_url=https://raw.githubusercontent.com/balena-os/meta-balena/v2.3.0/meta-resin-common/recipes-support/resin-device-progress/resin-device-progress/resin-device-progress
-        CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -o $tools_path/resin-device-progress $download_url || log WARN "Couldn't download tool from $download_url, progress bar won't work, but not aborting..."
-        chmod 755 $tools_path/resin-device-progress
-else
-    log "No resin-device-progress fix is required..."
-fi
-
 # Fix for issue: https://github.com/balena-os/meta-balena/pull/864
 # Also includes change from: https://github.com/balena-os/meta-balena/pull/882
 if version_gt "${HOST_OS_VERSION}" "2.0.7" &&
@@ -1176,30 +1149,6 @@ elif [ ! -f "/mnt/state/root-overlay/etc/systemd/timesyncd.conf" ] \
    && version_gt "2.13.1" "$target_version"; then
     cp "/etc/systemd/timesyncd.conf" "/mnt/state/root-overlay/etc/systemd/timesyncd.conf"
     log "timesyncd.conf migrated to the state partition"
-fi
-
-# Raspberry Pi 1 and certain docker versions (in balenaOS <2.5.0) cannot run multilayer
-# docker pulls from Docker Hub. Workaround is limiting concurrent downloads
-# Apply this fix only to balenaOS version >=2.0.7, though, as docker in earlier
-# versions does not have that flag, and would not run properly
-if [ "$SLUG" = "raspberry-pi" ] && \
-    version_gt "${HOST_OS_VERSION}" "2.0.7" && \
-    version_gt "2.5.1" "${HOST_OS_VERSION}"; then
-        if [ -f "/etc/systemd/system/docker.service.d/docker.conf" ]; then
-            # development device have this config
-            service_file="/etc/systemd/system/docker.service.d/docker.conf"
-        else
-            service_file="/lib/systemd/system/docker.service"
-        fi
-        if ! grep -q "^ExecStart=.*--max-concurrent-downloads.*" "${service_file}"; then
-            log "Docker fix is needed for correct multilayer pulls..."
-            tmp_service_file="/tmp/$(basename $service_file)"
-            cp "${service_file}" "${tmp_service_file}"
-            sed -i 's/^ExecStart=\/usr\/bin\/docker.*/& --max-concurrent-downloads 1/g' "${tmp_service_file}"
-            mount -o bind "${tmp_service_file}" "${service_file}"
-            systemctl daemon-reload && systemctl stop docker  && systemctl start docker
-            log "Docker service file updated and docker restarted."
-        fi
 fi
 
 log "hostapp-update command exists, use that for update"
