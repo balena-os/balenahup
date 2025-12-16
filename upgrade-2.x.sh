@@ -13,7 +13,6 @@ set -o pipefail
 
 preferred_hostos_version=2.0.7
 minimum_target_version=2.0.7
-minimum_hostapp_target_version=2.5.1
 minimum_balena_target_version=2.9.0
 minimum_supervisor_stop=2.53.10
 
@@ -118,12 +117,6 @@ Options:
   --stop-all
         Request the updater to stop all containers (including user application)
         before the update.
-
-  --assume-supported
-        This is now deprecated. Assuming supported device, and disabling the relevant check.
-        Only enabled for updates that does not use update hooks, otherwise the updater
-        wouldn't know how to switch partitions, so only available for balenaOS
-        below ${minimum_hostapp_target_version}.
 EOF
 }
 
@@ -1116,9 +1109,6 @@ while [[ $# -gt 0 ]]; do
             target_image=$2
             shift
             ;;
-        --assume-supported)
-            log WARN "The --assume-supported flag is deprecated, and has no effect."
-            ;;
         *)
             log WARN "Unrecognized option $1."
             ;;
@@ -1197,20 +1187,6 @@ if [ -n "$app_uuid" ]; then
         log ERROR "Target image URI expected '/': ${target_image}"
     fi
     log "Registry endpoint from target release: ${REGISTRY_ENDPOINT}"
-fi
-
-if version_gt "${target_version}" "${minimum_hostapp_target_version}" || [ "${target_version}" == "${minimum_hostapp_target_version}" ]; then
-    log "Target version supports hostapps, no device type support check required."
-else
-    case $SLUG in
-        # Check board support for device types that might have 2.x-2.x non-hostapp updates
-        # The same device types listed as below in the "Switching root partition..." section
-        artik710|beaglebone*|raspberry*|intel-nuc|up-board)
-            log "Device type root partition switch is known, proceeding"
-            ;;
-        *)
-            log ERROR "Unsupported board type $SLUG."
-    esac
 fi
 
 if [ -n "$target_version" ]; then
