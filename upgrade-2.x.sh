@@ -4,17 +4,14 @@
 NOREBOOT=no
 DELTA_VERSION=3
 SCRIPTNAME=upgrade-2.x.sh
-LEGACY_UPDATE=no
 STOP_ALL=no
 
 set -o errexit
 set -E
 set -o pipefail
 
-preferred_hostos_version=2.0.7
-minimum_target_version=2.0.7
-minimum_hostapp_target_version=2.5.1
-minimum_balena_target_version=2.9.0
+minimum_hostos_version=2.14.0
+minimum_target_version=2.16.0
 minimum_supervisor_stop=2.53.10
 
 # This will set VERSION, SLUG
@@ -25,13 +22,7 @@ minimum_supervisor_stop=2.53.10
 # shellcheck disable=SC1091
 source /etc/profile
 
-if [ -x "$(command -v balena)" ]; then
-    DOCKER_CMD="balena"
-    DOCKERD="balenad"
-else
-    DOCKER_CMD="docker"
-    DOCKERD="dockerd"
-fi
+DOCKER_CMD="balena"
 
 ###
 # Helper functions
@@ -106,24 +97,9 @@ Options:
   --balenaos-registry
         Upstream registry to use for host OS applications.
 
-  --balenaos-repo
-        No op
-
-  --balenaos-tag
-        No op
-
-  --staging
-        No op
-
   --stop-all
         Request the updater to stop all containers (including user application)
         before the update.
-
-  --assume-supported
-        This is now deprecated. Assuming supported device, and disabling the relevant check.
-        Only enabled for updates that does not use update hooks, otherwise the updater
-        wouldn't know how to switch partitions, so only available for balenaOS
-        below ${minimum_hostapp_target_version}.
 EOF
 }
 
@@ -348,24 +324,18 @@ function _patch_supervisor_version() {
 #   target_supervisor_version
 # Arguments:
 #   image: the docker image to exctract the config from
-#   non_docker_host: empty value will use docker-host, non empty value will use the main docker
 # Returns:
 #   None
 #######################################
 function upgrade_supervisor() {
     local image=$1
-    local no_docker_host=$2
     log "Supervisor update start..."
 
     if [ -z "$target_supervisor_version" ]; then
         log "No explicit supervisor version was provided, update to default version in target balenaOS..."
         local DEFAULT_SUPERVISOR_VERSION
         versioncheck_cmd=("run" "--rm" "${image}" "bash" "-c" "cat /etc/*-supervisor/supervisor.conf | sed -rn 's/SUPERVISOR_(TAG|VERSION)=v(.*)/\\2/p'")
-        if [ -z "$no_docker_host" ]; then
-            DEFAULT_SUPERVISOR_VERSION=$(DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} "${versioncheck_cmd[@]}")
-        else
-            DEFAULT_SUPERVISOR_VERSION=$(${DOCKER_CMD} "${versioncheck_cmd[@]}")
-        fi
+        DEFAULT_SUPERVISOR_VERSION=$(DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} "${versioncheck_cmd[@]}")
         if [ -z "$DEFAULT_SUPERVISOR_VERSION" ]; then
             log ERROR "Could not get the default supervisor version for this balenaOS release, bailing out."
         else
@@ -429,23 +399,6 @@ function error_handler() {
     exit 1
 }
 
-function remove_sample_wifi {
-    # Removing the `resin-sample` file if it exists on the device, and has the default
-    # connection settings, as they are well known and thus insecure
-    local filename=$1
-    if [ -f "${filename}" ] && grep -Fxq "ssid=My_Wifi_Ssid" "${filename}" && grep -Fxq "psk=super_secret_wifi_password" "${filename}" ; then
-        if nmcli c  show --active | grep "resin-sample" ; then
-            # If a connection with that name is in use, do not actually remove the settings
-            log WARN "resin-sample configuration found at ${filename} but it might be connected, not removing..."
-        else
-            log "resin-sample configuration found at ${filename}, removing..."
-            rm "${filename}" || log WARN "couldn't remove ${filename}; continuing anyways..."
-        fi
-    else
-        log "No resin-sample found at ${filename} with default config, good..."
-    fi
-}
-
 # Pre update cleanup: remove some not-required files from the boot partition to clear some space
 function pre_update_pi_bootfiles_removal {
     local boot_files_for_removal=('start_db.elf' 'fixup_db.dat')
@@ -454,15 +407,6 @@ function pre_update_pi_bootfiles_removal {
         rm -f "/mnt/boot/$f"
     done
     sync /mnt/boot
-}
-
-function pre_update_fix_bootfiles_hook {
-    log "Applying bootfiles hostapp-hook fix"
-    local bootfiles_temp
-    bootfiles_temp=$(mktemp)
-    CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -o "$bootfiles_temp" https://raw.githubusercontent.com/balena-os/balenahup/77401f3ecdeddaac843b26827f0a44d3b044efdd/upgrade-patches/0-bootfiles || log ERROR "Couldn't download fixed '0-bootfiles', aborting."
-    chmod 755 "$bootfiles_temp"
-    mount --bind "$bootfiles_temp"  /etc/hostapp-update-hooks.d/0-bootfiles
 }
 
 function pre_update_jetson_fix {
@@ -580,102 +524,9 @@ function persistent_logging_config_var {
 # Includes pre-update fixes and balena migration
 # Globals:
 #   DOCKER_CMD
-#   target_version
-#   minimum_balena_target_version
-# Arguments:
-#   update_package: the docker image to use for the update
-#   tmp_inactive: host path to the directory that will be bind-mounted to /mnt/sysroot/inactive inside the container
-# Returns:
-#   None
-#######################################
-function in_container_hostapp_update {
-    local update_package=$1
-    local tmp_inactive=$2
-    local inactive="/mnt/sysroot/inactive"
-    local hostapp_update_extra_args=""
-    local target_docker_cmd
-    local target_dockerd
-    local volumes_args=()
-    local -i retrycount=0
-    local tmp_image
-
-    stop_services
-    if [ "${STOP_ALL}" == "yes" ]; then
-        remove_containers
-    fi
-
-    # Disable rollbacks when doing migration to rollback enabled system, as couldn't roll back anyways
-    if version_gt "${target_version}" "2.9.3"; then
-        hostapp_update_extra_args="-x"
-    fi
-    # Set the name of the docker/balena command within the target image to the appropriate one
-    if version_gt "${target_version}" "${minimum_balena_target_version}"; then
-        target_docker_cmd="balena"
-        target_dockerd="balenad"
-    else
-        target_docker_cmd="docker"
-        target_dockerd="dockerd"
-    fi
-
-    while true ; do
-        if ${DOCKER_CMD} pull "${update_package}"; then
-            break
-        else
-            log WARN "Couldn't pull docker image, was try #${retrycount}..."
-        fi
-        retrycount+=1
-        if [ $retrycount -ge 10 ]; then
-            log ERROR "Couldn't pull docker image, giving up..."
-        else
-            sleep 10
-        fi
-    done
-
-    tmp_image=$(mktemp -u "/tmp/hupfile.XXXXXXXX")
-    log "Using ${tmp_image} for update image transfer into container"
-    mkfifo "${tmp_image}"
-    ${DOCKER_CMD} save "${update_package}" > "${tmp_image}" &
-    mkdir -p /mnt/data/balenahup/tmp
-
-    # The setting up the required volumes
-    volumes_args+=("-v" "/dev/disk:/dev/disk")
-    volumes_args+=("-v" "/mnt/boot:/mnt/boot")
-    volumes_args+=("-v" "/mnt/data/balenahup/tmp:/mnt/data/balenahup/tmp")
-    if mountpoint "/mnt/sysroot/active"; then
-        volumes_args+=("-v" "/mnt/sysroot/active:/mnt/sysroot/active")
-    else
-        volumes_args+=("-v" "/:/mnt/sysroot/active")
-    fi
-    volumes_args+=("-v" "${tmp_inactive}:${inactive}")
-    volumes_args+=("-v" "${tmp_image}:/balenaos-image.docker")
-
-    log "Starting hostapp-update within a container"
-    # Note that the following docker daemon is started with a different --bip and --fixed-cidr
-    # setting, otherwise it is clashing with the system docker on balenaOS >=2.3.0 || <2.5.1
-    # and then docker pull would not succeed
-    # shellcheck disable=SC2016
-    ${DOCKER_CMD} run \
-      --rm \
-      --name balenahup \
-      --privileged \
-      "${volumes_args[@]}" \
-      "${update_package}" \
-      /bin/bash -c 'storage_driver=$(cat /boot/storage-driver) ; DOCKER_TMPDIR=/mnt/data/balenahup/tmp/ '"${target_dockerd}"' --storage-driver=$storage_driver --data-root='"${inactive}"'/'"${target_docker_cmd}"' --host=unix:///var/run/'"${target_docker_cmd}"'-host.sock --pidfile=/var/run/'"${target_docker_cmd}"'-host.pid --exec-root=/var/run/'"${target_docker_cmd}"'-host --bip=10.114.201.1/24 --fixed-cidr=10.114.201.128/25 --iptables=false & timeout_iterations=0; until DOCKER_HOST="unix:///var/run/'"${target_docker_cmd}"'-host.sock" '"${target_docker_cmd}"' ps &> /dev/null; do sleep 0.2; if [ $((timeout_iterations++)) -ge 1500 ]; then echo "'"${target_docker_cmd}"'-host did not come up before check timed out..."; exit 1; fi; done; echo "Starting hostapp-update"; hostapp-update -f /balenaos-image.docker '"${hostapp_update_extra_args}"'' \
-    || log ERROR "Update based on hostapp-update has failed..."
-
-}
-
-#######################################
-# Prepares and runs update based on hostapp-update
-# Includes pre-update fixes and balena migration
-# Globals:
-#   DOCKER_CMD
-#   DOCKERD
-#   LEGACY_UPDATE
 #   SLUG
 #   HOST_OS_VERSION
 #   target_version
-#   minimum_balena_target_version
 # Arguments:
 #   update_package: the docker image to use for the update
 # Returns:
@@ -683,16 +534,9 @@ function in_container_hostapp_update {
 #######################################
 function hostapp_based_update {
     local update_package=$1
-    local storage_driver
     local inactive="/mnt/sysroot/inactive"
-    local balena_migration=no
     local inactive_used
     local hostapp_image_count
-    storage_driver=overlay2
-    if [ -f /boot/storage-driver ]; then
-        storage_driver=$(cat /boot/storage-driver)
-    fi
-
     local active_part_dev
     local inactive_part_dev
 
@@ -713,9 +557,6 @@ function hostapp_based_update {
         raspberry*)
             log "Running pre-update fixes for ${SLUG}"
             pre_update_pi_bootfiles_removal
-            if ! version_gt "${HOST_OS_VERSION}" "2.7.6" ; then
-                pre_update_fix_bootfiles_hook
-            fi
             ;;
         jetson-tx2)
             log "Running pre-update fixes for ${SLUG}"
@@ -729,200 +570,48 @@ function hostapp_based_update {
     esac
 
 
-    if [ "${DOCKER_CMD}" = "docker" ] &&
-        version_gt "${target_version}" "${minimum_balena_target_version}" ; then
-            balena_migration="yes"
-    fi
-
-    if ! [ -S "/var/run/${DOCKER_CMD}-host.sock" ]; then
-        ## Happens on devices booting after a regular HUP update onto a hostapps enabled balenaOS
-        log "Do not have ${DOCKER_CMD}-host running; legacy mode"
-        LEGACY_UPDATE=yes
+    if [ -f "$inactive/resinos.fingerprint" ]; then
+        # Happens on a device, which has HUP'd from a non-hostapp balenaOS to
+        # a hostapp version. The previous "active", partition now inactive,
+        # and still has leftover data
+        log "Have ${DOCKER_CMD}-host running, with dirty inactive partition"
+        systemctl stop "${DOCKER_CMD}-host"
         log "Clean inactive partition"
         rm -rf "${inactive:?}/"*
-        if [ "$balena_migration" = "no" ]; then
-            log "Starting ${DOCKER_CMD}-host with ${storage_driver} storage driver"
-            ${DOCKERD} --log-driver=journald --storage-driver="${storage_driver}" --data-root="${inactive}/${DOCKER_CMD}" --host="unix:///var/run/${DOCKER_CMD}-host.sock" --pidfile="/var/run/${DOCKER_CMD}-host.pid" --exec-root="/var/run/${DOCKER_CMD}-host" --bip=10.114.101.1/24 --fixed-cidr=10.114.101.128/25 --iptables=false &
-            local timeout_iterations=0
-            until DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} ps &> /dev/null; do sleep 0.2; if [ $((timeout_iterations++)) -ge 1500 ]; then log ERROR "${DOCKER_CMD}-host did not come up before check timed out..."; fi; done
-        fi
-    else
-        if [ -f "$inactive/resinos.fingerprint" ]; then
-            # Happens on a device, which has HUP'd from a non-hostapp balenaOS to
-            # a hostapp version. The previous "active", partition now inactive,
-            # and still has leftover data
-            log "Have ${DOCKER_CMD}-host running, with dirty inactive partition"
+        systemctl start "${DOCKER_CMD}-host"
+        local timeout_iterations=0
+        until DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} ps &> /dev/null; do sleep 0.2; if [ $((timeout_iterations++)) -ge 1500 ]; then log ERROR "${DOCKER_CMD}-host did not come up before check timed out..."; fi; done
+    fi
+    if [ "${DOCKER_CMD}" = "balena" ] &&
+        [ -d "$inactive/docker" ]; then
+            log "Removing leftover docker folder on a balena device"
+            rm -rf "$inactive/docker"
+    fi
+
+    # Check leftover data on the Inactive partition, and clean up when found
+    inactive_used=$(df "${inactive}" | grep "${inactive}" | awk '{ print $3}')
+    # The empty/default storage space use is about 2200kb, so if more than that is in use, trigger cleanup
+    if [ "$inactive_used" -gt "5000" ]; then
+        hostapp_image_count=$(DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} images -q | wc -l)
+        if [ "$hostapp_image_count" -eq "0" ]; then
+            # There are no hostapp images, but space is still taken up
+            local target_folder="${inactive}/${DOCKER_CMD}/"
+            log "Found potential leftover data, cleaning ${target_folder}"
             systemctl stop "${DOCKER_CMD}-host"
-            log "Clean inactive partition"
-            rm -rf "${inactive:?}/"*
+            find "$target_folder" -mindepth 1 -maxdepth 1 -exec rm -r "{}" \; || true
+            log "Inactive partition usage after cleanup: $(df -h "${inactive}" | grep "${inactive}" | awk '{ print $3}')"
             systemctl start "${DOCKER_CMD}-host"
             local timeout_iterations=0
             until DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} ps &> /dev/null; do sleep 0.2; if [ $((timeout_iterations++)) -ge 1500 ]; then log ERROR "${DOCKER_CMD}-host did not come up before check timed out..."; fi; done
         fi
-        if [ "${DOCKER_CMD}" = "balena" ] &&
-            [ -d "$inactive/docker" ]; then
-                log "Removing leftover docker folder on a balena device"
-                rm -rf "$inactive/docker"
-        fi
-
-        # Check leftover data on the Inactive partition, and clean up when found
-        inactive_used=$(df "${inactive}" | grep "${inactive}" | awk '{ print $3}')
-        # The empty/default storage space use is about 2200kb, so if more than that is in use, trigger cleanup
-        if [ "$inactive_used" -gt "5000" ]; then
-            hostapp_image_count=$(DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} images -q | wc -l)
-            if [ "$hostapp_image_count" -eq "0" ]; then
-                # There are no hostapp images, but space is still taken up
-                local target_folder="${inactive}/${DOCKER_CMD}/"
-                log "Found potential leftover data, cleaning ${target_folder}"
-                systemctl stop "${DOCKER_CMD}-host"
-                find "$target_folder" -mindepth 1 -maxdepth 1 -exec rm -r "{}" \; || true
-                log "Inactive partition usage after cleanup: $(df -h "${inactive}" | grep "${inactive}" | awk '{ print $3}')"
-                systemctl start "${DOCKER_CMD}-host"
-                local timeout_iterations=0
-                until DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} ps &> /dev/null; do sleep 0.2; if [ $((timeout_iterations++)) -ge 1500 ]; then log ERROR "${DOCKER_CMD}-host did not come up before check timed out..."; fi; done
-            fi
-        fi
     fi
 
-    if [ "$balena_migration" = "yes" ]; then
-            # Migrating to balena and hostapp-update hooks run inside the target container
-            log "Balena migration"
-            systemctl stop docker-host || true
-            if  [ -d "${inactive}/docker" ] &&
-                [ ! -L "${inactive}/docker" ] ; then
-                    log "Need to move docker folder on the inactive partition"
-                    rm -rf "${inactive}/balena" || true
-                    mv "${inactive}/"{docker,balena} && ln -s "${inactive}/"{balena,docker}
-            fi
-
-            in_container_hostapp_update "${update_package}" "${inactive}"
-
-            if [ "${LEGACY_UPDATE}" != "yes" ]; then
-                systemctl start docker-host
-            fi
-    else
-        if [ "$STOP_ALL" = "yes" ]; then
-            stop_services
-            remove_containers
-        fi
-        log "Calling hostapp-update for ${update_package}"
-        hostapp-update -i "${update_package}" && post_update_fixes
+    if [ "$STOP_ALL" = "yes" ]; then
+        stop_services
+        remove_containers
     fi
-}
-
-#######################################
-# Upgrade from a non-hostapp (<2.7.0) to a hostapp-enabled balenaOS version
-# Handles both pre-balena and balena updates
-# Globals:
-#   SLUG
-#   minimum_balena_target_version
-#   target_version
-# Arguments:
-#   update_package: the docker image to use for the update
-# Returns:
-#   None
-#######################################
-function non_hostapp_to_hostapp_update {
-    local update_package=$1
-    local tmp_inactive
-
-    # Mount spare root partition
-    find_partitions
-    umount "${update_part}" || true
-    mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0 -i 8192 -L "${update_label}" "${update_part}"
-    tmp_inactive=$(mktemp -d "/tmp/hupinactive.XXXXXXXX")
-    log "Mounting inactive partition ${update_part} to ${tmp_inactive}..."
-    mount "${update_part}" "${tmp_inactive}" || log ERROR "Cannot mount inactive partition..."
-    # remove REC files on boot partition
-    remove_rec_files
-
-    case "${SLUG}" in
-        raspberry*)
-            log "Running pre-update fixes for ${SLUG}"
-            pre_update_pi_bootfiles_removal
-            ;;
-        *)
-            log "No device-specific pre-update fix for ${SLUG}"
-    esac
-
-    in_container_hostapp_update "${update_package}" "${tmp_inactive}"
-}
-
-function find_partitions {
-    # Find which partition is / and which we should write the update to
-    # This function is only used in pre-hostapp-update-enabled 2.x devices
-    root_part=$(findmnt -n --raw --evaluate --output=source /)
-    log "Found root at ${root_part}..."
-    case ${root_part} in
-        # on 2.x the following device types have these kinds of results for $root_part, examples
-        # raspberrypi: /dev/mmcblk0p2
-        # beaglebone: /dev/disk/by-partuuid/93956da0-02
-        # edison: /dev/disk/by-partuuid/012b3303-34ac-284d-99b4-34e03a2335f4
-        # NUC: /dev/disk/by-label/resin-rootA and underlying /dev/sda2
-        # up-board: /dev/disk/by-label/resin-rootA and underlying /dev/mmcblk0p2
-        /dev/disk/by-partuuid/*)
-            # reread the physical device that that part refers to
-            root_part=$(readlink -f "${root_part}")
-            case ${root_part} in
-                *p2)
-                    root_dev=${root_part%p2}
-                    update_part=${root_dev}p3
-                    update_part_no=3
-                    update_label=resin-rootB
-                    ;;
-                *p3)
-                    root_dev=${root_part%p3}
-                    update_part=${root_dev}p2
-                    update_part_no=2
-                    update_label=resin-rootA
-                    ;;
-                *p8)
-                    root_dev=${root_part%p8}
-                    update_part=${root_dev}p9
-                    update_part_no=9
-                    update_label=resin-rootB
-                    ;;
-                *p9)
-                    root_dev=${root_part%p9}
-                    update_part=${root_dev}p8
-                    update_part_no=8
-                    update_label=resin-rootA
-                    ;;
-                *)
-                    log ERROR "Couldn't get the root partition from the part-uuid..."
-            esac
-            ;;
-        /dev/disk/by-label/resin-rootA)
-            old_label=resin-rootA
-            update_label=resin-rootB
-            root_part_dev=$(readlink -f /dev/disk/by-label/${old_label})
-            update_part=${root_part_dev%2}3
-            ;;
-        /dev/disk/by-label/resin-rootB)
-            old_label=resin-rootB
-            update_label=resin-rootA
-            root_part_dev=$(readlink -f /dev/disk/by-label/${old_label})
-            update_part=${root_part_dev%3}2
-            ;;
-        *2)
-            root_dev=${root_part%2}
-            update_part=${root_dev}3
-            update_part_no=3
-            update_label=resin-rootB
-            ;;
-        *3)
-            root_dev=${root_part%3}
-            update_part=${root_dev}2
-            update_part_no=2
-            update_label=resin-rootA
-            ;;
-        *)
-            log ERROR "Unknown root partition ${root_part}."
-    esac
-    if [ ! -b "${update_part}" ]; then
-        log ERROR "Update partition detected as ${update_part} but it's not a block device."
-    fi
-    log "Update partition: ${update_part}"
+    log "Calling hostapp-update for ${update_package}"
+    hostapp-update -i "${update_package}" && post_update_fixes
 }
 
 #######################################
@@ -1217,14 +906,6 @@ while [[ $# -gt 0 ]]; do
             REGISTRY_ENDPOINT=$2
             shift
             ;;
-        --resinos-repo | --balenaos-repo)
-            # no op
-            shift
-            ;;
-        --resinos-tag | --balenaos-tag)
-            # no op
-            shift
-            ;;
         --supervisor-version)
             if [ -z "$2" ]; then
                 log ERROR "\"$1\" argument needs a value."
@@ -1235,9 +916,6 @@ while [[ $# -gt 0 ]]; do
         --no-reboot)
             NOREBOOT="yes"
             ;;
-        --staging)
-            # no op
-            ;;
         --stop-all)
             STOP_ALL="yes"
             ;;
@@ -1247,9 +925,6 @@ while [[ $# -gt 0 ]]; do
             fi
             target_image=$2
             shift
-            ;;
-        --assume-supported)
-            log WARN "The --assume-supported flag is deprecated, and has no effect."
             ;;
         *)
             log WARN "Unrecognized option $1."
@@ -1291,6 +966,19 @@ FETCHED_SLUG=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -H "Authorization: Bearer ${AP
 SLUG=${FORCED_SLUG:-$FETCHED_SLUG}
 HOST_OS_VERSION=${META_BALENA_VERSION:-${VERSION_ID}}
 
+# Check host OS version
+case $VERSION in
+    [2-9].*|2[0-9][0-9][0-9].*.*)
+        if version_gt "$minimum_hostos_version" "$VERSION"; then
+            log ERROR "Host OS version \"$VERSION\" < \"$minimum_hostos_version\", not supported."
+        fi
+        log "Host OS version \"$VERSION\" OK."
+        ;;
+    *)
+        log ERROR "Host OS version \"$VERSION\" not supported."
+        ;;
+esac
+
 # Must query for target version and perhaps for target image, which includes registry
 # endpoint, if started from app UUID.
 if [ -n "$app_uuid" ]; then
@@ -1331,20 +1019,6 @@ if [ -n "$app_uuid" ]; then
     log "Registry endpoint from target release: ${REGISTRY_ENDPOINT}"
 fi
 
-if version_gt "${target_version}" "${minimum_hostapp_target_version}" || [ "${target_version}" == "${minimum_hostapp_target_version}" ]; then
-    log "Target version supports hostapps, no device type support check required."
-else
-    case $SLUG in
-        # Check board support for device types that might have 2.x-2.x non-hostapp updates
-        # The same device types listed as below in the "Switching root partition..." section
-        artik710|beaglebone*|raspberry*|intel-nuc|up-board)
-            log "Device type root partition switch is known, proceeding"
-            ;;
-        *)
-            log ERROR "Unsupported board type $SLUG."
-    esac
-fi
-
 if [ -n "$target_version" ]; then
     case $target_version in
         [2-9].*|2[0-9][0-9][0-9].*.*)
@@ -1363,16 +1037,6 @@ else
     log ERROR "No target OS version specified."
 fi
 
-# Check host OS version
-case $VERSION in
-    [2-9].*|2[0-9][0-9][0-9].*.*)
-        log "Host OS version \"$VERSION\" OK."
-        ;;
-    *)
-        log ERROR "Host OS version \"$VERSION\" not supported."
-        ;;
-esac
-
 if [ "${SLUG}" = "raspberrypi4-64" ] && \
     [ "${target_version}" = "2.83.10+rev1" ] ; then
     board_rev="$(awk '{print $NF}' < /proc/device-tree/model)"
@@ -1389,13 +1053,9 @@ if [ -z "${target_image}" ]; then
     fi
 fi
 
-# starting with the balena engine, we can use native deltas
-if version_gt "${HOST_OS_VERSION}" "${minimum_balena_target_version}"; then
-    log "Attempting host OS update using deltas"
-    delta_image=$(find_delta "${target_image}")
-else
-    log "Device not delta capable"
-fi
+log "Attempting host OS update using deltas"
+delta_image=$(find_delta "${target_image}")
+
 if [ -n "${delta_image}" ]; then
     delta_size=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -H "Authorization: Bearer ${APIKEY}" \
     "${API_ENDPOINT}/v5/delta?\$filter=((status%20eq%20'success')%20and%20(version%20eq%20'${DELTA_VERSION}')%20and%20(is_stored_at__location%20eq%20'${delta_image}'))" 2>/dev/null \
@@ -1406,259 +1066,28 @@ else
     log "No delta found, falling back to regular pull"
 fi
 
-# Check if we need to install some more extra tools
-if ! version_gt "$VERSION" "$preferred_hostos_version" &&
-    ! [ "$VERSION" == "$preferred_hostos_version" ]; then
-    log "Host OS version $VERSION is less than $preferred_hostos_version, installing tools..."
-
-    tools_path=/tmp/upgrade_tools
-    tools_binaries="tar"
-    mkdir -p $tools_path
-    export PATH=$tools_path:$PATH
-
-    architecture=$(uname -m)
-    case ${architecture} in
-        arm*|aarch64)
-            binary_type="arm"
-            ;;
-        i*86|x86_64)
-            binary_type="x86"
-            ;;
-        *)
-            log WARN "Not explicitly known architecture: ${architecture}"
-            binary_type=""
-    esac
-
-    case $binary_type in
-        arm|x86)
-            download_uri=https://github.com/balena-os/balenahup/raw/master/upgrade-binaries/$binary_type
-            for binary in $tools_binaries; do
-                log "Installing $binary..."
-                CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -o $tools_path/$binary $download_uri/$binary || log ERROR "Couldn't download tool from $download_uri/$binary, aborting."
-                chmod 755 $tools_path/$binary
-            done
-            ;;
-        "")
-            log "No extra tooling fetched..."
-            ;;
-        *)
-            log ERROR "Binary type $binary_type not supported."
-            ;;
-    esac
-fi
-
-# fix resin-device-progress, between version 2.0.6 and 2.3.0
-# the script does not work using deviceApiKey
-if version_gt "${HOST_OS_VERSION}" "2.0.6" &&
-    version_gt "2.3.0" "${HOST_OS_VERSION}"; then
-        log "Fixing resin-device-progress is required..."
-        tools_path=/tmp/upgrade_tools_extra
-        mkdir -p $tools_path
-        export PATH=$tools_path:$PATH
-        download_url=https://raw.githubusercontent.com/balena-os/meta-balena/v2.3.0/meta-resin-common/recipes-support/resin-device-progress/resin-device-progress/resin-device-progress
-        CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -o $tools_path/resin-device-progress $download_url || log WARN "Couldn't download tool from $download_url, progress bar won't work, but not aborting..."
-        chmod 755 $tools_path/resin-device-progress
-else
-    log "No resin-device-progress fix is required..."
-fi
-
-# Fix for issue: https://github.com/balena-os/meta-balena/pull/864
-# Also includes change from: https://github.com/balena-os/meta-balena/pull/882
-if version_gt "${HOST_OS_VERSION}" "2.0.7" &&
-    version_gt "2.7.0" "${HOST_OS_VERSION}"; then
-        log "Fixing supervisor updater..."
-        if CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -o "/tmp/update-resin-supervisor" https://raw.githubusercontent.com/balena-os/meta-balena/40d5a174da6b52d530c978e0cae22aa61f65d203/meta-resin-common/recipes-containers/docker-disk/docker-resin-supervisor-disk/update-resin-supervisor ; then
-            chmod 755 "/tmp/update-resin-supervisor"
-            PATH="/tmp:$PATH"
-            log "Added temporary supervisor updater replaced with fixed version..."
-        else
-            log ERROR "Could not download temporary supervisor updater..."
-        fi
-else
-    log "No supervisor updater fix is required..."
-fi
-
-# Fix issue with `read` on 2.10.x/2.11.0 balenaOS versions
-if version_gt "${HOST_OS_VERSION}" "2.9.7" &&
-    version_gt "2.11.1" "${HOST_OS_VERSION}"; then
-        log "Fixing supervisor updater if needed..."
-        #shellcheck disable=SC2016
-        sed 's/read tag image_name <<<$data/read tag <<<"$(echo "$data" | head -n 1)" ; read image_name <<<"$(echo "$data" | tail -n 1)"/' /usr/bin/update-resin-supervisor > /tmp/fixed-update-resin-supervisor && \
-          chmod +x /tmp/fixed-update-resin-supervisor && \
-          mount -o bind /tmp/fixed-update-resin-supervisor /usr/bin/update-resin-supervisor
-fi
-
-# The timesyncd.conf lives on the state partition starting from balenaOS 2.1.0 up to 2.13.1
-# For devices that were updated before this fix came to effect, fix things up, otherwise migrate when updating
-if [ -d "/mnt/state/root-overlay/etc/systemd/timesyncd.conf" ] \
-   && [ -f "/etc/systemd/timesyncd.conf" ]; then
-    rm -rf "/mnt/state/root-overlay/etc/systemd/timesyncd.conf"
-    cp "/etc/systemd/timesyncd.conf" "/mnt/state/root-overlay/etc/systemd/timesyncd.conf"
-    systemctl restart etc-systemd-timesyncd.conf.mount
-    log "timesyncd.conf mount service fixed up"
-elif [ ! -f "/mnt/state/root-overlay/etc/systemd/timesyncd.conf" ] \
-   && [ -f "/etc/systemd/timesyncd.conf" ] \
-   && version_gt "$target_version" "2.1.0" \
-   && version_gt "2.13.1" "$target_version"; then
-    cp "/etc/systemd/timesyncd.conf" "/mnt/state/root-overlay/etc/systemd/timesyncd.conf"
-    log "timesyncd.conf migrated to the state partition"
-fi
-
-# Raspberry Pi 1 and certain docker versions (in balenaOS <2.5.0) cannot run multilayer
-# docker pulls from Docker Hub. Workaround is limiting concurrent downloads
-# Apply this fix only to balenaOS version >=2.0.7, though, as docker in earlier
-# versions does not have that flag, and would not run properly
-if [ "$SLUG" = "raspberry-pi" ] && \
-    version_gt "${HOST_OS_VERSION}" "2.0.7" && \
-    version_gt "2.5.1" "${HOST_OS_VERSION}"; then
-        if [ -f "/etc/systemd/system/docker.service.d/docker.conf" ]; then
-            # development device have this config
-            service_file="/etc/systemd/system/docker.service.d/docker.conf"
-        else
-            service_file="/lib/systemd/system/docker.service"
-        fi
-        if ! grep -q "^ExecStart=.*--max-concurrent-downloads.*" "${service_file}"; then
-            log "Docker fix is needed for correct multilayer pulls..."
-            tmp_service_file="/tmp/$(basename $service_file)"
-            cp "${service_file}" "${tmp_service_file}"
-            sed -i 's/^ExecStart=\/usr\/bin\/docker.*/& --max-concurrent-downloads 1/g' "${tmp_service_file}"
-            mount -o bind "${tmp_service_file}" "${service_file}"
-            systemctl daemon-reload && systemctl stop docker  && systemctl start docker
-            log "Docker service file updated and docker restarted."
-        fi
-fi
-
-### hostapp-update based updater
-
-if version_gt "${HOST_OS_VERSION}" "${minimum_hostapp_target_version}" ||
-    [ "${HOST_OS_VERSION}" == "${minimum_hostapp_target_version}" ]; then
-    log "hostapp-update command exists, use that for update"
-    progress 50 "Running OS update"
-    images=("${delta_image}" "${target_image}")
-    # record the "source" of each image in the array above for clarity during fallback
-    image_types=("delta" "balena_registry")
-    update_failed=0
-    # login for private device types
-    DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} login "${REGISTRY_ENDPOINT}" -u "d_${UUID}" \
-    --password "${APIKEY}" > /dev/null 2>&1 || log WARN "logging into registry failed, proceeding anyway (only required for private device types)"
-    for img in "${images[@]}"; do
-        if [ -n "${img}" ] && hostapp_based_update "${img}"; then
-            # once we've updated successfully, set our canonical image
-            image=${img}
-            break
-        else
-            log "Image type ${image_types[${update_failed}]}, location '${img}' failed or not found, trying another source"
-            update_failed=$(( update_failed + 1 ))
-        fi
-    done
-    if [ -z "${image}" ]; then
-        log ERROR "all hostapp-update attempts have failed..."
-    fi
-
-    if [ "${LEGACY_UPDATE}" = "yes" ]; then
-        upgrade_supervisor "${image}" no_docker_host
-        finish_up "${image}"
+log "hostapp-update command exists, use that for update"
+progress 50 "Running OS update"
+images=("${delta_image}" "${target_image}")
+# record the "source" of each image in the array above for clarity during fallback
+image_types=("delta" "balena_registry")
+update_failed=0
+# login for private device types
+DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} login "${REGISTRY_ENDPOINT}" -u "d_${UUID}" \
+--password "${APIKEY}" > /dev/null 2>&1 || log WARN "logging into registry failed, proceeding anyway (only required for private device types)"
+for img in "${images[@]}"; do
+    if [ -n "${img}" ] && hostapp_based_update "${img}"; then
+        # once we've updated successfully, set our canonical image
+        image=${img}
+        break
     else
-        upgrade_supervisor "${image}"
-        finish_up "${image}"
+        log "Image type ${image_types[${update_failed}]}, location '${img}' failed or not found, trying another source"
+        update_failed=$(( update_failed + 1 ))
     fi
-
-elif version_gt "${target_version}" "${minimum_hostapp_target_version}" ||
-     [ "${target_version}" == "${minimum_hostapp_target_version}" ]; then
-    image="${target_image}"
-    log "Running update from a non-hostapp-update enabled version to a hostapp-update enabled version..."
-    progress 50 "Running OS update"
-    non_hostapp_to_hostapp_update "${image}"
-
-    upgrade_supervisor "${image}" no_docker_host
-    finish_up "${image}"
+done
+if [ -z "${image}" ]; then
+    log ERROR "all hostapp-update attempts have failed..."
 fi
 
-### Below here is the regular, non-hostapp balenaOS host update
-
-# Find partition information
-find_partitions
-
-# remove REC files on boot partition
-remove_rec_files
-
-# Stop supervisor, plus all running containers if requested
-stop_services
-if [ "${STOP_ALL}" = "yes" ]; then
-    remove_containers
-fi
-
-trap 'error_handler' ERR
-
-log "Getting new OS image..."
-progress 50 "Downloading OS update"
-# Create container for new version
-container=$(${DOCKER_CMD} create "${target_image}" echo export)
-
-progress 75 "Running OS update"
-
-log "Making new OS filesystem..."
-# Format alternate root partition
-log "Update partition: ${update_part}"
-mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0 -i 8192 -L "$update_label" "$update_part"
-
-# Mount alternate root partition
-mkdir -p /tmp/updateroot
-mount "$update_part" /tmp/updateroot
-
-# Extract rootfs
-log "Extracting new rootfs..."
-cat >/tmp/root-exclude <<EOF
-quirks
-resin-boot
-EOF
-${DOCKER_CMD} export "$container" | tar -x -X /tmp/root-exclude -C /tmp/updateroot
-
-# Extract quirks
-${DOCKER_CMD} export "$container" | tar -x -C /tmp quirks
-cp -a /tmp/quirks/* /tmp/updateroot/
-rm -rf /tmp/quirks
-
-# Unmount alternate root partition
-umount /tmp/updateroot
-
-# Extract boot partition, exclude boot_whitelist files
-log "Extracting new boot partition..."
-cat >/tmp/boot-exclude <<EOF
-resin-boot/cmdline.txt
-resin-boot/config.txt
-resin-boot/splash/resin-logo.png
-resin-boot/uEnv.txt
-resin-boot/EFI/BOOT/grub.cfg
-resin-boot/config.json
-EOF
-${DOCKER_CMD} export "$container" | tar -x -X /tmp/boot-exclude -C /tmp resin-boot
-cp -a /tmp/resin-boot/* /mnt/boot/
-
-# Clearing up
-${DOCKER_CMD} rm "$container"
-
-# Updating supervisor
-upgrade_supervisor "${target_image}" no_docker_host
-
-# Remove resin-sample to plug security hole
-remove_sample_wifi "/mnt/boot/system-connections/resin-sample"
-remove_sample_wifi "/mnt/state/root-overlay/etc/NetworkManager/system-connections/resin-sample"
-
-# Switch root partition
-log "Switching root partition..."
-case $SLUG in
-    artik710|beaglebone*)
-        echo "resin_root_part=$update_part_no" >/mnt/boot/resinOS_uEnv.txt
-        ;;
-    raspberry*)
-        old_root=${root_part#/dev/}
-        new_root=${update_part#/dev/}
-        sed -i -e "s/$old_root/$new_root/" /mnt/boot/cmdline.txt
-        ;;
-    intel-nuc|up-board)
-        sed -i -e "s/${old_label}/${update_label}/" /mnt/boot/EFI/BOOT/grub.cfg
-        ;;
-esac
-
-finish_up "${target_image}"
+upgrade_supervisor "${image}"
+finish_up "${image}"
