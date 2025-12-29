@@ -1,4 +1,30 @@
 - commits:
+    - subject: Remove scripts for OS v1.x upgrade
+      hash: 9e5b569603f773cf3f47f1c0d84a900a394a263c
+      body: ""
+      footer:
+        Change-type: major
+        change-type: major
+        Signed-off-by: Ken Bannister <kb2ma@runbox.com>
+        signed-off-by: Ken Bannister <kb2ma@runbox.com>
+      author: Ken Bannister
+      nested: []
+    - subject: Drop support for running on OS < 2.14.0 and HUP target OS < 2.16.0
+      hash: ade951130bf05c57688778328063acf1945a5f95
+      body: ""
+      footer:
+        Changelog-entry: Drop support for running on OS < 2.14.0 and HUP target OS < 2.16.0
+        changelog-entry: Drop support for running on OS < 2.14.0 and HUP target OS < 2.16.0
+        Change-type: major
+        change-type: major
+        Signed-off-by: Ken Bannister <kb2ma@runbox.com>
+        signed-off-by: Ken Bannister <kb2ma@runbox.com>
+      author: Ken Bannister
+      nested: []
+  version: 4.0.0
+  title: ""
+  date: 2025-12-29T16:23:59.133Z
+- commits:
     - subject: Publish the block on staging as well
       hash: 9f93b339be4c55e386745abe2c90add8b5323295
       body: ""
