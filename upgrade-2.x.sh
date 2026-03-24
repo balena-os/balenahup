@@ -1041,9 +1041,19 @@ if [ -n "$target_version" ]; then
         if ! version_gt "$target_version" "$minimum_target_version" &&
             ! [ "$target_version" == "$minimum_target_version" ]; then
                 log ERROR "Target OS version \"$target_version\" too low, please use \"$minimum_target_version\" or above."
-                else
+            else
+                # Strip the pre-release portion of the target raw_version, based on
+                # the format "<major>.<minor>.<patch>[-<pre-release>][+<revision>]".
+                # Otherwise, version_gt would consider 1.2.3 < 1.2.3-1234. This strip
+                # also allows 1.2.3+rev1 -> 1.2.3-1234+rev2 HUPs. Although the rest
+                # of the platform treats a pre-release version as lower, ignoring
+                # the pre-release portion is the correct behavior for balenaOS versioning.
+                target_nopre=$(echo "$target_version" | sed -E 's/-[^+]+(\+|$)/\1/')
+                if ! version_gt "$target_nopre" "$VERSION"; then
+                    log ERROR "Target OS version \"$target_version\" must be greater than current version."
+                fi
                 log "Target OS version \"$target_version\" OK."
-        fi
+            fi
             ;;
         *)
             log ERROR "Target OS version \"$target_version\" not supported."
