@@ -37,7 +37,14 @@ _exit_handler() {
     _exit_status=$?
     if [ "${_exit_status}" -ne 0 ]; then
         log "Exit on error ${_exit_status}"
-        if ! report_update_failed > /dev/null 2>&1; then
+        local skip_report
+        if [ "${_exit_status}" -eq 9 ] && [ "${call_mode}" == "proxy" ]; then
+            # Since API initiated HUPs are re-triggered even before the initial HUP completes,
+            # and surfacing concurrent update errors while the HUP is still ongoing will make
+            # the UX bad, we in that case do not report such errors to the API.
+            skip_report=1
+        fi
+        if [ -n "${skip_report}" ] && ! report_update_failed > /dev/null 2>&1; then
             log "Failed to report progress on exit with status $?"
         fi
         if [ "${_exit_status}" -eq 9 ]; then
@@ -953,6 +960,12 @@ if [ -n "$app_uuid" ] && [ -z "$release_commit" ]; then
 fi
 if [ -z "$app_uuid" ] && [ -n "$target_image" ]; then
     log ERROR "--target-image-uri is useful only with --app-uuid."
+fi
+
+if [ -n "$app_uuid" ]; then
+    call_mode='supervisor'
+else
+    call_mode='proxy'
 fi
 
 progress 25 "Preparing OS update"
