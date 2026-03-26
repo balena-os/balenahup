@@ -31,20 +31,22 @@ DOCKER_CMD="balena"
 # Preventing running multiple instances of upgrades running
 LOCKFILE="/var/lock/resinhup.lock"
 LOCKFD=99
+# Ensure call mode defined for exit handler.
+call_mode="unknown"
 ## Private functions
 _lock()             { flock "-$1" $LOCKFD; }
 _exit_handler() {
     _exit_status=$?
     if [ "${_exit_status}" -ne 0 ]; then
         log "Exit on error ${_exit_status}"
-        local skip_report
+        local send_report="true"
         if [ "${_exit_status}" -eq 9 ] && [ "${call_mode}" == "proxy" ]; then
             # Since API initiated HUPs are re-triggered even before the initial HUP completes,
             # and surfacing concurrent update errors while the HUP is still ongoing will make
             # the UX bad, we in that case do not report such errors to the API.
-            skip_report=1
+            send_report="false"
         fi
-        if [ -n "${skip_report}" ] && ! report_update_failed > /dev/null 2>&1; then
+        if [ "${send_report}" == "true" ] && ! report_update_failed > /dev/null 2>&1; then
             log "Failed to report progress on exit with status $?"
         fi
         if [ "${_exit_status}" -eq 9 ]; then
@@ -940,6 +942,13 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
+# Used in exit handler, so must define before prep for locking.
+if [ -n "$app_uuid" ]; then
+    call_mode='supervisor'
+else
+    call_mode='proxy'
+fi
+
 # Run on start
 _prepare_locking
 # Try to get lock, and exit if cannot, meaning another instance is running already
@@ -960,12 +969,6 @@ if [ -n "$app_uuid" ] && [ -z "$release_commit" ]; then
 fi
 if [ -z "$app_uuid" ] && [ -n "$target_image" ]; then
     log ERROR "--target-image-uri is useful only with --app-uuid."
-fi
-
-if [ -n "$app_uuid" ]; then
-    call_mode='supervisor'
-else
-    call_mode='proxy'
 fi
 
 progress 25 "Preparing OS update"
