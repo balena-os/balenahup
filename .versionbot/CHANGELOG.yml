@@ -1,4 +1,19 @@
 - commits:
+    - subject: Don't report concurrent HUP errors to the cloud when triggered from the
+        Proxy
+      hash: 8d18c205f23316a4d97e9af1a32735cacfc9b512
+      body: ""
+      footer:
+        Change-type: patch
+        change-type: patch
+        See: https://balena.fibery.io/Work/Project/1704
+        see: https://balena.fibery.io/Work/Project/1704
+      author: Thodoris Greasidis
+      nested: []
+  version: 4.0.1
+  title: ""
+  date: 2026-03-27T14:06:30.332Z
+- commits:
     - subject: Remove scripts for OS v1.x upgrade
       hash: 9e5b569603f773cf3f47f1c0d84a900a394a263c
       body: ""
