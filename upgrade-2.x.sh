@@ -5,6 +5,7 @@ NOREBOOT=no
 DELTA_VERSION=3
 SCRIPTNAME=upgrade-2.x.sh
 STOP_ALL=no
+REQUIRE_UPGRADE=yes
 
 set -o errexit
 set -E
@@ -102,6 +103,9 @@ Options:
 
   --no-reboot
         Do not reboot if update is successful. This is useful when debugging.
+
+  --no-require-upgrade
+        Do not require the target OS version is an upgrade.
 
   --balenaos-registry
         Upstream registry to use for host OS applications.
@@ -925,6 +929,9 @@ while [[ $# -gt 0 ]]; do
         --no-reboot)
             NOREBOOT="yes"
             ;;
+        --no-require-upgrade)
+            REQUIRE_UPGRADE="no"
+            ;;
         --stop-all)
             STOP_ALL="yes"
             ;;
@@ -1049,7 +1056,7 @@ if [ -n "$target_version" ]; then
                 # of the platform treats a pre-release version as lower, ignoring
                 # the pre-release portion is the correct behavior for balenaOS versioning.
                 target_nopre=$(echo "$target_version" | sed -E 's/-[^+]+(\+|$)/\1/')
-                if ! version_gt "$target_nopre" "$VERSION"; then
+                if [ "$REQUIRE_UPGRADE" = "yes" ] && ! version_gt "$target_nopre" "$VERSION"; then
                     log ERROR "Target OS version \"$target_version\" must be greater than current version."
                 fi
                 log "Target OS version \"$target_version\" OK."
