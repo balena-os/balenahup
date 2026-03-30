@@ -1,4 +1,29 @@
 - commits:
+    - subject: Add option --no-require-upgrade to avoid the new default requirement
+      hash: a093491e1d47c573ae97ed6af87e3bcc83082b3f
+      body: |
+        This capability is intended for manual/support use.
+      footer:
+        Change-type: minor
+        change-type: minor
+        Signed-off-by: Ken Bannister <kb2ma@runbox.com>
+        signed-off-by: Ken Bannister <kb2ma@runbox.com>
+      author: Ken Bannister
+      nested: []
+    - subject: Require target OS version is an upgrade
+      hash: b7afa5672031288919719c7910be251eec1416d4
+      body: ""
+      footer:
+        Change-type: minor
+        change-type: minor
+        Signed-off-by: Ken Bannister <kb2ma@runbox.com>
+        signed-off-by: Ken Bannister <kb2ma@runbox.com>
+      author: Ken Bannister
+      nested: []
+  version: 4.1.0
+  title: ""
+  date: 2026-03-30T13:16:04.535Z
+- commits:
     - subject: Don't report concurrent HUP errors to the cloud when triggered from the
         Proxy
       hash: 8d18c205f23316a4d97e9af1a32735cacfc9b512
