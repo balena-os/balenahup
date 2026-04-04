@@ -1002,12 +1002,10 @@ case $VERSION in
         ;;
 esac
 
-# Must query for target version and perhaps for target image, which includes registry
-# endpoint, if started from app UUID.
 if [ -n "$app_uuid" ]; then
     # Retrieve version for the provided app UUID and release commit. Verify that
     # the release succeeded and has not been invalidated. We expect at most a
-    # single release. Catch command failure for handling below.
+    # single release.
     _query_res=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} \
         -H "Content-Type: application/json" -H "Authorization: Bearer ${APIKEY}" \
         "${API_ENDPOINT}/v7/release?\$select=raw_version&\$filter=commit%20eq%20%27${release_commit}%27%20and%20(belongs_to__application/any(bta:bta/is_host%20and%20bta/uuid%20eq%20%27${app_uuid}%27))%20and%20status%20eq%20'success'%20and%20is_invalidated%20eq%20false" || echo "fail")
@@ -1022,24 +1020,6 @@ if [ -n "$app_uuid" ]; then
         fi
     fi
     target_version=$(echo "${_query_res}" | jq -r ".d[] | .raw_version")
-
-    # We do not expect registry endpoint is defined separately, so must query
-    # for optional target image here if not defined already -- so we can parse
-    # for the endpoint below.
-    if [ -z "${target_image}" ]; then
-        target_image=$(get_image_location "${target_version}")
-        if [ -z "${target_image}" ]; then
-            log ERROR "Zero or multiple matching target hostapp releases found, update attempt has failed..."
-        fi
-    fi
-
-    # Not expecting a backslash in domain name, so:
-    # shellcheck disable=SC2162
-    read -d "/" REGISTRY_ENDPOINT <<<"$target_image"    
-    if [ -z "${REGISTRY_ENDPOINT}" ] || [ "${REGISTRY_ENDPOINT}" = "${target_image}" ]; then
-        log ERROR "Target image URI expected '/': ${target_image}"
-    fi
-    log "Registry endpoint from target release: ${REGISTRY_ENDPOINT}"
 fi
 
 if [ -n "$target_version" ]; then
@@ -1078,11 +1058,23 @@ if [ "${SLUG}" = "raspberrypi4-64" ] && \
     fi
 fi
 
-# Already retrieved if script inputs from App UUID and release commit.
+# Script inputs from App UUID and release commit may provide the image, so don't
+# lookup in that case.
 if [ -z "${target_image}" ]; then
     target_image=$(get_image_location "${target_version}")
     if [ -z "${target_image}" ]; then
         log ERROR "Zero or multiple matching target hostapp releases found, update attempt has failed..."
+    fi
+fi
+
+# Not provided when script inputs from App UUID and release commit. Must define
+# for delta lookup below.
+if [ -z "$REGISTRY_ENDPOINT" ]; then
+    # Not expecting a backslash in domain name, so:
+    # shellcheck disable=SC2162
+    read -d "/" REGISTRY_ENDPOINT <<<"$target_image"    
+    if [ -z "${REGISTRY_ENDPOINT}" ] || [ "${REGISTRY_ENDPOINT}" = "${target_image}" ]; then
+        log ERROR "Target image URI expected '/': ${target_image}"
     fi
 fi
 
