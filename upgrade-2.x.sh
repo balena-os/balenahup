@@ -14,6 +14,7 @@ set -o pipefail
 minimum_hostos_version=2.14.0
 minimum_target_version=2.16.0
 minimum_supervisor_stop=2.53.10
+minimum_aufs_unsupported=8.0.0
 
 # This will set VERSION, SLUG
 # shellcheck disable=SC1091
@@ -1076,6 +1077,12 @@ if [ "${SLUG}" = "raspberrypi4-64" ] && \
     if [ "${board_rev}" = "1.4" ] ; then
         log ERROR "Upgrading to release 2.83.10+rev1 is disabled for Raspberry Pi 4 Model B Rev 1.4 due to an EEPROM issue"
     fi
+fi
+
+if version_gt "${target_version}" "${minimum_aufs_unsupported}" || \
+    [ "$target_version" == "$minimum_aufs_unsupported" ] && \
+    $(balena info |grep "Storage Driver: aufs"); then
+    log ERROR "BalenaEngine aufs storage supported only before ${minimum_aufs_unsupported}; first upgrade to at least 2.83 to convert"
 fi
 
 # Already retrieved if script inputs from App UUID and release commit.
