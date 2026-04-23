@@ -16,6 +16,7 @@ minimum_target_version=2.16.0
 minimum_supervisor_stop=2.53.10
 
 # This will set VERSION, SLUG
+# VERSION may represent a rolling release or an ESR release.
 # shellcheck disable=SC1091
 . /etc/os-release
 
@@ -573,7 +574,7 @@ function hostapp_based_update {
             ;;
         jetson-tx2)
             log "Running pre-update fixes for ${SLUG}"
-            if version_gt "${HOST_OS_VERSION}" "2.31.1" && version_gt "2.84.7" "${target_version}" ; then
+            if version_gt "${HOST_OS_VERSION}" "2.31.1" && version_gt "2.84.7" "${target_metabalena_version}" ; then
                 export JETSON_FIX=1
                 pre_update_jetson_fix
             fi
@@ -628,6 +629,153 @@ function hostapp_based_update {
 }
 
 #######################################
+# Query API release endpoint for rolling release or image location for a provided
+# version. This function provides a single implementation for the actual query,
+# which is called by multiple clients.
+# Globals:
+#   APIKEY
+#   API_ENDPOINT
+#   SLUG
+#   VARIANT (deprecated)
+# Arguments:
+#   expand: Contents for $expand -- 'release_tag' or 'contains__image/image'
+#   filter: How to filter: 'raw_version' or 'release_tag'
+#   version: OS version for search
+# Returns:
+#   Echoes query result release
+#######################################
+function _fetch_release() {
+    local release
+    if [ "${2}" = "raw_version" ]; then
+        # Filters for version in release raw_version property
+        release=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${APIKEY}" \
+            "${API_ENDPOINT}/v6/release?\$select=id&\$expand=${1}&\$filter=(belongs_to__application/any(a:a/is_for__device_type/any(dt:dt/slug%20eq%20'${SLUG}')%20and%20is_host%20eq%20true))%20and%20is_invalidated%20eq%20false%20and%20raw_version%20eq%20'${3}'")
+
+    elif [ "${2}" = "release_tag" ]; then
+        # TODO: Get the target variant from the caller, based on the raw version passed to script.
+        local variant_tag=$(echo "${VARIANT:-production}" | tr "[:upper:]" "[:lower:]")
+        # Filters for version in release tag entries, where an entry includes
+        # 'tag_key' and 'value' properties. Specifically we expect the entry:
+        # 'version' in major.minor.patch format possibly with a leading zero on the
+        #           minor, like '2021.04.0' or '2019.10.0.dev',
+        release=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${APIKEY}" \
+            "${API_ENDPOINT}/v6/release?\$select=id&\$expand=${1}&\$filter=(belongs_to__application/any(a:a/is_for__device_type/any(dt:dt/slug%20eq%20'${SLUG}')%20and%20is_host%20eq%20true))%20and%20is_final%20eq%20true%20and%20is_invalidated%20eq%20false%20and%20(release_tag/any(rt:(rt/tag_key%20eq%20'version')%20and%20(rt/value%20eq%20'${3}')))%20and%20((release_tag/any(rt:(rt/tag_key%20eq%20'variant')%20and%20(rt/value%20eq%20'${variant_tag}')))%20or%20not(release_tag/any(rt:rt/tag_key%20eq%20'variant')))")
+    else
+        # Really a development time assertion for completeness
+        log ERROR "Release filter not understood: ${2}"
+    fi
+    echo "${release}"
+}
+
+#######################################
+# Initialize global vars derived from release API, including 'target_image' and
+# 'target_metabalena_version'.
+# Globals:
+# Arguments:
+#   version: OS version for search
+# Returns:
+#######################################
+function init_release_vars() {
+    if [ -n "${target_image}" ] && [ -n "${target_metabalena_version}" ]; then
+        return 0
+    fi
+
+    local variant_tag
+    # we need to strip the target_version's variant tag to query the API properly
+    local version=${1/.dev/}
+    version=${version/.prod/}
+
+    # TODO: Get the target variant from the raw version the user provided
+    variant_tag=$(echo "${VARIANT:-production}" | tr "[:upper:]" "[:lower:]")
+
+    # For recent ESR versions we expect this query to return a single result,
+    # filtering on raw_version. We also expect an array of release_tag entries
+    # (object with tag_key and value). We expect at least this entry:
+    # 'meta-balena-base' of the equivalent rolling version like '2.73.15', optionally
+    #           prefixed with a 'v'.
+    release=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer ${APIKEY}" \
+        "${API_ENDPOINT}/v6/release?\$select=id&\$expand=release_tag,contains__image/image&\$filter=(belongs_to__application/any(a:a/is_for__device_type/any(dt:dt/slug%20eq%20'${SLUG}')%20and%20is_host%20eq%20true))%20and%20is_invalidated%20eq%20false%20and%20raw_version%20eq%20'${version}'")
+
+        # We always expect an image, but only sometimes expect a meta-balena-base release_tag.
+        local image=$(echo "${release}" | jq -r "[.d[] | .contains__image[0].image[0] | [.is_stored_at__image_location, .content_hash] | \"\(.[0])@\(.[1])\"]")
+        local tag=$(echo "${release}" | jq -r "[.d[] | .release_tag[] | select(.tag_key == \"meta-balena-base\").value]")
+
+############## Continue here....
+
+        | jq -r "[.d[] | .contains__image[0].image[0] | [.is_stored_at__image_location, .content_hash] | \"\(.[0])@\(.[1])\"]")
+    if echo "${release}" | jq -e '. | length == 1' > /dev/null; then
+        echo "${release}" | jq -r '.[0]'
+    else
+        # However, ESR versions before 2022.1 have a raw_version of 0.0.0+revN, so the
+        # query above returns an empty array. Instead those versions include a
+        # release_tag entry for the version:
+        # 'version' in major.minor.patch format possibly with a leading zero on the
+        #           minor, like '2021.04.0' or '2019.10.0.dev'.
+        release=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${APIKEY}" \
+            "${API_ENDPOINT}/v6/release?\$select=id&\$expand=release_tag,contains__image/image&\$filter=(belongs_to__application/any(a:a/is_for__device_type/any(dt:dt/slug%20eq%20'${SLUG}')%20and%20is_host%20eq%20true))%20and%20is_final%20eq%20true%20and%20is_invalidated%20eq%20false%20and%20(release_tag/any(rt:(rt/tag_key%20eq%20'version')%20and%20(rt/value%20eq%20'${version}')))%20and%20((release_tag/any(rt:(rt/tag_key%20eq%20'variant')%20and%20(rt/value%20eq%20'${variant_tag}')))%20or%20not(release_tag/any(rt:rt/tag_key%20eq%20'variant')))" \
+            | jq -r "[.d[] | .contains__image[0].image[0] | [.is_stored_at__image_location, .content_hash] | \"\(.[0])@\(.[1])\"]")
+        if echo "${release}" | jq -e '. | length == 1' > /dev/null; then
+            echo "${release}" | jq -r '.[0]'
+        else
+            # we should only get one result, something is wrong
+            log ERROR "Cannot retrieve release data for version \"${version}\""
+        fi
+    fi
+}
+
+#######################################
+# Query API release endpoint for rolling version associated with an ESR version.
+# Globals:
+#   APIKEY
+#   API_ENDPOINT
+#   SLUG
+#   VARIANT (deprecated)
+# Arguments:
+#   version: OS version for search; must be in ESR format (2026.1.0).
+# Returns:
+#   Version number of rolling release or empty if none
+#######################################
+function get_rolling_for_esr() {
+    local variant_tag
+    # we need to strip the target_version's variant tag to query the API properly
+    local version=${1/.dev/}
+    version=${version/.prod/}
+
+    # For recent ESR releases we expect this query to return a single result,
+    # filtering on raw_version. We also expect an array of release_tag entries
+    # (object with tag_key and value). We expect at least this entry:
+    # 'meta-balena-base' of the equivalent rolling version like '2.73.15', optionally
+    #           prefixed with a 'v'.
+    local release=$(_fetch_release release_tag raw_version "${version}")
+    local tag=$(echo "${release}" | jq -r "[.d[] | .release_tag[] | select(.tag_key == \"meta-balena-base\").value]")
+
+    if echo "${tag}" | jq -e '. | length == 1' > /dev/null; then
+        echo "${tag}" | jq -r '.[0] | scan("v?(.+)")[0]'
+    else
+        # However, ESR versions before 2022.1 have a raw_version of 0.0.0+revN, so the
+        # query above returns an empty array. Instead those versions include a
+        # release_tag entry for the version, used in the query.
+        release=$(_fetch_release release_tag release_tag "${version}")
+        tag=$(echo "${release}" | jq -r "[.d[] | .release_tag[] | select(.tag_key == \"meta-balena-base\").value]")
+
+        if echo "${tag}" | jq -e '. | length == 1' > /dev/null; then
+            echo "${tag}" | jq -r '.[0] | scan("v?(.+)")[0]'
+        else
+            # we should only get one result, something is wrong
+            echo
+        fi
+    fi
+}
+
+#######################################
 # Query public apps for a matching image
 # Globals:
 #   APIKEY
@@ -635,7 +783,8 @@ function hostapp_based_update {
 #   SLUG
 #   VARIANT (deprecated)
 # Arguments:
-#   version: the OS version to look for
+#   version: OS version for search; may be in rolling format (6.12.2) or ESR
+#            format (2026.1.0).
 # Returns:
 #   Registry URL for desired image
 #######################################
@@ -645,25 +794,20 @@ function get_image_location() {
     local version=${1/.dev/}
     version=${version/.prod/}
 
-    # TODO: Get the target variant from the raw version the user provided
-    variant_tag=$(echo "${VARIANT:-production}" | tr "[:upper:]" "[:lower:]")
+    # For recent ESR releases we expect this query to return a single result,
+    # filtering on raw_version.
+    local release=$(_fetch_release "contains__image/image" raw_version "${version}")
+    local image=$(echo "${release}" | jq -r "[.d[] | .contains__image[0].image[0] | [.is_stored_at__image_location, .content_hash] | \"\(.[0])@\(.[1])\"]")
 
-    image=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} \
-        -H "Content-Type: application/json" \
-        -H "Authorization: Bearer ${APIKEY}" \
-        "${API_ENDPOINT}/v6/release?\$select=id&\$expand=contains__image/image&\$filter=(belongs_to__application/any(a:a/is_for__device_type/any(dt:dt/slug%20eq%20'${SLUG}')%20and%20is_host%20eq%20true))%20and%20is_invalidated%20eq%20false%20and%20raw_version%20eq%20'${version}'" \
-        | jq -r "[.d[] | .contains__image[0].image[0] | [.is_stored_at__image_location, .content_hash] | \"\(.[0])@\(.[1])\"]")
     if echo "${image}" | jq -e '. | length == 1' > /dev/null; then
         echo "${image}" | jq -r '.[0]'
     else
-        # We still need to try finding the hostApp release by filtering using the deprecated release_tags,
-        # since the versioning format of balenaOS [2019.10.0.dev, 2022.01.0] was non-semver compliant
-        # and they were not migrated to the release semver fields.
-        image=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${APIKEY}" \
-            "${API_ENDPOINT}/v6/release?\$select=id&\$expand=contains__image/image&\$filter=(belongs_to__application/any(a:a/is_for__device_type/any(dt:dt/slug%20eq%20'${SLUG}')%20and%20is_host%20eq%20true))%20and%20is_final%20eq%20true%20and%20is_invalidated%20eq%20false%20and%20(release_tag/any(rt:(rt/tag_key%20eq%20'version')%20and%20(rt/value%20eq%20'${version}')))%20and%20((release_tag/any(rt:(rt/tag_key%20eq%20'variant')%20and%20(rt/value%20eq%20'${variant_tag}')))%20or%20not(release_tag/any(rt:rt/tag_key%20eq%20'variant')))" \
-            | jq -r "[.d[] | .contains__image[0].image[0] | [.is_stored_at__image_location, .content_hash] | \"\(.[0])@\(.[1])\"]")
+        # However, ESR versions before 2022.1 have a raw_version of 0.0.0+revN, so the
+        # query above returns an empty array. Instead those versions include the
+        # release_tag entry for the version, used in the query.
+        release=$(_fetch_release "contains__image/image" release_tag "${version}")
+        image=$(echo "${release}" | jq -r "[.d[] | .contains__image[0].image[0] | [.is_stored_at__image_location, .content_hash] | \"\(.[0])@\(.[1])\"]")
+
         if echo "${image}" | jq -e '. | length == 1' > /dev/null; then
             echo "${image}" | jq -r '.[0]'
         else
@@ -987,11 +1131,20 @@ FETCHED_SLUG=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -H "Authorization: Bearer ${AP
 )
 
 SLUG=${FORCED_SLUG:-$FETCHED_SLUG}
+# META_BALENA_VERSION provides the rolling version for an ESR based release.
+# However we are not sure of its availability and format across all devices,
+# so use it only when required.
 HOST_OS_VERSION=${META_BALENA_VERSION:-${VERSION_ID}}
 
-# Check host OS version
+# Check OS version currently running on host.
+host_version_scheme="rolling"
 case $VERSION in
+    2[0-9][0-9][0-9].*.*)
+        host_version_scheme="esr"
+        ;&
     [2-9].*|2[0-9][0-9][0-9].*.*)
+        # TODO This comparison is not valid when $VERSION is an ESR. Maybe
+        # define a 'minimum_hostos_esr_version' so don't need to use $HOST_OS_VERSION.
         if version_gt "$minimum_hostos_version" "$VERSION"; then
             log ERROR "Host OS version \"$VERSION\" < \"$minimum_hostos_version\", not supported."
         fi
@@ -1002,12 +1155,10 @@ case $VERSION in
         ;;
 esac
 
-# Must query for target version and perhaps for target image, which includes registry
-# endpoint, if started from app UUID.
 if [ -n "$app_uuid" ]; then
     # Retrieve version for the provided app UUID and release commit. Verify that
     # the release succeeded and has not been invalidated. We expect at most a
-    # single release. Catch command failure for handling below.
+    # single release.
     _query_res=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} \
         -H "Content-Type: application/json" -H "Authorization: Bearer ${APIKEY}" \
         "${API_ENDPOINT}/v7/release?\$select=raw_version&\$filter=commit%20eq%20%27${release_commit}%27%20and%20(belongs_to__application/any(bta:bta/is_host%20and%20bta/uuid%20eq%20%27${app_uuid}%27))%20and%20status%20eq%20'success'%20and%20is_invalidated%20eq%20false" || echo "fail")
@@ -1022,53 +1173,140 @@ if [ -n "$app_uuid" ]; then
         fi
     fi
     target_version=$(echo "${_query_res}" | jq -r ".d[] | .raw_version")
-
-    # We do not expect registry endpoint is defined separately, so must query
-    # for optional target image here if not defined already -- so we can parse
-    # for the endpoint below.
-    if [ -z "${target_image}" ]; then
-        target_image=$(get_image_location "${target_version}")
-        if [ -z "${target_image}" ]; then
-            log ERROR "Zero or multiple matching target hostapp releases found, update attempt has failed..."
-        fi
-    fi
-
-    # Not expecting a backslash in domain name, so:
-    # shellcheck disable=SC2162
-    read -d "/" REGISTRY_ENDPOINT <<<"$target_image"    
-    if [ -z "${REGISTRY_ENDPOINT}" ] || [ "${REGISTRY_ENDPOINT}" = "${target_image}" ]; then
-        log ERROR "Target image URI expected '/': ${target_image}"
-    fi
-    log "Registry endpoint from target release: ${REGISTRY_ENDPOINT}"
-fi
-
-if [ -n "$target_version" ]; then
-    case $target_version in
-        [2-9].*|2[0-9][0-9][0-9].*.*)
-        if ! version_gt "$target_version" "$minimum_target_version" &&
-            ! [ "$target_version" == "$minimum_target_version" ]; then
-                log ERROR "Target OS version \"$target_version\" too low, please use \"$minimum_target_version\" or above."
-            else
-                # Strip the pre-release portion of the target raw_version, based on
-                # the format "<major>.<minor>.<patch>[-<pre-release>][+<revision>]".
-                # Otherwise, version_gt would consider 1.2.3 < 1.2.3-1234. This strip
-                # also allows 1.2.3+rev1 -> 1.2.3-1234+rev2 HUPs. Although the rest
-                # of the platform treats a pre-release version as lower, ignoring
-                # the pre-release portion is the correct behavior for balenaOS versioning.
-                target_nopre=$(echo "$target_version" | sed -E 's/-[^+]+(\+|$)/\1/')
-                if [ "$REQUIRE_UPGRADE" = "yes" ] && ! version_gt "$target_nopre" "$VERSION"; then
-                    log ERROR "Target OS version \"$target_version\" must be greater than current version."
-                fi
-                log "Target OS version \"$target_version\" OK."
-            fi
-            ;;
-        *)
-            log ERROR "Target OS version \"$target_version\" not supported."
-            ;;
-    esac
-else
+elif [ -z "$target_version" ]; then
     log ERROR "No target OS version specified."
 fi
+
+# Allows comparison of an ESR version and a rolling version to confirm target
+# is an upgrade. Retrieves rolling version corresponding to the ESR version
+# from the release API.
+# Defines 'rolling_version' for target value and 'device_rolling' for current
+# device value.
+# Use VERSION for device_rolling if feasible because META_BALENA_VERSION
+# and meta-balena-base from the release_tag do not include "+revN", used
+# for version comparison.
+
+# TODO Create/call get_target_release_data(). This function retrieves image
+# location and meta-balena-base with a single query, and sets 'target_metabalena_version'
+# and 'target_image_location'. This function also must do any cleanup of metabalena
+# version information, for example the 'v' prefix before version number.
+case $target_version in
+    2[0-9][0-9][0-9].*.*)
+        target_version_scheme="esr"
+        ;;
+    [2-9].*)
+        target_version_scheme="rolling"
+        ;;
+    *)
+        log ERROR "Target OS version format \"$target_version\" not supported."
+        ;;
+esac
+
+# Populate required target data variables.
+# If target image provided to the script, we must use it regardless of the image
+# associated with the target version.
+if [ -z "$target_image" ]; then
+    _release_data=$(_fetch_release_data "$target_version")
+    read target_image _dummy <<<"${_release_data}"
+fi
+
+# If this HUP will transition the host from a rolling version to an ESR version,
+# any comparisons between the two must use the meta-balena version for the target.
+if [ "$host_version_scheme" = "rolling" ] && [ "$target_version_scheme" = "esr" ]; then
+    if [ -z "$_release_data"]; then
+        _release_data=$(_fetch_release_data "$target_version")
+    fi
+    read _dummy target_metabalena_version <<<"${_release_data}"
+fi
+
+if ! version_gt "$target_version" "$minimum_target_version" &&
+    ! [ "$target_version" == "$minimum_target_version" ]; then
+        log ERROR "Target OS version \"$target_version\" too low, please use \"$minimum_target_version\" or above."
+else
+    # Strip the pre-release portion of the target raw_version, based on
+    # the format "<major>.<minor>.<patch>[-<pre-release>][+<revision>]".
+    # Otherwise, version_gt would consider 1.2.3 < 1.2.3-1234. This strip
+    # also allows 1.2.3+rev1 -> 1.2.3-1234+rev2 HUPs. Although the rest
+    # of the platform treats a pre-release version as lower, ignoring
+    # the pre-release portion is the correct behavior for balenaOS versioning.
+
+    # TODO: Don't always check rolling version. First check the provided
+    # target_version to $VERSION. If that fails, then check rolling
+    # versions. We are only concerned about ESR -> rolling for a limited
+    # set of cases.
+    if [ -n "$target_metabalena_version" ]; then
+        _target="$target_metabalena_version"
+    else
+        _target="$target_version"
+    fi
+    target_nopre=$(echo "$_target" | sed -E 's/-[^+]+(\+|$)/\1/')
+    if [ "$REQUIRE_UPGRADE" = "yes" ] && ! version_gt "$target_nopre" "$VERSION"; then
+        log ERROR "Target OS version \"$target_version\" must be an upgrade to current version."
+    fi
+    log "Target OS version \"$target_version\" OK."
+fi
+
+
+
+
+
+case $target_version in
+    2[0-9][0-9][0-9].*.*)
+        target_version_scheme="esr"
+
+        # TODO: So now we can just check target_metabalena_version, which
+        # was set above.
+        rolling_version=$(get_rolling_for_esr "$target_version")
+        if [ -z "$rolling_version" ]; then
+            log ERROR "Cannot determine rolling version for target version \"$target_version\""
+        fi
+        # TODO: Check that target_metabalena_version is semver compliant.
+        # Ensure is exactly major.minor.patch, because we know this value
+        # does not include prerelease or build/rev info. For example 2.83.x
+        # should fail. This means it also does not include pre-release or
+        # +revN.
+        device_rolling="$HOST_OS_VERSION"
+        log "Target rolling version: \"$rolling_version\""
+        log "Device rolling version: \"$device_rolling\""
+        ;&
+    [2-9].*|2[0-9][0-9][0-9].*.*)
+        # Release vars provide target image and 
+        if [ -z "$target_image" ]; then
+            _fetch_release_data "$target_version"
+        elif [ "$host_version_scheme" = "rolling" ] && [ "$target_version_scheme" = "esr" ]; then
+            _fetch_release_data "$target_version"
+        fi
+    
+        if [ -z "$rolling_version" ]; then
+            rolling_version="$target_version"
+            device_rolling="$VERSION"
+        fi
+        if ! version_gt "$rolling_version" "$minimum_target_version" &&
+            ! [ "$rolling_version" == "$minimum_target_version" ]; then
+                log ERROR "Target OS version \"$target_version\" too low, please use \"$minimum_target_version\" or above."
+        else
+            # Strip the pre-release portion of the target raw_version, based on
+            # the format "<major>.<minor>.<patch>[-<pre-release>][+<revision>]".
+            # Otherwise, version_gt would consider 1.2.3 < 1.2.3-1234. This strip
+            # also allows 1.2.3+rev1 -> 1.2.3-1234+rev2 HUPs. Although the rest
+            # of the platform treats a pre-release version as lower, ignoring
+            # the pre-release portion is the correct behavior for balenaOS versioning.
+
+            # TODO: Don't always check rolling version. First check the provided
+            # target_version to $VERSION. If that fails, then check rolling
+            # versions. We are only concerned about ESR -> rolling for a limited
+            # set of cases.
+            target_nopre=$(echo "$rolling_version" | sed -E 's/-[^+]+(\+|$)/\1/')
+            if [ "$REQUIRE_UPGRADE" = "yes" ] && ! version_gt "$target_nopre" "$device_rolling"; then
+                log ERROR "Target OS version \"$target_version\" must be an upgrade to current version."
+            fi
+            log "Target OS version \"$target_version\" OK."
+        fi
+        ;;
+    *)
+        log ERROR "Target OS version \"$target_version\" not supported."
+        ;;
+esac
 
 if [ "${SLUG}" = "raspberrypi4-64" ] && \
     [ "${target_version}" = "2.83.10+rev1" ] ; then
@@ -1078,11 +1316,30 @@ if [ "${SLUG}" = "raspberrypi4-64" ] && \
     fi
 fi
 
-# Already retrieved if script inputs from App UUID and release commit.
-if [ -z "${target_image}" ]; then
-    target_image=$(get_image_location "${target_version}")
+# Script inputs from App UUID and release commit may provide the image, so don't
+# lookup in that case.
+#
+# TODO: Don't need the outer check because target_image will have been set above.
+# Either the supervisor passes it in as an optional value, or we have resolved
+# in get_target_release_data() above.
+#
+# Note: Need to think through how get_image_location will work for the source image
+# in find_delta(). 
+#if [ -z "${target_image}" ]; then
+#    target_image=$(get_image_location "${target_version}")
     if [ -z "${target_image}" ]; then
         log ERROR "Zero or multiple matching target hostapp releases found, update attempt has failed..."
+    fi
+#fi
+
+# Not provided when script inputs from App UUID and release commit. Must define
+# for delta lookup below.
+if [ -z "$REGISTRY_ENDPOINT" ]; then
+    # Not expecting a backslash in domain name, so:
+    # shellcheck disable=SC2162
+    read -d "/" REGISTRY_ENDPOINT <<<"$target_image"    
+    if [ -z "${REGISTRY_ENDPOINT}" ] || [ "${REGISTRY_ENDPOINT}" = "${target_image}" ]; then
+        log ERROR "Target image URI expected '/': ${target_image}"
     fi
 fi
 
