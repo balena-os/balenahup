@@ -15,13 +15,13 @@ minimum_hostos_version=2.14.0
 minimum_target_version=2.16.0
 minimum_supervisor_stop=2.53.10
 # Minimum metabalena OS version at which aufs is not supported.
-minimum_aufs_unsupported=8.0.0
+aufs_minimum_unsupported=8.0.0
 # Minimum ESR OS version at which aufs is not supported. The particular metabalena
 # version for an ESR version varies by device type. A particualar ESR version
 # also may not exist for a device type. So this value is the earliest ESR version
 # across device types that no longer supports aufs, and is meant to *ensure* a
 # device does not update to an unsupported version.
-minimum_esr_aufs_unsupported=2026.7.0
+aufs_minimum_esr_unsupported=2026.7.0
 
 # This will set VERSION, SLUG
 # shellcheck disable=SC1091
@@ -1094,19 +1094,20 @@ fi
 # If target OS uses a balenaEngine that does not support aufs storage, verify
 # device is not currently using aufs storage.
 if [ "$target_version_scheme" = "rolling" ]; then
-    is_target_aufs_unsupported=$(version_gt "${target_version}" "${minimum_aufs_unsupported}" || \
-      [ "$target_version" == "$minimum_aufs_unsupported" ])
-    minimum_migration_target=2.85
+    is_target_aufs_unsupported=$(version_gt "${target_version}" "${aufs_minimum_unsupported}" || \
+      [ "$target_version" == "$aufs_minimum_unsupported" ])
+    aufs_minimum_migration_target=2.85
 elif [ "$target_version_scheme" = "esr" ]; then
-    is_target_aufs_unsupported=$(version_gt "${target_version}" "${minimum_esr_aufs_unsupported}" || \
-      [ "$target_version" == "$minimum_esr_aufs_unsupported" ])
-    minimum_migration_target=2022.1
+    is_target_aufs_unsupported=$(version_gt "${target_version}" "${aufs_minimum_esr_unsupported}" || \
+      [ "$target_version" == "$aufs_minimum_esr_unsupported" ])
+    aufs_minimum_unsupported="$aufs_minimum_esr_unsupported"
+    aufs_minimum_migration_target=2022.1
 else 
     log ERROR "target_version_scheme ${target_version_scheme} not understood" 
 fi
 if [ is_target_aufs_unsupported ] && $(balena info |grep "Storage Driver: aufs"); then
-    err1="This device is using the AUFS storage driver and must be migrated before upgrading to v${minimum_aufs_unsupported} or later."
-    log ERROR "${err1} Upgrade to a release between v${minimum_migration_target} and < v${minimum_aufs_unsupported}"
+    err1="This device is using the AUFS storage driver and must be migrated before upgrading to v${aufs_minimum_unsupported} or later."
+    log ERROR "${err1} Upgrade to a release between v${aufs_minimum_migration_target} and < v${aufs_minimum_unsupported}"
 fi
 
 # Already retrieved if script inputs from App UUID and release commit.
