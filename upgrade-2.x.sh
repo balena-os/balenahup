@@ -14,6 +14,14 @@ set -o pipefail
 minimum_hostos_version=2.14.0
 minimum_target_version=2.16.0
 minimum_supervisor_stop=2.53.10
+# Minimum metabalena OS version at which aufs is not supported.
+minimum_aufs_unsupported=8.0.0
+# Minimum ESR OS version at which aufs is not supported. The particular metabalena
+# version for an ESR version varies by device type. A particualar ESR version
+# also may not exist for a device type. So this value is the earliest ESR version
+# across device types that no longer supports aufs, and is meant to *ensure* a
+# device does not update to an unsupported version.
+minimum_esr_aufs_unsupported=2026.7.0
 
 # This will set VERSION, SLUG
 # shellcheck disable=SC1091
@@ -1044,28 +1052,33 @@ fi
 
 if [ -n "$target_version" ]; then
     case $target_version in
-        [2-9].*|2[0-9][0-9][0-9].*.*)
-        if ! version_gt "$target_version" "$minimum_target_version" &&
-            ! [ "$target_version" == "$minimum_target_version" ]; then
+        2[0-9][0-9][0-9].*.*)
+            target_version_scheme="esr"
+            ;;
+        [2-9].*)
+            target_version_scheme="rolling"
+            if ! version_gt "$target_version" "$minimum_target_version" && \
+                ! [ "$target_version" == "$minimum_target_version" ]; then
                 log ERROR "Target OS version \"$target_version\" too low, please use \"$minimum_target_version\" or above."
-            else
-                # Strip the pre-release portion of the target raw_version, based on
-                # the format "<major>.<minor>.<patch>[-<pre-release>][+<revision>]".
-                # Otherwise, version_gt would consider 1.2.3 < 1.2.3-1234. This strip
-                # also allows 1.2.3+rev1 -> 1.2.3-1234+rev2 HUPs. Although the rest
-                # of the platform treats a pre-release version as lower, ignoring
-                # the pre-release portion is the correct behavior for balenaOS versioning.
-                target_nopre=$(echo "$target_version" | sed -E 's/-[^+]+(\+|$)/\1/')
-                if [ "$REQUIRE_UPGRADE" = "yes" ] && ! version_gt "$target_nopre" "$VERSION"; then
-                    log ERROR "Target OS version \"$target_version\" must be greater than current version."
-                fi
-                log "Target OS version \"$target_version\" OK."
             fi
             ;;
         *)
             log ERROR "Target OS version \"$target_version\" not supported."
             ;;
     esac
+
+    # Verify target version is an upgrade.
+    # First strip the pre-release portion of the target raw_version, based on
+    # the format "<major>.<minor>.<patch>[-<pre-release>][+<revision>]".
+    # Otherwise, version_gt would consider 1.2.3 < 1.2.3-1234. This strip
+    # also allows 1.2.3+rev1 -> 1.2.3-1234+rev2 HUPs. Although the rest
+    # of the platform treats a pre-release version as lower, ignoring
+    # the pre-release portion is the correct behavior for balenaOS versioning.
+    target_nopre=$(echo "$target_version" | sed -E 's/-[^+]+(\+|$)/\1/')
+    if [ "$REQUIRE_UPGRADE" = "yes" ] && ! version_gt "$target_nopre" "$VERSION"; then
+        log ERROR "Target OS version \"$target_version\" must be greater than current version."
+    fi
+    log "Target OS version \"$target_version\" OK."
 else
     log ERROR "No target OS version specified."
 fi
@@ -1076,6 +1089,24 @@ if [ "${SLUG}" = "raspberrypi4-64" ] && \
     if [ "${board_rev}" = "1.4" ] ; then
         log ERROR "Upgrading to release 2.83.10+rev1 is disabled for Raspberry Pi 4 Model B Rev 1.4 due to an EEPROM issue"
     fi
+fi
+
+# If target OS uses a balenaEngine that does not support aufs storage, verify
+# device is not currently using aufs storage.
+if [ "$target_version_scheme" = "rolling" ]; then
+    is_target_aufs_unsupported=$(version_gt "${target_version}" "${minimum_aufs_unsupported}" || \
+      [ "$target_version" == "$minimum_aufs_unsupported" ])
+    minimum_migration_target=2.85
+elif [ "$target_version_scheme" = "esr" ]; then
+    is_target_aufs_unsupported=$(version_gt "${target_version}" "${minimum_esr_aufs_unsupported}" || \
+      [ "$target_version" == "$minimum_esr_aufs_unsupported" ])
+    minimum_migration_target=2022.1
+else 
+    log ERROR "target_version_scheme ${target_version_scheme} not understood" 
+fi
+if [ is_target_aufs_unsupported ] && $(balena info |grep "Storage Driver: aufs"); then
+    err1="This device is using the AUFS storage driver and must be migrated before upgrading to v${minimum_aufs_unsupported} or later."
+    log ERROR "${err1} Upgrade to a release between v${minimum_migration_target} and < v${minimum_aufs_unsupported}"
 fi
 
 # Already retrieved if script inputs from App UUID and release commit.
