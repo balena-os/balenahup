@@ -14,12 +14,12 @@ set -o pipefail
 minimum_hostos_version=2.14.0
 minimum_target_version=2.16.0
 minimum_supervisor_stop=2.53.10
-# Minimum metabalena OS version at which aufs no longer is supported as a storage
-# type for balenaEngine, and minimum version that provides migration to overlayfs.
+# Metabalena OS version at which aufs support was removed from the included balenaEngine,
+# and minimum version that provides migration to overlayfs.
 # Provides an interval of versions to which such a device must hop before updating
 # to latest release.
-aufs_minimum_unsupported=8.0.0
-aufs_minimum_migration_target=2.85
+aufs_removed_version=8.0.0
+aufs_minimum_migration=2.85
 
 # This will set VERSION, SLUG
 # shellcheck disable=SC1091
@@ -1051,13 +1051,13 @@ fi
 if [ -n "$target_version" ]; then
     case $target_version in
         2[0-9][0-9][0-9].*.*)
-            # Minimum ESR OS version at which aufs no longer is supported as a
-            # storage type for balenaEngine, and minimum version that provides
-            # migration to overlayfs.
+            # Metabalena ESR OS version at which aufs support was removed from
+            # the included balenaEngine, and minimum version that provides migration
+            # to overlayfs.
             # Overwrites the variable values defined at the top of the script,
             # which are based on rolling OS version.
-            aufs_minimum_unsupported=2026.7.0
-            aufs_minimum_migration_target=2022.1
+            aufs_removed_version=2026.7.0
+            aufs_minimum_migration=2022.1
             ;;
         [2-9].*)
             # Note: Update comparison to include ESR target when minimum target
@@ -1097,12 +1097,12 @@ if [ "${SLUG}" = "raspberrypi4-64" ] && \
 fi
 
 # If target OS version uses a balenaEngine that does not support aufs storage,
-# verify device is not currently using aufs.
-if $(version_gt "${target_version}" "${aufs_minimum_unsupported}") ||
-      [ "$target_version" = "$aufs_minimum_unsupported" ] &&
+# verify device is not currently using aufs. Otherwise must migrate first.
+if $(version_gt "${target_version}" "${aufs_removed_version}") ||
+      [ "$target_version" = "$aufs_removed_version" ] &&
       $(balena info |grep "Storage Driver: aufs"); then
-    log ERROR "This device is using the AUFS storage driver and must be migrated before upgrading to v${aufs_minimum_unsupported} or later. \
-Upgrade to a release between v${aufs_minimum_migration_target} and < v${aufs_minimum_unsupported}."
+    log ERROR "This device is using the AUFS storage driver and must be migrated before upgrading to v${aufs_removed_version} or later. \
+Upgrade to a release between v${aufs_minimum_migration} and < v${aufs_removed_version}."
 fi
 
 # Already retrieved if script inputs from App UUID and release commit.
