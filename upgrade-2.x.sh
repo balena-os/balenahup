@@ -14,12 +14,6 @@ set -o pipefail
 minimum_hostos_version=2.14.0
 minimum_target_version=2.16.0
 minimum_supervisor_stop=2.53.10
-# Metabalena OS version at which aufs support was removed from the included balenaEngine,
-# and minimum version that provides migration to overlayfs.
-# Provides an interval of versions to which such a device must hop before updating
-# to latest release.
-aufs_removed_version=8.0.0
-aufs_minimum_migration=2.85
 
 # This will set VERSION, SLUG
 # shellcheck disable=SC1091
@@ -1049,17 +1043,19 @@ if [ -n "$app_uuid" ]; then
 fi
 
 if [ -n "$target_version" ]; then
+    # Define meta-balena OS version at which aufs support was removed from the
+    # included balenaEngine, and minimum version that provides migration to overlayfs.
+    # Provides an interval of versions to which such a device must hop before
+    # updating to latest release.
     case $target_version in
         2[0-9][0-9][0-9].*.*)
-            # Metabalena ESR OS version at which aufs support was removed from
-            # the included balenaEngine, and minimum version that provides migration
-            # to overlayfs.
-            # Overwrites the variable values defined at the top of the script,
-            # which are based on rolling OS version.
             aufs_removed_version=2026.7.0
             aufs_minimum_migration=2022.1
             ;;
         [2-9].*)
+            aufs_removed_version=8.0.0
+            aufs_minimum_migration=2.85
+
             # Note: Update comparison to include ESR target when minimum target
             # version advances to at least v2.44, when ESR introduced.
             if ! version_gt "$target_version" "$minimum_target_version" && \
@@ -1100,7 +1096,7 @@ fi
 # verify device is not currently using aufs. Otherwise must migrate first.
 if $(version_gt "${target_version}" "${aufs_removed_version}") ||
       [ "$target_version" = "$aufs_removed_version" ] &&
-      $(balena info |grep "Storage Driver: aufs"); then
+      balena info 2>/dev/null |grep -q "Storage Driver: aufs"; then
     log ERROR "This device is using the AUFS storage driver and must be migrated before upgrading to v${aufs_removed_version} or later. \
 Upgrade to a release between v${aufs_minimum_migration} and < v${aufs_removed_version}."
 fi
