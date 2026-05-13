@@ -793,17 +793,6 @@ function post_update_fixes() {
 
 ###
 # Script start
-#
-# There are two patterns of required input arguments to invoke this script:
-# --hostos-version, --balenaos-registry
-#   Used by balenaProxy push to device. Queries for target image URI.
-#
-# --app-uuid, --release-commit, --target-image-uri (optional)
-#   Used by Supervisor pull from balenaCloud. Queries for target version, and
-#   target-image-uri as needed, and parses registry from the target URI.
-#
-# Note: --target-image-uri value may not be stable long-term, so we cannot use
-# it alone as the source of target version.
 ###
 
 # If no arguments passed, just display the help
@@ -869,6 +858,17 @@ tee -a "${LOGFILE}" < "${errfifo}" >&2 &
 exec >"${outfifo}" 2>"${errfifo}"
 
 # Parse arguments
+#
+# There are two patterns of required input arguments to invoke this script:
+# --hostos-version, --balenaos-registry
+#   Used by balenaProxy push to device. Queries for target image URI.
+#
+# --app-uuid, --release-commit, --target-image-uri (optional)
+#   Used by Supervisor pull from balenaCloud. Queries for target version, and
+#   target-image-uri as needed, and parses registry from the target URI.
+#
+# Note: --target-image-uri value may not be stable long-term, so we cannot use
+# it alone as the source of target version.
 while [[ $# -gt 0 ]]; do
     arg="$1"
 
