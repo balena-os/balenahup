@@ -1,4 +1,19 @@
 - commits:
+    - subject: Disallow target with balenaEngine v25 if using aufs storage
+      hash: ed3c8af1df05a6f22dfc0c97ec73675046583570
+      body: |
+        First must upgrade to an earlier version to convert to overlayfs.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Ken Bannister <kb2ma@runbox.com>
+        signed-off-by: Ken Bannister <kb2ma@runbox.com>
+      author: Ken Bannister
+      nested: []
+  version: 4.1.1
+  title: ""
+  date: 2026-05-30T18:44:59.720Z
+- commits:
     - subject: Add option --no-require-upgrade to avoid the new default requirement
       hash: a093491e1d47c573ae97ed6af87e3bcc83082b3f
       body: |
