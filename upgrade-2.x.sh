@@ -1149,6 +1149,21 @@ update_failed=0
 # login for private device types
 DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} login "${REGISTRY_ENDPOINT}" -u "d_${UUID}" \
 --password "${APIKEY}" > /dev/null 2>&1 || log WARN "logging into registry failed, proceeding anyway (only required for private device types)"
+
+# Fail if target image already present on inactive partition, indicating already
+# downloaded on a previous HUP and failed. There is little chance the HUP will
+# succeed this time, and we wish to conserve the data bandwidth of the download.
+# Assumes the full and delta image locations have the same repository value (excluding the tag).
+repos=$(DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} image ls |tail -n +1 |awk '{print $1}')
+for repo in "${repos}"; do
+    if [[ "${target_image}" == "${repo}"* ]]; then
+        # TODO Extend 'log()' function to accept 'ERRORn' as the log level parameter.
+        # This value means there is an additional parameter, the exit code.
+        # Ex. log ERRORn 2 "Retry exits with code 2"
+        log ERROR "Retry detected from earlier attempt on target image: ${img}"
+    fi
+done
+
 for img in "${images[@]}"; do
     if [ -n "${img}" ] && hostapp_based_update "${img}"; then
         # once we've updated successfully, set our canonical image
