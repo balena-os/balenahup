@@ -1,4 +1,31 @@
 #!/bin/bash
+#
+# Upgrades balenaOS by downloading hostapp image and flashing to inactive rootfs
+# partition via the hostapp-update script in the current OS.
+#
+# Options:
+#  There are two patterns of required input arguments to invoke this script:
+#  --hostos-version, --balenaos-registry
+#    Used by balenaProxy push to device. Queries for target image URI.
+#
+#  --app-uuid, --release-commit, --target-image-uri (optional)
+#    Used by Supervisor pull from balenaCloud. Queries for target version, and
+#    target-image-uri as needed, and parses registry from the target URI.
+#
+#   Note: --target-image-uri value may not be stable long-term, so we cannot use
+#   it alone as the source of target version.
+#
+#   Also see help() for more options.
+#
+# Outputs:
+#  * Writes log file to /mnt/boot/balenahup
+#  * PATCHes /device API provisioning state via resin-device-progress script
+#
+# Failure exit codes:
+#  1 -- unspecified failure
+#  2 -- target image already on inactive partition, indicating an upgrade to that
+#       OS version already has been tried and failed
+#  9 -- upgrade script lockfile already taken
 
 # default configuration
 NOREBOOT=no
@@ -129,10 +156,34 @@ function report_update_failed() {
     done
 }
 
-# Log function helper
+# Log error message and exit with provided code. Only really useful when require
+# custom exit_code.
+#
+# $1 -- exit code
+# $2 -- log message
+function log_error {
+    _log_with_exit "$1" ERROR "$2"
+}
+
+# Log operational message; writes provided text to journal and echoes to stdout.
+# If log at ERROR level, cleanup work directory and exit this script with code 1.
+#
+# $1 -- log level; respects ERROR or WARN, otherwise defaults to INFO
+# $2 -- log message
 function log {
+    _log_with_exit 1 "$1" "$2"
+}
+
+# Log function implementation called by log...() functions.
+#
+# $1 -- exit code; used only for ERROR logging
+# $2 -- log level; respects ERROR or WARN, otherwise defaults to INFO
+# $3 -- log message
+function _log_with_exit {
     # Address log levels
     priority=6
+    exit_code=$1
+    shift
     case $1 in
         ERROR)
             loglevel=ERROR
@@ -152,7 +203,7 @@ function log {
     endtime=$(date +%s)
     printf "[%s][%09d%s%s\n" "$SCRIPTNAME" "$((endtime - starttime))" "][$loglevel]" "$1"
     if [ "$loglevel" == "ERROR" ]; then
-        exit 1
+        exit $exit_code
     fi
 }
 
@@ -793,17 +844,6 @@ function post_update_fixes() {
 
 ###
 # Script start
-#
-# There are two patterns of required input arguments to invoke this script:
-# --hostos-version, --balenaos-registry
-#   Used by balenaProxy push to device. Queries for target image URI.
-#
-# --app-uuid, --release-commit, --target-image-uri (optional)
-#   Used by Supervisor pull from balenaCloud. Queries for target version, and
-#   target-image-uri as needed, and parses registry from the target URI.
-#
-# Note: --target-image-uri value may not be stable long-term, so we cannot use
-# it alone as the source of target version.
 ###
 
 # If no arguments passed, just display the help
@@ -1141,28 +1181,30 @@ else
 fi
 
 log "hostapp-update command exists, use that for update"
-progress 50 "Running OS update"
 images=("${delta_image}" "${target_image}")
 # record the "source" of each image in the array above for clarity during fallback
 image_types=("delta" "balena_registry")
+
+# Fail if target image already present on inactive partition, indicating already
+# downloaded on a previous HUP and failed. Test only against target image as we
+# want to ensure both delta (if available) and target images have been attempted.
+# In this case there is little chance the HUP will succeed if tried again. We wish
+# to conserve data bandwidth in an environment that automatically retries downloads.
+# We expect just a single image from the 'image ls' command but don't insist on it.
+# We also expect the target_image URL includes the digest.
+host_images=$(DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} image ls --digests |tail -n +2 |awk '{print $1"@"$3}')
+for host_img in "${host_images}"; do
+    log "Found local host image: ${host_img}"
+    if [ "${host_img}" = "${target_image}" ]; then
+        log_error 2 "Target image previously downloaded; don't retry: ${host_img}"
+    fi
+done
+
+progress 50 "Running OS update"
 update_failed=0
 # login for private device types
 DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} login "${REGISTRY_ENDPOINT}" -u "d_${UUID}" \
 --password "${APIKEY}" > /dev/null 2>&1 || log WARN "logging into registry failed, proceeding anyway (only required for private device types)"
-
-# Fail if target image already present on inactive partition, indicating already
-# downloaded on a previous HUP and failed. There is little chance the HUP will
-# succeed this time, and we wish to conserve the data bandwidth of the download.
-# Assumes the full and delta image locations have the same repository value (excluding the tag).
-repos=$(DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} image ls |tail -n +1 |awk '{print $1}')
-for repo in "${repos}"; do
-    if [[ "${target_image}" == "${repo}"* ]]; then
-        # TODO Extend 'log()' function to accept 'ERRORn' as the log level parameter.
-        # This value means there is an additional parameter, the exit code.
-        # Ex. log ERRORn 2 "Retry exits with code 2"
-        log ERROR "Retry detected from earlier attempt on target image: ${img}"
-    fi
-done
 
 for img in "${images[@]}"; do
     if [ -n "${img}" ] && hostapp_based_update "${img}"; then
