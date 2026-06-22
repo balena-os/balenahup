@@ -23,8 +23,6 @@
 #
 # Failure exit codes:
 #  1 -- unspecified failure
-#  2 -- target image already on inactive partition, indicating an upgrade to that
-#       OS version already has been tried and failed
 #  9 -- upgrade script lockfile already taken
 
 # default configuration
@@ -156,34 +154,10 @@ function report_update_failed() {
     done
 }
 
-# Log error message and exit with provided code. Only really useful when require
-# custom exit_code.
-#
-# $1 -- exit code
-# $2 -- log message
-function log_error {
-    _log_with_exit "$1" ERROR "$2"
-}
-
-# Log operational message; writes provided text to journal and echoes to stdout.
-# If log at ERROR level, cleanup work directory and exit this script with code 1.
-#
-# $1 -- log level; respects ERROR or WARN, otherwise defaults to INFO
-# $2 -- log message
+# Log function helper
 function log {
-    _log_with_exit 1 "$1" "$2"
-}
-
-# Log function implementation called by log...() functions.
-#
-# $1 -- exit code; used only for ERROR logging
-# $2 -- log level; respects ERROR or WARN, otherwise defaults to INFO
-# $3 -- log message
-function _log_with_exit {
     # Address log levels
     priority=6
-    exit_code=$1
-    shift
     case $1 in
         ERROR)
             loglevel=ERROR
@@ -203,7 +177,7 @@ function _log_with_exit {
     endtime=$(date +%s)
     printf "[%s][%09d%s%s\n" "$SCRIPTNAME" "$((endtime - starttime))" "][$loglevel]" "$1"
     if [ "$loglevel" == "ERROR" ]; then
-        exit $exit_code
+        exit 1
     fi
 }
 
@@ -592,12 +566,14 @@ function persistent_logging_config_var {
 #   HOST_OS_VERSION
 #   target_version
 # Arguments:
+#   keep_installed: use the image already installed in the inactive partition
 #   update_package: the docker image to use for the update
 # Returns:
 #   None
 #######################################
 function hostapp_based_update {
-    local update_package=$1
+    local keep_installed=$1
+    local update_package=$2
     local inactive="/mnt/sysroot/inactive"
     local inactive_used
     local hostapp_image_count
@@ -674,8 +650,13 @@ function hostapp_based_update {
         stop_services
         remove_containers
     fi
+
     log "Calling hostapp-update for ${update_package}"
-    hostapp-update -i "${update_package}" && post_update_fixes
+    if [ "$keep_installed" = "yes" ]; then
+        hostapp-update -k -i "${update_package}" && post_update_fixes
+    else
+        hostapp-update -i "${update_package}" && post_update_fixes
+    fi
 }
 
 #######################################
@@ -1181,24 +1162,29 @@ else
 fi
 
 log "hostapp-update command exists, use that for update"
-images=("${delta_image}" "${target_image}")
-# record the "source" of each image in the array above for clarity during fallback
-image_types=("delta" "balena_registry")
 
-# Fail if target image already present on inactive partition, indicating already
-# downloaded on a previous HUP and failed. Test only against target image as we
-# want to ensure both delta (if available) and target images have been attempted.
-# In this case there is little chance the HUP will succeed if tried again. We wish
-# to conserve data bandwidth in an environment that automatically retries downloads.
+# Determine if target image already present on inactive partition, and don't download
+# if so. A previous HUP likely failed after the download. At this point the best
+# strategy is to find the root problem and try again with the same image.
 # We expect just a single image from the 'image ls' command but don't insist on it.
 # We also expect the target_image URL includes the digest.
 host_images=$(DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} image ls --digests |tail -n +2 |awk '{print $1"@"$3}')
+keep_remote=no
 for host_img in "${host_images}"; do
-    log "Found local host image: ${host_img}"
     if [ "${host_img}" = "${target_image}" ]; then
-        log_error 2 "Target image previously downloaded; don't retry: ${host_img}"
+        log "Found target image locally: ${host_img}"
+        images=("${target_image}")
+        image_types=("balena_registry")
+        keep_remote=yes
     fi
 done
+# Otherwise, first download and install the delta image if available, then the
+# registry image if not found or fails.
+if [ -z "$images" ]; then
+    images=("${delta_image}" "${target_image}")
+    # record the "source" of each image in the array above for clarity during fallback
+    image_types=("delta" "balena_registry")
+fi
 
 progress 50 "Running OS update"
 update_failed=0
@@ -1207,7 +1193,7 @@ DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} login "${REG
 --password "${APIKEY}" > /dev/null 2>&1 || log WARN "logging into registry failed, proceeding anyway (only required for private device types)"
 
 for img in "${images[@]}"; do
-    if [ -n "${img}" ] && hostapp_based_update "${img}"; then
+    if [ -n "${img}" ] && hostapp_based_update "$keep_remote" "${img}"; then
         # once we've updated successfully, set our canonical image
         image=${img}
         break
