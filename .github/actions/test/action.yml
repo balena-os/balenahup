@@ -1,0 +1,20 @@
+# https://docs.github.com/en/actions/creating-actions/creating-a-composite-action
+name: "Custom tests"
+description: "Lint the update scripts and run the bats suite"
+runs:
+  using: "composite"
+  steps:
+    - name: Lint shell scripts
+      shell: bash
+      run: |
+        shellcheck -S warning \
+          upgrade-2.x.sh \
+          upgrade-ssh-2.x.sh \
+          upgrade-takeover.sh \
+          entry.sh \
+          tests/test_helper.bash \
+          tests/stubs/curl
+
+    - name: Run bats suite
+      shell: bash
+      run: ./tests/bats/bin/bats --print-output-on-failure tests/

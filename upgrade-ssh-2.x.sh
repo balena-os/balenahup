@@ -167,16 +167,14 @@ function checkqueue {
 # MAIN
 #
 
+# Log timer. Set before anything that can fail, since log reads it.
+STARTTIME=$(date +%s)
+
 # Get the absolute script location
-pushd "$(dirname "$0")" > /dev/null 2>&1
-SCRIPTPATH=$(pwd)
-popd > /dev/null 2>&1
+SCRIPTPATH=$(cd "$(dirname "$0")" && pwd) || log ERROR "Cannot resolve the directory holding $0."
 
 # The script running the update on the device
 UPDATE_SCRIPT="$SCRIPTPATH/${main_script_name}"
-
-# Log timer
-STARTTIME=$(date +%s)
 
 # If no arguments passed, just display the help
 if [ $# -eq 0 ]; then
