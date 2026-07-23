@@ -18,14 +18,6 @@ minimum_hostos_version=2.14.0
 minimum_target_version=2.16.0
 minimum_supervisor_stop=2.53.10
 
-# This will set VERSION, SLUG
-# shellcheck disable=SC1091
-. /etc/os-release
-
-# Don't run anything before this source as it sets PATH here
-# shellcheck disable=SC1091
-source /etc/profile
-
 DOCKER_CMD="balena"
 
 ###
@@ -64,13 +56,6 @@ _no_more_locking()  { _lock u; _lock xn && rm -f $LOCKFILE;rm -f "${outfifo}";rm
 _prepare_locking()  { eval "exec $LOCKFD>\"$LOCKFILE\""; trap _exit_handler EXIT; }
 # Public functions
 exlock_now()        { _lock xn; }  # obtain an exclusive lock immediately or fail
-
-# workaround for self-signed certs, waiting for https://github.com/balena-os/meta-balena/issues/1398
-TMPCRT=$(mktemp)
-jq -r '.balenaRootCA' < /mnt/boot/config.json | base64 -d > "${TMPCRT}"
-cat /etc/ssl/certs/ca-certificates.crt >> "${TMPCRT}"
-
-CURL="curl --silent --retry 10 --fail --location --compressed"
 
 # Dashboard progress helper
 function progress {
@@ -821,11 +806,33 @@ function post_update_fixes() {
 # it alone as the source of target version.
 ###
 
+# The test suite sources this script to exercise individual functions, so
+# everything below runs only for a real update.
+if [ -n "${BALENAHUP_LIB_ONLY:-}" ]; then
+    return 0
+fi
+
 # If no arguments passed, just display the help
 if [ $# -eq 0 ]; then
     help
     exit 0
 fi
+
+# This will set VERSION, SLUG
+# shellcheck disable=SC1091
+. /etc/os-release
+
+# Don't run anything before this source as it sets PATH here
+# shellcheck disable=SC1091
+source /etc/profile
+
+# workaround for self-signed certs, waiting for https://github.com/balena-os/meta-balena/issues/1398
+TMPCRT=$(mktemp)
+jq -r '.balenaRootCA' < /mnt/boot/config.json | base64 -d > "${TMPCRT}"
+cat /etc/ssl/certs/ca-certificates.crt >> "${TMPCRT}"
+
+CURL="curl --silent --retry 10 --fail --location --compressed"
+
 # Log timer
 starttime=$(date +%s)
 

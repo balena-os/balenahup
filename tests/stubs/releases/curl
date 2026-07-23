@@ -1,0 +1,47 @@
+#!/bin/bash
+
+# Stand-in for curl that serves a canned API response instead of reaching the
+# network. The fixture directory holds one file per query the script issues:
+#
+#   primary.json   response to the raw_version release query
+#   fallback.json  response to the deprecated release_tag query
+#
+# A missing file means "no such response", answered with curl's --fail exit
+# code for an HTTP 4xx so the script sees a realistic failure.
+
+set -o errexit
+set -o nounset
+
+url=""
+for arg in "$@"; do
+    case "${arg}" in
+        http://*|https://*)
+            url="${arg}"
+            ;;
+    esac
+done
+
+if [ -z "${url}" ]; then
+    echo "curl stub: no URL in arguments: $*" >&2
+    exit 2
+fi
+
+if [ -n "${CURL_LOG:-}" ]; then
+    echo "${url}" >> "${CURL_LOG}"
+fi
+
+# The release_tag filter is only used by the fallback query.
+case "${url}" in
+    *release_tag*)
+        fixture="${FIXTURE_DIR}/fallback.json"
+        ;;
+    *)
+        fixture="${FIXTURE_DIR}/primary.json"
+        ;;
+esac
+
+if [ ! -f "${fixture}" ]; then
+    exit 22
+fi
+
+cat "${fixture}"

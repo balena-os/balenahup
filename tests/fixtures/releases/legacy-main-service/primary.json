@@ -1,0 +1,27 @@
+{
+  "d": [
+    {
+      "contains__image": [
+        {
+          "image": [
+            {
+              "is_a_build_of__service": [
+                {
+                  "service_name": "main"
+                }
+              ],
+              "is_stored_at__image_location": "registry2.balena-staging.com/v2/c2c95046a3b3920cbbd099d8da0a626d",
+              "content_hash": "sha256:4a7993657cde2baf56b95eeb31f6c722568e1b0d8af06d1f0c45bb6bd139bb57"
+            }
+          ],
+          "id": 185913,
+          "created_at": "2023-09-28T13:07:44.831Z",
+          "is_part_of__release": {
+            "__id": 170709
+          }
+        }
+      ],
+      "id": 170709
+    }
+  ]
+}
