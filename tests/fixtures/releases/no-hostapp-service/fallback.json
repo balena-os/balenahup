@@ -1,0 +1,27 @@
+{
+  "d": [
+    {
+      "contains__image": [
+        {
+          "image": [
+            {
+              "is_a_build_of__service": [
+                {
+                  "service_name": "hostapp"
+                }
+              ],
+              "is_stored_at__image_location": "registry2.balena-staging.com/v2/14d96ac3064492f64f75a7a6d53e004f",
+              "content_hash": "sha256:3a7b912f92407133ec79967ed712789e4b41bf9bf1adcf65069f06e13da6c823"
+            }
+          ],
+          "id": 252530,
+          "created_at": "2026-05-05T16:11:21.690Z",
+          "is_part_of__release": {
+            "__id": 233286
+          }
+        }
+      ],
+      "id": 233286
+    }
+  ]
+}

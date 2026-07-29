@@ -7,6 +7,9 @@ SCRIPTNAME=upgrade-2.x.sh
 STOP_ALL=no
 REQUIRE_UPGRADE=yes
 
+# API version for the release resource.
+RELEASE_API_VERSION=v7
+
 set -o errexit
 set -E
 set -o pipefail
@@ -14,14 +17,6 @@ set -o pipefail
 minimum_hostos_version=2.14.0
 minimum_target_version=2.16.0
 minimum_supervisor_stop=2.53.10
-
-# This will set VERSION, SLUG
-# shellcheck disable=SC1091
-. /etc/os-release
-
-# Don't run anything before this source as it sets PATH here
-# shellcheck disable=SC1091
-source /etc/profile
 
 DOCKER_CMD="balena"
 
@@ -61,13 +56,6 @@ _no_more_locking()  { _lock u; _lock xn && rm -f $LOCKFILE;rm -f "${outfifo}";rm
 _prepare_locking()  { eval "exec $LOCKFD>\"$LOCKFILE\""; trap _exit_handler EXIT; }
 # Public functions
 exlock_now()        { _lock xn; }  # obtain an exclusive lock immediately or fail
-
-# workaround for self-signed certs, waiting for https://github.com/balena-os/meta-balena/issues/1398
-TMPCRT=$(mktemp)
-jq -r '.balenaRootCA' < /mnt/boot/config.json | base64 -d > "${TMPCRT}"
-cat /etc/ssl/certs/ca-certificates.crt >> "${TMPCRT}"
-
-CURL="curl --silent --retry 10 --fail --location --compressed"
 
 # Dashboard progress helper
 function progress {
@@ -640,7 +628,7 @@ function hostapp_based_update {
 #   Registry URL for desired image
 #######################################
 function get_image_location() {
-    local variant_tag
+    local variant_tag expand_query hostapp_selector
     # we need to strip the target_version's variant tag to query the API properly
     local version=${1/.dev/}
     version=${version/.prod/}
@@ -648,11 +636,23 @@ function get_image_location() {
     # TODO: Get the target variant from the raw version the user provided
     variant_tag=$(echo "${VARIANT:-production}" | tr "[:upper:]" "[:lower:]")
 
+    # Host OS releases can bundle several images so the hostapp is
+    # not guaranteed to be first in the list.
+    expand_query='$select=id&$expand=contains__image($expand=image($select=is_stored_at__image_location,content_hash;$expand=is_a_build_of__service($select=service_name)))'
+
+    # Pick the image built by the service holding the rootfs. Releases up to the
+    # 6.1 line name it "main", later ones "hostapp".
+    hostapp_selector='[.d[]
+        | (.contains__image // []) | map(.image[0])
+        | map(select(.is_a_build_of__service[0].service_name | . == "hostapp" or . == "main"))[0]
+        | select(. != null)
+        | "\(.is_stored_at__image_location)@\(.content_hash)"]'
+
     image=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} \
         -H "Content-Type: application/json" \
         -H "Authorization: Bearer ${APIKEY}" \
-        "${API_ENDPOINT}/v6/release?\$select=id&\$expand=contains__image/image&\$filter=(belongs_to__application/any(a:a/is_for__device_type/any(dt:dt/slug%20eq%20'${SLUG}')%20and%20is_host%20eq%20true))%20and%20is_invalidated%20eq%20false%20and%20raw_version%20eq%20'${version}'" \
-        | jq -r "[.d[] | .contains__image[0].image[0] | [.is_stored_at__image_location, .content_hash] | \"\(.[0])@\(.[1])\"]")
+        "${API_ENDPOINT}/${RELEASE_API_VERSION}/release?${expand_query}&\$filter=(belongs_to__application/any(a:a/is_for__device_type/any(dt:dt/slug%20eq%20'${SLUG}')%20and%20is_host%20eq%20true))%20and%20is_invalidated%20eq%20false%20and%20raw_version%20eq%20'${version}'" \
+        | jq -r "${hostapp_selector}")
     if echo "${image}" | jq -e '. | length == 1' > /dev/null; then
         echo "${image}" | jq -r '.[0]'
     else
@@ -662,8 +662,8 @@ function get_image_location() {
         image=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${APIKEY}" \
-            "${API_ENDPOINT}/v6/release?\$select=id&\$expand=contains__image/image&\$filter=(belongs_to__application/any(a:a/is_for__device_type/any(dt:dt/slug%20eq%20'${SLUG}')%20and%20is_host%20eq%20true))%20and%20is_final%20eq%20true%20and%20is_invalidated%20eq%20false%20and%20(release_tag/any(rt:(rt/tag_key%20eq%20'version')%20and%20(rt/value%20eq%20'${version}')))%20and%20((release_tag/any(rt:(rt/tag_key%20eq%20'variant')%20and%20(rt/value%20eq%20'${variant_tag}')))%20or%20not(release_tag/any(rt:rt/tag_key%20eq%20'variant')))" \
-            | jq -r "[.d[] | .contains__image[0].image[0] | [.is_stored_at__image_location, .content_hash] | \"\(.[0])@\(.[1])\"]")
+            "${API_ENDPOINT}/${RELEASE_API_VERSION}/release?${expand_query}&\$filter=(belongs_to__application/any(a:a/is_for__device_type/any(dt:dt/slug%20eq%20'${SLUG}')%20and%20is_host%20eq%20true))%20and%20is_final%20eq%20true%20and%20is_invalidated%20eq%20false%20and%20(release_tag/any(rt:(rt/tag_key%20eq%20'version')%20and%20(rt/value%20eq%20'${version}')))%20and%20((release_tag/any(rt:(rt/tag_key%20eq%20'variant')%20and%20(rt/value%20eq%20'${variant_tag}')))%20or%20not(release_tag/any(rt:rt/tag_key%20eq%20'variant')))" \
+            | jq -r "${hostapp_selector}")
         if echo "${image}" | jq -e '. | length == 1' > /dev/null; then
             echo "${image}" | jq -r '.[0]'
         else
@@ -806,11 +806,33 @@ function post_update_fixes() {
 # it alone as the source of target version.
 ###
 
+# The test suite sources this script to exercise individual functions, so
+# everything below runs only for a real update.
+if [ -n "${BALENAHUP_LIB_ONLY:-}" ]; then
+    return 0
+fi
+
 # If no arguments passed, just display the help
 if [ $# -eq 0 ]; then
     help
     exit 0
 fi
+
+# This will set VERSION, SLUG
+# shellcheck disable=SC1091
+. /etc/os-release
+
+# Don't run anything before this source as it sets PATH here
+# shellcheck disable=SC1091
+source /etc/profile
+
+# workaround for self-signed certs, waiting for https://github.com/balena-os/meta-balena/issues/1398
+TMPCRT=$(mktemp)
+jq -r '.balenaRootCA' < /mnt/boot/config.json | base64 -d > "${TMPCRT}"
+cat /etc/ssl/certs/ca-certificates.crt >> "${TMPCRT}"
+
+CURL="curl --silent --retry 10 --fail --location --compressed"
+
 # Log timer
 starttime=$(date +%s)
 
@@ -1010,7 +1032,7 @@ if [ -n "$app_uuid" ]; then
     # single release. Catch command failure for handling below.
     _query_res=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} \
         -H "Content-Type: application/json" -H "Authorization: Bearer ${APIKEY}" \
-        "${API_ENDPOINT}/v7/release?\$select=raw_version&\$filter=commit%20eq%20%27${release_commit}%27%20and%20(belongs_to__application/any(bta:bta/is_host%20and%20bta/uuid%20eq%20%27${app_uuid}%27))%20and%20status%20eq%20'success'%20and%20is_invalidated%20eq%20false" || echo "fail")
+        "${API_ENDPOINT}/${RELEASE_API_VERSION}/release?\$select=raw_version&\$filter=commit%20eq%20%27${release_commit}%27%20and%20(belongs_to__application/any(bta:bta/is_host%20and%20bta/uuid%20eq%20%27${app_uuid}%27))%20and%20status%20eq%20'success'%20and%20is_invalidated%20eq%20false" || echo "fail")
 
     # Verify the result includes a json row.
     _has_row=$(echo "${_query_res}" | jq -r ".d[]" || echo "")

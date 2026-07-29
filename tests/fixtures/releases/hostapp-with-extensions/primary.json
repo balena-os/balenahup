@@ -1,0 +1,63 @@
+{
+  "d": [
+    {
+      "contains__image": [
+        {
+          "image": [
+            {
+              "is_a_build_of__service": [
+                {
+                  "service_name": "hostapp"
+                }
+              ],
+              "is_stored_at__image_location": "registry2.balena-staging.com/v2/d1cc383a5248e92f59d3335ad9875664",
+              "content_hash": "sha256:70d7e47608dc490ddfb3b8fd3193be88805b86a409a00a74d2f7c398a9df2ffe"
+            }
+          ],
+          "id": 256273,
+          "created_at": "2026-07-19T15:50:21.276Z",
+          "is_part_of__release": {
+            "__id": 236491
+          }
+        },
+        {
+          "image": [
+            {
+              "is_a_build_of__service": [
+                {
+                  "service_name": "kernel-modules"
+                }
+              ],
+              "is_stored_at__image_location": "registry2.balena-staging.com/v2/c784ffca29fa1bf6a6018d74aa271e45",
+              "content_hash": "sha256:74474f31d8991473d9df71509c666367f757c2975a93303d92933b0802bd5c20"
+            }
+          ],
+          "id": 256274,
+          "created_at": "2026-07-19T15:50:21.368Z",
+          "is_part_of__release": {
+            "__id": 236491
+          }
+        },
+        {
+          "image": [
+            {
+              "is_a_build_of__service": [
+                {
+                  "service_name": "debug"
+                }
+              ],
+              "is_stored_at__image_location": "registry2.balena-staging.com/v2/e0ccef4a396037e0e45f52121b851f0e",
+              "content_hash": "sha256:48b2abf688f189f6747671e628d61d6e45020f52949d9dbcc71852225f9f65a3"
+            }
+          ],
+          "id": 256275,
+          "created_at": "2026-07-19T15:50:21.450Z",
+          "is_part_of__release": {
+            "__id": 236491
+          }
+        }
+      ],
+      "id": 236491
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "d": [
+    {
+      "contains__image": [
+        {
+          "image": [
+            {
+              "is_a_build_of__service": [
+                {
+                  "service_name": "kernel-modules-raspberrypi4-64"
+                }
+              ],
+              "is_stored_at__image_location": "registry2.balena-staging.com/v2/c247ccd6279ed8f95186da0cf9adea3b",
+              "content_hash": "sha256:15ba8034fbffcd3fcbc1e1122a4c5d7cd28e4b99d72cfe5a1a44b0f9d9e2ff90"
+            }
+          ],
+          "id": 249361,
+          "created_at": "2026-02-15T18:36:51.435Z",
+          "is_part_of__release": {
+            "__id": 230345
+          }
+        }
+      ],
+      "id": 230345
+    }
+  ]
+}
