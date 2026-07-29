@@ -1,4 +1,39 @@
 - commits:
+    - subject: "tests: add bats based test suite"
+      hash: afd909cd88c576b285c9fb72a54c5b70d0b5cd04
+      body: |
+        This allows to test bash scripts in ci.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Alex Gonzalez <alexg@balena.io>
+        signed-off-by: Alex Gonzalez <alexg@balena.io>
+      author: Alex Gonzalez
+      nested: []
+    - subject: "upgrade-2.x: do not rely on hostapps being the first in the service
+        list"
+      hash: 079b6cd26e3647a4344c08b07c69658c0b4905df
+      body: >
+        When hostapp extensions are part of the OS composition, the order is not
+
+        guaranteed to contain the hostapp first.
+
+
+        Filter the hostapp to match by service name and fallback to the
+        first/only
+
+        entry.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Alex Gonzalez <alexg@balena.io>
+        signed-off-by: Alex Gonzalez <alexg@balena.io>
+      author: Alex Gonzalez
+      nested: []
+  version: 4.1.2
+  title: ""
+  date: 2026-07-29T15:49:03.448Z
+- commits:
     - subject: Disallow target with balenaEngine v25 if using aufs storage
       hash: ed3c8af1df05a6f22dfc0c97ec73675046583570
       body: |
