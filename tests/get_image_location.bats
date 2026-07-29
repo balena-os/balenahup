@@ -37,6 +37,13 @@ setup() {
     assert_output "registry2.balena-staging.com/v2/c2c95046a3b3920cbbd099d8da0a626d@sha256:4a7993657cde2baf56b95eeb31f6c722568e1b0d8af06d1f0c45bb6bd139bb57"
 }
 
+@test "picks the fallback image when the primary is empty for an old esr release" {
+    run_get_image_location legacy-main-fallback
+
+    assert_success
+    assert_output "registry2.balena-cloud.com/v2/bf8379ff26618556d94ce799a4917b40@sha256:56b57e62d4f7f8bda326f199ebca216d27d0decbc3d306178d53d5e5cb22ca90"
+}
+
 @test "returns nothing when the only image is an extension" {
     run_get_image_location single-extension-only
 
