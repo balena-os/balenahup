@@ -1,4 +1,17 @@
 - commits:
+    - subject: Update balena-io/deploy-to-balena-action action to v2.3.1
+      hash: 0dcb0cfc4c844146902359f2d94159bbee3df735
+      body: |
+        Update balena-io/deploy-to-balena-action from 2.0.148 to 2.3.1
+      footer:
+        Change-type: patch
+        change-type: patch
+      author: balena-renovate[bot]
+      nested: []
+  version: 4.1.7
+  title: ""
+  date: 2026-08-25T22:22:30.217Z
+- commits:
     - subject: Update flowzonify to v0.4.0
       hash: bd53e05ea544a1b8efdaea093d25354fc616aace
       body: |
