@@ -1,4 +1,17 @@
 - commits:
+    - subject: Update balena-io/deploy-to-balena-action action to v2.0.148
+      hash: 6bde9ebf7ca3e552596db090c97f9d86fb00f7db
+      body: |
+        Update balena-io/deploy-to-balena-action from 2.0.136 to 2.0.148
+      footer:
+        Change-type: patch
+        change-type: patch
+      author: balena-renovate[bot]
+      nested: []
+  version: 4.1.5
+  title: ""
+  date: 2026-08-25T18:24:38.237Z
+- commits:
     - subject: Update tests/bats digest to ae4b94d
       hash: 3a5fe7c972155d88bcd6a355ebe8db861d0b3362
       body: |
