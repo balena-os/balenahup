@@ -1,4 +1,16 @@
 - commits:
+    - subject: "renovate: Extend configuration from balena-io/renovate-config"
+      hash: 2a6a10c42f4e45286ff18b9d04f81357ed05517a
+      body: ""
+      footer:
+        Change-type: patch
+        change-type: patch
+      author: Kyle Harding
+      nested: []
+  version: 4.1.3
+  title: ""
+  date: 2026-08-25T15:35:11.419Z
+- commits:
     - subject: "tests: add bats based test suite"
       hash: afd909cd88c576b285c9fb72a54c5b70d0b5cd04
       body: |
