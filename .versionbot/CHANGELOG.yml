@@ -1,4 +1,17 @@
 - commits:
+    - subject: Update tests/bats digest to ae4b94d
+      hash: 3a5fe7c972155d88bcd6a355ebe8db861d0b3362
+      body: |
+        Update tests/bats
+      footer:
+        Change-type: patch
+        change-type: patch
+      author: balena-renovate[bot]
+      nested: []
+  version: 4.1.4
+  title: ""
+  date: 2026-08-25T16:26:11.886Z
+- commits:
     - subject: "renovate: Extend configuration from balena-io/renovate-config"
       hash: 2a6a10c42f4e45286ff18b9d04f81357ed05517a
       body: ""
