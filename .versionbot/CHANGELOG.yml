@@ -1,4 +1,17 @@
 - commits:
+    - subject: Update tests/bats digest to ddfefa0
+      hash: 52477f3ad65f39eb45122f750c61f430a71d2e1d
+      body: |
+        Update tests/bats
+      footer:
+        Change-type: patch
+        change-type: patch
+      author: balena-renovate[bot]
+      nested: []
+  version: 4.1.8
+  title: ""
+  date: 2026-09-07T02:39:28.383Z
+- commits:
     - subject: Update balena-io/deploy-to-balena-action action to v2.3.1
       hash: 0dcb0cfc4c844146902359f2d94159bbee3df735
       body: |
