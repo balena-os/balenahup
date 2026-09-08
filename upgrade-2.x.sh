@@ -1169,8 +1169,17 @@ images=("${delta_image}" "${target_image}")
 image_types=("delta" "balena_registry")
 update_failed=0
 # login for private device types
-DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" ${DOCKER_CMD} login "${REGISTRY_ENDPOINT}" -u "d_${UUID}" \
---password "${APIKEY}" > /dev/null 2>&1 || log WARN "logging into registry failed, proceeding anyway (only required for private device types)"
+# Use of a tmp directory works around a bug in balenaOS v6.5.31 -> 6.6.2 inclusive,
+# where the HOME directory may be defined incorrectly, and so the login command
+# cannot cache the password in $HOME/.balena-engine. Must export the variable so
+# hostapp-update script has access for the actual pull from the registry.
+export DOCKER_CONFIG
+DOCKER_CONFIG=$(mktemp -d)
+if ! _login_err=$(DOCKER_HOST="unix:///var/run/${DOCKER_CMD}-host.sock" \
+    ${DOCKER_CMD} login "${REGISTRY_ENDPOINT}" -u "d_${UUID}" \
+    --password "${APIKEY}" 2>&1); then
+    log WARN "logging into registry failed (only required for private device types): ${_login_err}"
+fi
 for img in "${images[@]}"; do
     if [ -n "${img}" ] && hostapp_based_update "${img}"; then
         # once we've updated successfully, set our canonical image
