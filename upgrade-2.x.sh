@@ -29,13 +29,13 @@ LOCKFILE="/var/lock/resinhup.lock"
 LOCKFD=99
 # Ensure call mode defined for exit handler.
 call_mode="unknown"
+send_report="true"
 ## Private functions
 _lock()             { flock "-$1" $LOCKFD; }
 _exit_handler() {
     _exit_status=$?
     if [ "${_exit_status}" -ne 0 ]; then
         log "Exit on error ${_exit_status}"
-        local send_report="true"
         if [ "${_exit_status}" -eq 9 ] && [ "${call_mode}" == "proxy" ]; then
             # Since API initiated HUPs are re-triggered even before the initial HUP completes,
             # and surfacing concurrent update errors while the HUP is still ongoing will make
@@ -1100,6 +1100,13 @@ if [ -n "$target_version" ]; then
     # the pre-release portion is the correct behavior for balenaOS versioning.
     target_nopre=$(echo "$target_version" | sed -E 's/-[^+]+(\+|$)/\1/')
     if [ "$REQUIRE_UPGRADE" = "yes" ] && ! version_gt "$target_nopre" "$VERSION"; then
+        if [ "$target_nopre" -eq "$VERSION" ] && [ "${call_mode}" == "proxy" ]; then
+            # There is a race condition between a device that get's HUPed & reboots
+            # and the API's Queued OS updates retry mechanism re-triggering a HUP before
+            # the device manages to report its new os_version after rebooting to the new OS.
+            # In order to avoid user confusion, we silence this case.
+            send_report="false"
+        fi
         log ERROR "Target OS version \"$target_version\" must be greater than current version."
     fi
     log "Target OS version \"$target_version\" OK."
