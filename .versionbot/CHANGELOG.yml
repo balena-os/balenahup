@@ -1,4 +1,20 @@
 - commits:
+    - subject: Use tmp directory when login to registry
+      hash: beaefe98f37e92739e15b5b561099c451eaa34e7
+      body: |
+        Workaround for error in OS v6.5-6.6 where HOME directory not valid.
+        Co-authored by Alex Gonzalez.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Ken Bannister <kb2ma@runbox.com>
+        signed-off-by: Ken Bannister <kb2ma@runbox.com>
+      author: Ken Bannister
+      nested: []
+  version: 4.1.17
+  title: ""
+  date: 2026-09-21T23:24:29.057Z
+- commits:
     - subject: Update tests/bats digest to 5d99e45
       hash: 7a7084050efb4068575b982a40e3efd13d3ce8cb
       body: |
