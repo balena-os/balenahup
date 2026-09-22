@@ -14,6 +14,13 @@ setup() {
     assert_output "rolling"
 }
 
+@test "two-digit major rolling version" {
+    run_version_scheme 10.1.9
+
+    assert_success
+    assert_output "rolling"
+}
+
 @test "rolling version +rev" {
     run_version_scheme 7.4.0+rev6
 

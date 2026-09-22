@@ -158,7 +158,7 @@ function version_scheme() {
         2[0-9][0-9][0-9].*.*)
             echo "esr"
             ;;
-        [2-9].*)
+        [2-9].*|[1-9][0-9].*)
             echo "rolling"
             ;;
         *)
