@@ -1,4 +1,17 @@
 - commits:
+    - subject: Update tests/bats digest to 52439eb
+      hash: f5ef9a43160c5e2f753966143eb109f3ede42b78
+      body: |
+        Update tests/bats
+      footer:
+        Change-type: patch
+        change-type: patch
+      author: balena-renovate[bot]
+      nested: []
+  version: 4.1.18
+  title: ""
+  date: 2026-09-23T06:46:25.218Z
+- commits:
     - subject: Use tmp directory when login to registry
       hash: beaefe98f37e92739e15b5b561099c451eaa34e7
       body: |
