@@ -149,6 +149,24 @@ function version_gt() {
     test "$(echo "$@" | tr " " "\n" | sort -V | head -n 1)" != "$1"
 }
 
+# Identify the version scheme based on the format of the provided version.
+# Echo a well known value -- 'esr' or 'rolling', or else 'unknown'.
+#
+# $1 -- version string
+function version_scheme() {
+    case $1 in
+        2[0-9][0-9][0-9].*.*)
+            echo "esr"
+            ;;
+        [2-9].*|[1-9][0-9].*)
+            echo "rolling"
+            ;;
+        *)
+            echo "unknown"
+            ;;
+    esac
+}
+
 function compare_device_state() {
     perc=$1
     state=$2
@@ -1011,18 +1029,14 @@ FETCHED_SLUG=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -H "Authorization: Bearer ${AP
 SLUG=${FORCED_SLUG:-$FETCHED_SLUG}
 HOST_OS_VERSION=${META_BALENA_VERSION:-${VERSION_ID}}
 
-# Check host OS version
-case $VERSION in
-    [2-9].*|2[0-9][0-9][0-9].*.*)
-        if version_gt "$minimum_hostos_version" "$VERSION"; then
-            log ERROR "Host OS version \"$VERSION\" < \"$minimum_hostos_version\", not supported."
-        fi
-        log "Host OS version \"$VERSION\" OK."
-        ;;
-    *)
-        log ERROR "Host OS version \"$VERSION\" not supported."
-        ;;
-esac
+# Validate host OS version
+if [ "$(version_scheme $VERSION)" = "unknown" ]; then
+    log ERROR "Host OS version \"$VERSION\" not supported."
+fi
+if version_gt "$minimum_hostos_version" "$VERSION"; then
+    log ERROR "Host OS version \"$VERSION\" < \"$minimum_hostos_version\", not supported."
+fi
+log "Host OS version \"$VERSION\" OK."
 
 # Must query for target version and perhaps for target image, which includes registry
 # endpoint, if started from app UUID.
@@ -1070,12 +1084,12 @@ if [ -n "$target_version" ]; then
     # Provides an interval of versions to which such a device must hop before
     # updating to latest release.
     aufs_removed_version=""
-    case $target_version in
-        2[0-9][0-9][0-9].*.*)
+    case "$(version_scheme $target_version)" in
+        "esr")
             aufs_removed_version=2026.7.0
             aufs_minimum_migration=2022.1
             ;;
-        [2-9].*)
+        "rolling")
             aufs_removed_version=7.2.0
             aufs_minimum_migration=2.85
 
