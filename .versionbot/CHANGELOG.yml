@@ -1,4 +1,18 @@
 - commits:
+    - subject: Allow for two-digit semver major in a rolling version string
+      hash: f725b6911d180cc07fd8af91b3df62528a7a0cb6
+      body: ""
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Ken Bannister <kb2ma@runbox.com>
+        signed-off-by: Ken Bannister <kb2ma@runbox.com>
+      author: Ken Bannister
+      nested: []
+  version: 4.1.19
+  title: ""
+  date: 2026-09-29T19:10:15.102Z
+- commits:
     - subject: Update tests/bats digest to 52439eb
       hash: f5ef9a43160c5e2f753966143eb109f3ede42b78
       body: |
