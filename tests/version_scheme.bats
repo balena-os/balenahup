@@ -28,6 +28,27 @@ setup() {
     assert_output "unknown"
 }
 
+@test "two-digit major rolling version" {
+    run_version_scheme 10.1.9
+
+    assert_success
+    assert_output "rolling"
+}
+
+@test "three-digit major rolling version" {
+    run_version_scheme 100.0.0
+
+    assert_success
+    assert_output "rolling"
+}
+
+@test "four-digit major rolling version < 2000 as unknown" {
+    run_version_scheme 1000.0.0
+
+    assert_success
+    assert_output "unknown"
+}
+
 @test "rolling version +rev" {
     run_version_scheme 7.4.0+rev6
 

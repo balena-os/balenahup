@@ -159,8 +159,8 @@ function version_scheme() {
         2[0-9][0-9][0-9].*.*)
             echo "esr"
             ;;
-        # Allow rolling major from 2 through 9.
-        [2-9].*)
+        # Allow rolling major from 2 through 999.
+        [2-9].*|[1-9][0-9].*|[1-9][0-9][0-9].*)
             echo "rolling"
             ;;
         *)
