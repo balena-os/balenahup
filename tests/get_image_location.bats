@@ -104,8 +104,8 @@ setup() {
 
 @test "queries the configured release API version, falling back to release_tag" {
     local api_version
-    api_version=$(script_global RELEASE_API_VERSION) \
-        || fail "RELEASE_API_VERSION is unset, so the queries would request //release"
+    api_version=$(script_global API_VERSION) \
+        || fail "API_VERSION is unset, so the queries would request //release"
 
     run_get_image_location no-hostapp-service
     assert_success
