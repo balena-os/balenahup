@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# Stand-in for curl that serves a canned API response instead of reaching the
+# network. The fixture directory holds one file per query the script issues:
+#
+#   output.json  response to the /device query for current supervisor version
+#                and scheduled supervisor version
+#
+# A missing file means "no such response", answered with curl's --fail exit
+# code for an HTTP 4xx so the script sees a realistic failure.
+
+set -o errexit
+set -o nounset
+
+url=""
+for arg in "$@"; do
+    case "${arg}" in
+        http://*|https://*)
+            url="${arg}"
+            ;;
+    esac
+done
+
+if [ -z "${url}" ]; then
+    echo "curl stub: no URL in arguments: $*" >&2
+    exit 2
+fi
+
+if [ -n "${CURL_LOG:-}" ]; then
+    echo "${url}" >> "${CURL_LOG}"
+fi
+
+case "${url}" in
+    *)
+        fixture="${FIXTURE_DIR}/output.json"
+        ;;
+esac
+
+if [ ! -f "${fixture}" ]; then
+    exit 22
+fi
+
+cat "${fixture}"
