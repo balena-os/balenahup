@@ -1,4 +1,17 @@
 - commits:
+    - subject: Update tests/bats digest to 8c8ec0b
+      hash: cee7b19ce4602525c898c262c39ee234645c573b
+      body: |
+        Update tests/bats
+      footer:
+        Change-type: patch
+        change-type: patch
+      author: balena-renovate[bot]
+      nested: []
+  version: 4.1.21
+  title: ""
+  date: 2026-10-08T16:36:12.778Z
+- commits:
     - subject: Use latest balenaAPI version, v7
       hash: 3282e4a0c36dc92cf971bbc25d07a1e2136925e3
       body: |
