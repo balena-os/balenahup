@@ -7,8 +7,8 @@ SCRIPTNAME=upgrade-2.x.sh
 STOP_ALL=no
 REQUIRE_UPGRADE=yes
 
-# API version for the release resource.
-RELEASE_API_VERSION=v7
+# Default version for API based resources.
+API_VERSION=v7
 
 set -o errexit
 set -E
@@ -176,7 +176,7 @@ function compare_device_state() {
     local remote_perc
     local remote_state
     resp=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} --header "Authorization: Bearer ${APIKEY}" \
-        "${API_ENDPOINT}/v6/device(uuid='${UUID}')?\$select=provisioning_state,provisioning_progress" | jq '.d[]')
+        "${API_ENDPOINT}/${API_VERSION}/device(uuid='${UUID}')?\$select=provisioning_state,provisioning_progress" | jq '.d[]')
     remote_perc=$(echo "${resp}" | jq -r '.provisioning_progress')
     remote_state=$(echo "${resp}" | jq -r '.provisioning_state')
     if [ -n "${remote_perc}" ] && [ -n "${remote_state}" ]; then
@@ -259,13 +259,13 @@ function _fetch_supervisor_version() {
     local supervisor_version
     local scheduled_supervisor_version
 
-      resp=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} --header "Authorization: Bearer ${APIKEY}" "${API_ENDPOINT}/v6/device(uuid='${UUID}')?\$select=supervisor_version&\$expand=should_be_managed_by__supervisor_release(\$top=1;\$select=supervisor_version)")
+      resp=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} --header "Authorization: Bearer ${APIKEY}" "${API_ENDPOINT}/${API_VERSION}/device(uuid='${UUID}')?\$select=supervisor_version&\$expand=should_be_managed_by__release(\$top=1;\$select=raw_version)")
     if supervisor_version=$(echo "${resp}" | jq -e -r '.d[0].supervisor_version' | tr -d 'v'); then
         if [ -z "${supervisor_version}" ]; then
             log ERROR "Could not get current supervisor version from the API, got ${resp}"
             return 1
         fi
-        scheduled_supervisor_version=$(echo "${resp}" | jq -e -r '.d[0].should_be_managed_by__supervisor_release[0].supervisor_version' | tr -d 'v')
+        scheduled_supervisor_version=$(echo "${resp}" | jq -e -r '.d[0].should_be_managed_by__release[0].raw_version')
         if [ -n "${scheduled_supervisor_version}" ] && [ "${scheduled_supervisor_version}" != "null" ]; then
             if version_gt "${scheduled_supervisor_version}" "${supervisor_version}"; then
 		# The supervisor is scheduled to update
@@ -306,14 +306,15 @@ function _patch_supervisor_version() {
     UPDATER_SUPERVISOR_TAG="v${version}"
 
     # Get the supervisor id
-    resp=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} --header "Authorization: Bearer ${APIKEY}" "${API_ENDPOINT}/v5/supervisor_release?\$select=id,image_name&\$filter=((device_type%20eq%20'$SLUG')%20and%20(supervisor_version%20eq%20'${UPDATER_SUPERVISOR_TAG}'))")
+    # Must use API v6 since it is the most recent for this resource.
+    resp=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} --header "Authorization: Bearer ${APIKEY}" "${API_ENDPOINT}/v6/supervisor_release?\$select=id,image_name&\$filter=((is_for__device_type/any(dt:dt/slug%20eq%20'$SLUG'))%20and%20(supervisor_version%20eq%20'${UPDATER_SUPERVISOR_TAG}'))")
     if UPDATER_SUPERVISOR_ID=$(echo "${resp}" | jq -e -r '.d[0].id'); then
         log "Extracted supervisor vars: ID: $UPDATER_SUPERVISOR_ID"
         log "Setting supervisor version in the API..."
 
         _errfile=$(mktemp)
         _outfile=$(mktemp)
-        if _status_code=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} --request PATCH -w "%{http_code}" --show-error -o "${_outfile}" --header "Authorization: Bearer ${APIKEY}" --header 'Content-Type: application/json' "${API_ENDPOINT}/v6/device(uuid='${UUID}')" --data-binary "{\"should_be_managed_by__supervisor_release\": \"${UPDATER_SUPERVISOR_ID}\"}" 2> "${_errfile}"); then
+        if _status_code=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} --request PATCH -w "%{http_code}" --show-error -o "${_outfile}" --header "Authorization: Bearer ${APIKEY}" --header 'Content-Type: application/json' "${API_ENDPOINT}/${API_VERSION}/device(uuid='${UUID}')" --data-binary "{\"should_be_managed_by__release\": \"${UPDATER_SUPERVISOR_ID}\"}" 2> "${_errfile}"); then
             rm -f "${_errfile}"
             case "${_status_code}" in
                 2*) log "Successfully set supervision version in target state";rm -f "${_outfile}";return 0;;
@@ -518,12 +519,12 @@ function post_update_jetson_fix {
 #   None
 #######################################
 function persistent_logging_config_var {
-    PROBLEMATIC_ENV_VAR=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} "${API_ENDPOINT}/v5/device_config_variable?\$filter=device/uuid%20eq%20'${UUID}'" -H "Content-Type: application/json" -H "Authorization: Bearer ${APIKEY}" | jq -r '.d[] | select((.name == "RESIN_SUPERVISOR_PERSISTENT_LOGGING") and (.value == "")) | .id')
+    PROBLEMATIC_ENV_VAR=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} "${API_ENDPOINT}/${API_VERSION}/device_config_variable?\$filter=device/uuid%20eq%20'${UUID}'" -H "Content-Type: application/json" -H "Authorization: Bearer ${APIKEY}" | jq -r '.d[] | select((.name == "RESIN_SUPERVISOR_PERSISTENT_LOGGING") and (.value == "")) | .id')
     if [ -n "${PROBLEMATIC_ENV_VAR}" ]; then
         local tmpfile
         log "Updating problematic RESIN_SUPERVISOR_PERSISTENT_LOGGING config variable"
         CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -X PATCH \
-            "${API_ENDPOINT}/v5/device_config_variable(${PROBLEMATIC_ENV_VAR})" \
+            "${API_ENDPOINT}/${API_VERSION}/device_config_variable(${PROBLEMATIC_ENV_VAR})" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${APIKEY}" \
             --data '{
@@ -671,7 +672,7 @@ function get_image_location() {
     image=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} \
         -H "Content-Type: application/json" \
         -H "Authorization: Bearer ${APIKEY}" \
-        "${API_ENDPOINT}/${RELEASE_API_VERSION}/release?${expand_query}&\$filter=(belongs_to__application/any(a:a/is_for__device_type/any(dt:dt/slug%20eq%20'${SLUG}')%20and%20is_host%20eq%20true))%20and%20is_invalidated%20eq%20false%20and%20raw_version%20eq%20'${version}'" \
+        "${API_ENDPOINT}/${API_VERSION}/release?${expand_query}&\$filter=(belongs_to__application/any(a:a/is_for__device_type/any(dt:dt/slug%20eq%20'${SLUG}')%20and%20is_host%20eq%20true))%20and%20is_invalidated%20eq%20false%20and%20raw_version%20eq%20'${version}'" \
         | jq -r "${hostapp_selector}")
     if echo "${image}" | jq -e '. | length == 1' > /dev/null; then
         echo "${image}" | jq -r '.[0]'
@@ -682,7 +683,7 @@ function get_image_location() {
         image=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${APIKEY}" \
-            "${API_ENDPOINT}/${RELEASE_API_VERSION}/release?${expand_query}&\$filter=(belongs_to__application/any(a:a/is_for__device_type/any(dt:dt/slug%20eq%20'${SLUG}')%20and%20is_host%20eq%20true))%20and%20is_final%20eq%20true%20and%20is_invalidated%20eq%20false%20and%20(release_tag/any(rt:(rt/tag_key%20eq%20'version')%20and%20(rt/value%20eq%20'${version}')))%20and%20((release_tag/any(rt:(rt/tag_key%20eq%20'variant')%20and%20(rt/value%20eq%20'${variant_tag}')))%20or%20not(release_tag/any(rt:rt/tag_key%20eq%20'variant')))" \
+            "${API_ENDPOINT}/${API_VERSION}/release?${expand_query}&\$filter=(belongs_to__application/any(a:a/is_for__device_type/any(dt:dt/slug%20eq%20'${SLUG}')%20and%20is_host%20eq%20true))%20and%20is_final%20eq%20true%20and%20is_invalidated%20eq%20false%20and%20(release_tag/any(rt:(rt/tag_key%20eq%20'version')%20and%20(rt/value%20eq%20'${version}')))%20and%20((release_tag/any(rt:(rt/tag_key%20eq%20'variant')%20and%20(rt/value%20eq%20'${variant_tag}')))%20or%20not(release_tag/any(rt:rt/tag_key%20eq%20'variant')))" \
             | jq -r "${hostapp_selector}")
         if echo "${image}" | jq -e '. | length == 1' > /dev/null; then
             echo "${image}" | jq -r '.[0]'
@@ -1024,7 +1025,7 @@ progress 25 "Preparing OS update"
 
 
 FETCHED_SLUG=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -H "Authorization: Bearer ${APIKEY}" \
-"${API_ENDPOINT}/v6/device?\$select=is_of__device_type&\$expand=is_of__device_type(\$select=slug)&\$filter=uuid%20eq%20%27${UUID}%27" 2>/dev/null \
+"${API_ENDPOINT}/${API_VERSION}/device?\$select=is_of__device_type&\$expand=is_of__device_type(\$select=slug)&\$filter=uuid%20eq%20%27${UUID}%27" 2>/dev/null \
 | jq -r '.d[0].is_of__device_type[0].slug'
 )
 
@@ -1052,7 +1053,7 @@ if [ -n "$app_uuid" ]; then
     # single release. Catch command failure for handling below.
     _query_res=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} \
         -H "Content-Type: application/json" -H "Authorization: Bearer ${APIKEY}" \
-        "${API_ENDPOINT}/${RELEASE_API_VERSION}/release?\$select=raw_version&\$filter=commit%20eq%20%27${release_commit}%27%20and%20(belongs_to__application/any(bta:bta/is_host%20and%20bta/uuid%20eq%20%27${app_uuid}%27))%20and%20status%20eq%20'success'%20and%20is_invalidated%20eq%20false" || echo "fail")
+        "${API_ENDPOINT}/${API_VERSION}/release?\$select=raw_version&\$filter=commit%20eq%20%27${release_commit}%27%20and%20(belongs_to__application/any(bta:bta/is_host%20and%20bta/uuid%20eq%20%27${app_uuid}%27))%20and%20status%20eq%20'success'%20and%20is_invalidated%20eq%20false" || echo "fail")
 
     # Verify the result includes a json row.
     _has_row=$(echo "${_query_res}" | jq -r ".d[]" || echo "")
@@ -1174,7 +1175,7 @@ delta_image=$(find_delta "${target_image}")
 
 if [ -n "${delta_image}" ]; then
     delta_size=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -H "Authorization: Bearer ${APIKEY}" \
-    "${API_ENDPOINT}/v5/delta?\$filter=((status%20eq%20'success')%20and%20(version%20eq%20'${DELTA_VERSION}')%20and%20(is_stored_at__location%20eq%20'${delta_image}'))" 2>/dev/null \
+    "${API_ENDPOINT}/${API_VERSION}/delta?\$filter=((status%20eq%20'success')%20and%20(version%20eq%20'${DELTA_VERSION}')%20and%20(is_stored_at__location%20eq%20'${delta_image}'))" 2>/dev/null \
     | jq -r '.d[0].size|tonumber / (1024.0 * 1024.0) | floor' 2>/dev/null || /bin/true)
     log "Found delta image: ${delta_image}, size: ${delta_size:-unknown} MB"
 

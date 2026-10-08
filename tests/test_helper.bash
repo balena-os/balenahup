@@ -2,8 +2,6 @@
 
 TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "${TESTS_DIR}")"
-FIXTURES_DIR="${TESTS_DIR}/fixtures/releases"
-RELEASE_STUBS_DIR="${TESTS_DIR}/stubs/releases"
 
 load "${TESTS_DIR}/test_helper/bats-support/load"
 load "${TESTS_DIR}/test_helper/bats-assert/load"
@@ -62,6 +60,37 @@ script_global() {
 }
 
 #######################################
+# Run _fetch_supervisor_version against a fixture directory.
+#
+# Arguments:
+#   fixture: directory name under tests/fixtures/device-supervisor
+#######################################
+run_fetch_supervisor_version() {
+    local fixture="$1"
+
+    CURL_LOG="${BATS_TEST_TMPDIR}/curl.log"
+    FIXTURES_DIR="${TESTS_DIR}/fixtures/device-supervisor"
+    STUBS_DIR="${TESTS_DIR}/stubs/device-supervisor"
+
+    # shellcheck disable=SC2016
+    run env \
+        FIXTURE_DIR="${FIXTURES_DIR}/${fixture}" \
+        CURL_LOG="${CURL_LOG}" \
+        PATH="${STUBS_DIR}:${PATH}" \
+        bash -c '
+            set -o errexit
+            set -o pipefail
+            BALENAHUP_LIB_ONLY=1
+            source "$1"
+            CURL=curl
+            TMPCRT=/dev/null
+            APIKEY=deadbeef
+            API_ENDPOINT=https://api.balena-cloud.com
+            _fetch_supervisor_version
+        ' _ "${REPO_ROOT}/upgrade-2.x.sh"
+}
+
+#######################################
 # Run get_image_location against a fixture directory.
 #
 # Arguments:
@@ -72,13 +101,15 @@ run_get_image_location() {
     local fixture="$1"
     local version="${2:-2.85.0}"
 
+    FIXTURES_DIR="${TESTS_DIR}/fixtures/releases"
+    STUBS_DIR="${TESTS_DIR}/stubs/releases"
     CURL_LOG="${BATS_TEST_TMPDIR}/curl.log"
 
     # shellcheck disable=SC2016
     run env \
         FIXTURE_DIR="${FIXTURES_DIR}/${fixture}" \
         CURL_LOG="${CURL_LOG}" \
-        PATH="${RELEASE_STUBS_DIR}:${PATH}" \
+        PATH="${STUBS_DIR}:${PATH}" \
         bash -c '
             set -o errexit
             set -o pipefail

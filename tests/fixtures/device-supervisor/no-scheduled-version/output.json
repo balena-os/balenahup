@@ -1,0 +1,12 @@
+{
+  "d": [
+    {
+      "should_be_managed_by__release": [
+        {
+          "raw_version": "12.2.11"
+        }
+      ],
+      "supervisor_version": "12.2.11"
+    }
+  ]
+}
