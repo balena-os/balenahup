@@ -1,4 +1,19 @@
 - commits:
+    - subject: Use latest balenaAPI version, v7
+      hash: 3282e4a0c36dc92cf971bbc25d07a1e2136925e3
+      body: |
+        Co-authored by Thodoris Greasidis.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Ken Bannister <kb2ma@runbox.com>
+        signed-off-by: Ken Bannister <kb2ma@runbox.com>
+      author: Ken Bannister
+      nested: []
+  version: 4.1.20
+  title: ""
+  date: 2026-10-08T15:57:42.243Z
+- commits:
     - subject: Allow for two-digit semver major in a rolling version string
       hash: f725b6911d180cc07fd8af91b3df62528a7a0cb6
       body: ""
