@@ -1,4 +1,17 @@
 - commits:
+    - subject: Update tests/test_helper/bats-assert digest to 48b8731
+      hash: 781a5edc6edacddcf3eb44e9826748de3e183c01
+      body: |
+        Update tests/test_helper/bats-assert
+      footer:
+        Change-type: patch
+        change-type: patch
+      author: balena-renovate[bot]
+      nested: []
+  version: 4.1.23
+  title: ""
+  date: 2026-10-14T20:29:50.539Z
+- commits:
     - subject: Update tests/bats digest to 0c92eb4
       hash: a1b12f553d68bdd27b6121a58576d5b55efa22cb
       body: |
