@@ -1,4 +1,17 @@
 - commits:
+    - subject: Update tests/test_helper/bats-assert digest to dc1aa63
+      hash: 7086d062da9e474486ba3a05ca8f4d2411994add
+      body: |
+        Update tests/test_helper/bats-assert
+      footer:
+        Change-type: patch
+        change-type: patch
+      author: balena-renovate[bot]
+      nested: []
+  version: 4.1.31
+  title: ""
+  date: 2026-10-18T12:35:54.142Z
+- commits:
     - subject: Update tests/bats digest to f2a9f74
       hash: 10dd5621ef1c75db57acde9caf8a4c8d373e0178
       body: |
