@@ -111,6 +111,7 @@ function log {
     fi
 }
 
+# shellcheck disable=SC2329   # disable since called by a trap
 cleanstop() {
     log WARN "Force close requested. Waiting for already started updates... Please wait!"
     while [ -n "$QUEUE" ]; do

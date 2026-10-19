@@ -7,7 +7,7 @@ runs:
     - name: Lint shell scripts
       shell: bash
       run: |
-        shellcheck -S warning \
+        shellcheck \
           upgrade-2.x.sh \
           upgrade-ssh-2.x.sh \
           upgrade-takeover.sh \
