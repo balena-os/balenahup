@@ -320,19 +320,19 @@ else
 fi
 # Use the user's api key if it exists rather than deviceApiKey; it means we haven't
 # done the key exchange yet.
-APIKEY=$(jq -r '.apiKey // .deviceApiKey' "${CONFIGJSON}")
-UUID=$(jq -r '.uuid' "${CONFIGJSON}")
-API_ENDPOINT=$(jq -r '.apiEndpoint' "${CONFIGJSON}")
+APIKEY=$(jq -r '.apiKey // .deviceApiKey // empty' "${CONFIGJSON}")
+UUID=$(jq -r '.uuid // empty' "${CONFIGJSON}")
+API_ENDPOINT=$(jq -r '.apiEndpoint // empty' "${CONFIGJSON}")
 
-[ -z "${APIKEY}" ] && log ERROR "Error parsing config.json"
-[ -z "${UUID}" ] && log ERROR "Error parsing config.json"
-[ -z "${API_ENDPOINT}" ] && log ERROR "Error parsing config.json"
+[ -z "${APIKEY}" ] && log ERROR "Error parsing config.json: no apiKey or deviceApiKey"
+[ -z "${UUID}" ] && log ERROR "Error parsing config.json: no uuid"
+[ -z "${API_ENDPOINT}" ] && log ERROR "Error parsing config.json: no apiEndpoint"
 
 # Create a certificate bundle file incorporating any CA provided in config.json.
 # We create this primarily for use by curl. The OS started integrating this CA
 # with v2.58, but use this variable in case we have an older version.
 TMPCRT=$(mktemp)
-jq -r '.balenaRootCA' < "${CONFIGJSON}" | base64 -d > "${TMPCRT}"
+jq -r '.balenaRootCA // empty' < "${CONFIGJSON}" | base64 -d > "${TMPCRT}"
 cat /etc/ssl/certs/ca-certificates.crt >> "${TMPCRT}"
 
 # Set up curl for use within a script, retry many times for reliability, follow
