@@ -1,0 +1,3 @@
+# The scripts run under bash on devices and in CI, and bash fails on CRLF line
+# endings, so check text files out with LF even where core.autocrlf is set.
+* text=auto eol=lf
