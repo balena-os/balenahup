@@ -1,4 +1,22 @@
 - commits:
+    - subject: Check out text files with LF line endings
+      hash: 14689e9da4b7f08cc73332966357b2a381bad24c
+      body: |
+        A clone made with core.autocrlf=true, the default for Git for Windows,
+        checks the scripts out with CRLF line endings. bash then fails on them
+        ("$'\r': command not found"), both when running the bats suite locally
+        and in a block image built from that checkout with the Dockerfile.
+
+        Set eol=lf for all text files.
+      footer:
+        Change-type: patch
+        change-type: patch
+      author: Pagan Gazzard
+      nested: []
+  version: 4.1.36
+  title: ""
+  date: 2026-10-26T14:16:35.705Z
+- commits:
     - subject: Update tests/bats digest to 5b61d8f
       hash: cdb5cb2aeb5bc8bbc6ca07214b649d71cdc078f5
       body: |
