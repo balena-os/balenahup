@@ -659,6 +659,7 @@ function get_image_location() {
 
     # Host OS releases can bundle several images so the hostapp is
     # not guaranteed to be first in the list.
+    # shellcheck disable=SC2016   # $ indicates an OData query option, not a shell variable
     expand_query='$select=id&$expand=contains__image($expand=image($select=is_stored_at__image_location,content_hash;$expand=is_a_build_of__service($select=service_name)))'
 
     # Pick the image built by the service holding the rootfs. Releases up to the
@@ -874,24 +875,28 @@ else
     log "Don't know where config.json is." && exit 1
 fi
 # If the user api key exists we use it instead of the deviceApiKey as it means we haven't done the key exchange yet
-APIKEY=$(jq -r '.apiKey // .deviceApiKey' $CONFIGJSON)
-UUID=$(jq -r '.uuid' $CONFIGJSON)
-API_ENDPOINT=$(jq -r '.apiEndpoint' $CONFIGJSON)
-DELTA_ENDPOINT=$(jq -r '.deltaEndpoint' $CONFIGJSON)
+APIKEY=$(jq -r '.apiKey // .deviceApiKey' "$CONFIGJSON")
+UUID=$(jq -r '.uuid' "$CONFIGJSON")
+API_ENDPOINT=$(jq -r '.apiEndpoint' "$CONFIGJSON")
+DELTA_ENDPOINT=$(jq -r '.deltaEndpoint' "$CONFIGJSON")
 
 [ -z "${APIKEY}" ] && log "Error parsing config.json" && exit 1
 [ -z "${UUID}" ] && log "Error parsing config.json" && exit 1
 [ -z "${API_ENDPOINT}" ] && log "Error parsing config.json" && exit 1
 [ -z "${DELTA_ENDPOINT}" ] && log "Error parsing config.json" && exit 1
 
+# Disable check since called by a trap
+# shellcheck disable=SC2329
 _err_handler(){
     log ERROR "Interrupted on error"
 }
 
+# shellcheck disable=SC2329
 _int_handler(){
     log ERROR "Interrupted"
 }
 
+# shellcheck disable=SC2329
 _term_handler(){
     log ERROR "Terminated"
 }
