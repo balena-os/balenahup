@@ -1,0 +1,9 @@
+{
+  "d": [
+    {
+      "id": 1234,
+      "name": "RESIN_SUPERVISOR_PERSISTENT_LOGGING",
+      "value": "true"
+    }
+  ]
+}

@@ -412,8 +412,11 @@ function upgrade_supervisor() {
         log ERROR "Failed to fetch current supervisor version from the API."
     fi
 
-    # Post supervisor update fixes
-    persistent_logging_config_var
+    # Post supervisor update fixes. hostapp-update has already switched the
+    # device to the new OS, so these must not fail the update.
+    if ! persistent_logging_config_var; then
+        log WARN "Could not fix RESIN_SUPERVISOR_PERSISTENT_LOGGING, continuing with the update."
+    fi
 }
 
 function error_handler() {
@@ -511,36 +514,63 @@ function post_update_jetson_fix {
 # Update problematic persistent logging env var
 # Earlier supervisors might have set it to "", and
 # that doesn't validate on newer supervisor versions.
-# Convert into proper false value.
+# Convert into proper false value, both in the API and in config.json. The
+# config.json fix needs no network, so it runs whatever happens with the API.
+# Returns 1 if either part fails, leaving config.json unchanged if that part
+# failed, so the caller decides whether that fails the update. A caller that
+# tests the result also turns off errexit inside this function, so every step
+# checks its own status.
 # Globals:
 #   API_ENDPOINT
 #   APIKEY
 #   CONFIGJSON
 #   UUID
 # Returns:
-#   None
+#   0: Success, or nothing to fix
+#   1: Failure
 #######################################
 function persistent_logging_config_var {
-    PROBLEMATIC_ENV_VAR=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} "${API_ENDPOINT}/${API_VERSION}/device_config_variable?\$filter=device/uuid%20eq%20'${UUID}'" -H "Content-Type: application/json" -H "Authorization: Bearer ${APIKEY}" | jq -r '.d[] | select((.name == "RESIN_SUPERVISOR_PERSISTENT_LOGGING") and (.value == "")) | .id')
-    if [ -n "${PROBLEMATIC_ENV_VAR}" ]; then
-        local tmpfile
+    local status=0
+    local needs_fix
+    local tmpfile
+
+    if ! PROBLEMATIC_ENV_VAR=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} "${API_ENDPOINT}/${API_VERSION}/device_config_variable?\$filter=device/uuid%20eq%20'${UUID}'" -H "Content-Type: application/json" -H "Authorization: Bearer ${APIKEY}" | jq -r '.d[] | select((.name == "RESIN_SUPERVISOR_PERSISTENT_LOGGING") and (.value == "")) | .id'); then
+        log WARN "Could not query config variables."
+        status=1
+    elif [ -n "${PROBLEMATIC_ENV_VAR}" ]; then
         log "Updating problematic RESIN_SUPERVISOR_PERSISTENT_LOGGING config variable"
-        CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -X PATCH \
+        if ! CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -X PATCH \
             "${API_ENDPOINT}/${API_VERSION}/device_config_variable(${PROBLEMATIC_ENV_VAR})" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${APIKEY}" \
             --data '{
                 "value": "false"
-            }' >> /dev/null
+            }' >> /dev/null; then
+            log WARN "Could not update RESIN_SUPERVISOR_PERSISTENT_LOGGING config variable."
+            status=1
+        fi
+    fi
+
+    if ! needs_fix=$(jq '.persistentLogging == ""' < "${CONFIGJSON}"); then
+        log WARN "Couldn't read config.json, leaving it unchanged."
+        return 1
+    fi
+    if [ "${needs_fix}" = "true" ]; then
         log "Updating config.json with sanitized '.persistentLogging' value."
-        tmpfile=$(mktemp -t configjson.XXXXXXXX)
-        jq '.persistentLogging="false"' < "${CONFIGJSON}" > "${tmpfile}"
-        # 2-step move for atomicity
-        cp "${tmpfile}" "$CONFIGJSON.temp" || log ERROR "Couldn't copy temporary config.json to final partition."
-        sync
-        mv "$CONFIGJSON.temp" "$CONFIGJSON" || log ERROR "Couldn't move updated config.json onto original."
+        tmpfile=$(mktemp -t configjson.XXXXXXXX) || return 1
+        # 2-step move for atomicity. Replace config.json only with a complete
+        # rewrite, so that on failure the original stays in place.
+        if ! { jq '.persistentLogging="false"' < "${CONFIGJSON}" > "${tmpfile}" && [ -s "${tmpfile}" ] \
+            && cp "${tmpfile}" "$CONFIGJSON.temp" && sync \
+            && mv "$CONFIGJSON.temp" "$CONFIGJSON"; }; then
+            log WARN "Couldn't update config.json, leaving it unchanged."
+            rm -f "${tmpfile}" "$CONFIGJSON.temp"
+            return 1
+        fi
+        rm -f "${tmpfile}"
         sync
     fi
+    return "${status}"
 }
 
 #######################################
