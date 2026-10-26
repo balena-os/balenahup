@@ -1,4 +1,33 @@
 - commits:
+    - subject: Detect missing config.json keys
+      hash: 0e74f695980524731f44d9a9bbf6f77c37f25989
+      body: >
+        The config.json values were read with "jq -r '.key'", which prints the
+
+        string "null" for a missing key, so the "[ -z ]" checks that follow
+        never
+
+        fired. A config.json without a uuid ran with UUID=null, and one without
+
+        a deltaEndpoint asked the delta server at "null/api/v3/delta". A missing
+
+        balenaRootCA was base64-decoded from "null" into three bytes of junk at
+
+        the head of the CA bundle.
+
+
+        Use "// empty" so a missing key reads as empty and the checks fail the
+
+        update as intended, and name the missing key in the error.
+      footer:
+        Change-type: patch
+        change-type: patch
+      author: Pagan Gazzard
+      nested: []
+  version: 4.1.37
+  title: ""
+  date: 2026-10-26T16:40:21.387Z
+- commits:
     - subject: Check out text files with LF line endings
       hash: 14689e9da4b7f08cc73332966357b2a381bad24c
       body: |
