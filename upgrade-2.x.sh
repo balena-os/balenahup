@@ -849,7 +849,7 @@ source /etc/profile
 
 # workaround for self-signed certs, waiting for https://github.com/balena-os/meta-balena/issues/1398
 TMPCRT=$(mktemp)
-jq -r '.balenaRootCA' < /mnt/boot/config.json | base64 -d > "${TMPCRT}"
+jq -r '.balenaRootCA // empty' < /mnt/boot/config.json | base64 -d > "${TMPCRT}"
 cat /etc/ssl/certs/ca-certificates.crt >> "${TMPCRT}"
 
 CURL="curl --silent --retry 10 --fail --location --compressed"
@@ -874,15 +874,15 @@ else
     log "Don't know where config.json is." && exit 1
 fi
 # If the user api key exists we use it instead of the deviceApiKey as it means we haven't done the key exchange yet
-APIKEY=$(jq -r '.apiKey // .deviceApiKey' $CONFIGJSON)
-UUID=$(jq -r '.uuid' $CONFIGJSON)
-API_ENDPOINT=$(jq -r '.apiEndpoint' $CONFIGJSON)
-DELTA_ENDPOINT=$(jq -r '.deltaEndpoint' $CONFIGJSON)
+APIKEY=$(jq -r '.apiKey // .deviceApiKey // empty' $CONFIGJSON)
+UUID=$(jq -r '.uuid // empty' $CONFIGJSON)
+API_ENDPOINT=$(jq -r '.apiEndpoint // empty' $CONFIGJSON)
+DELTA_ENDPOINT=$(jq -r '.deltaEndpoint // empty' $CONFIGJSON)
 
-[ -z "${APIKEY}" ] && log "Error parsing config.json" && exit 1
-[ -z "${UUID}" ] && log "Error parsing config.json" && exit 1
-[ -z "${API_ENDPOINT}" ] && log "Error parsing config.json" && exit 1
-[ -z "${DELTA_ENDPOINT}" ] && log "Error parsing config.json" && exit 1
+[ -z "${APIKEY}" ] && log "Error parsing config.json: no apiKey or deviceApiKey" && exit 1
+[ -z "${UUID}" ] && log "Error parsing config.json: no uuid" && exit 1
+[ -z "${API_ENDPOINT}" ] && log "Error parsing config.json: no apiEndpoint" && exit 1
+[ -z "${DELTA_ENDPOINT}" ] && log "Error parsing config.json: no deltaEndpoint" && exit 1
 
 _err_handler(){
     log ERROR "Interrupted on error"
