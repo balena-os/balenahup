@@ -1,4 +1,17 @@
 - commits:
+    - subject: Update tests/test_helper/bats-support digest to 787ac47
+      hash: c0e84f60ed9075aeb1becf6951eb642325084a85
+      body: |
+        Update tests/test_helper/bats-support
+      footer:
+        Change-type: patch
+        change-type: patch
+      author: balena-renovate[bot]
+      nested: []
+  version: 4.1.38
+  title: ""
+  date: 2026-10-29T18:34:22.662Z
+- commits:
     - subject: Detect missing config.json keys
       hash: 0e74f695980524731f44d9a9bbf6f77c37f25989
       body: >
