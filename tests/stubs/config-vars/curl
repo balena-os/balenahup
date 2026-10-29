@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# Stand-in for curl that serves a canned API response instead of reaching the
+# network. The fixture directory holds one file per request the script issues:
+#
+#   query.json  response to the device_config_variable query
+#   patch.json  response to the PATCH of the problematic variable
+#
+# A missing file means "no such response", answered with curl's --fail exit
+# code for an HTTP 4xx so the script sees a realistic failure.
+
+set -o errexit
+set -o nounset
+
+url=""
+method="GET"
+for arg in "$@"; do
+    case "${arg}" in
+        http://*|https://*)
+            url="${arg}"
+            ;;
+        PATCH)
+            method="PATCH"
+            ;;
+    esac
+done
+
+if [ -z "${url}" ]; then
+    echo "curl stub: no URL in arguments: $*" >&2
+    exit 2
+fi
+
+if [ -n "${CURL_LOG:-}" ]; then
+    echo "${method} ${url}" >> "${CURL_LOG}"
+fi
+
+case "${method}" in
+    PATCH)
+        fixture="${FIXTURE_DIR}/patch.json"
+        ;;
+    *)
+        fixture="${FIXTURE_DIR}/query.json"
+        ;;
+esac
+
+if [ ! -f "${fixture}" ]; then
+    exit 22
+fi
+
+cat "${fixture}"

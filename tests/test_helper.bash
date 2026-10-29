@@ -125,6 +125,47 @@ run_get_image_location() {
 }
 
 #######################################
+# Run persistent_logging_config_var against a fixture directory, with the
+# errtrace and ERR trap the main script has in place when it calls it. Works
+# on a copy of a config.json in the test's temporary directory.
+#
+# Arguments:
+#   fixture: directory name under tests/fixtures/config-vars
+#######################################
+run_persistent_logging_config_var() {
+    local fixture="$1"
+
+    FIXTURES_DIR="${TESTS_DIR}/fixtures/config-vars"
+    STUBS_DIR="${TESTS_DIR}/stubs/config-vars"
+    CURL_LOG="${BATS_TEST_TMPDIR}/curl.log"
+    CONFIGJSON="${BATS_TEST_TMPDIR}/config.json"
+    echo '{"uuid":"0123456789abcdef0123456789abcdef","persistentLogging":""}' > "${CONFIGJSON}"
+
+    # shellcheck disable=SC2016
+    run env \
+        FIXTURE_DIR="${FIXTURES_DIR}/${fixture}" \
+        CURL_LOG="${CURL_LOG}" \
+        PATH="${STUBS_DIR}:${PATH}" \
+        bash -c '
+            set -o errexit
+            set -E
+            set -o pipefail
+            BALENAHUP_LIB_ONLY=1
+            source "$1"
+            CURL=curl
+            TMPCRT=/dev/null
+            APIKEY=deadbeef
+            UUID=0123456789abcdef0123456789abcdef
+            API_ENDPOINT=https://api.balena-cloud.com
+            CONFIGJSON="$2"
+            _err_handler() { log ERROR "Interrupted on error"; }
+            trap _err_handler ERR
+            persistent_logging_config_var
+            echo "done"
+        ' _ "${REPO_ROOT}/upgrade-2.x.sh" "${CONFIGJSON}"
+}
+
+#######################################
 # Run function version_scheme.
 #
 # Arguments:
