@@ -1,4 +1,17 @@
 - commits:
+    - subject: Update tests/bats digest to 48d8d75
+      hash: 59e03e2e7a9bb595b6ee5b36f6538b82252ff243
+      body: |
+        Update tests/bats
+      footer:
+        Change-type: patch
+        change-type: patch
+      author: balena-renovate[bot]
+      nested: []
+  version: 4.1.39
+  title: ""
+  date: 2026-11-01T22:19:16.632Z
+- commits:
     - subject: Update tests/test_helper/bats-support digest to 787ac47
       hash: c0e84f60ed9075aeb1becf6951eb642325084a85
       body: |
