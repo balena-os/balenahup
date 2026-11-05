@@ -19,6 +19,8 @@ minimum_target_version=2.16.0
 minimum_supervisor_stop=2.53.10
 
 DOCKER_CMD="balena"
+# Runs safe_reboot, which waits on app locks after completion.
+safe_reboot_unit="hup-reboot.service"
 
 ###
 # Helper functions
@@ -780,9 +782,9 @@ function finish_up() {
         log "Rebooting into new OS in 5 seconds..."
         progress 100 "Update successful, rebooting"
         if command -v /usr/libexec/safe_reboot > /dev/null; then
-            systemd-run --on-active=5 --property=StandardError=append:"${LOGFILE}" --quiet --unit=hup-reboot.service /usr/libexec/safe_reboot
+            systemd-run --on-active=5 --property=StandardError=append:"${LOGFILE}" --quiet --unit="$safe_reboot_unit" /usr/libexec/safe_reboot
         else
-            systemd-run --on-active=5 --quiet --unit=hup-reboot.service systemctl reboot
+            systemd-run --on-active=5 --quiet --unit="$safe_reboot_unit" systemctl reboot
             # If the previous reboot command has failed for any reason, let's try differently
             (sleep 300 && nohup bash -c "reboot --force" > /dev/null 2>&1) &
             # If the previous 2 reboot commands have failed for any reason, try the Magic SysRq
@@ -1003,6 +1005,16 @@ fi
 _prepare_locking
 # Try to get lock, and exit if cannot, meaning another instance is running already
 exlock_now || exit 9
+
+# Also exit if waiting on application locks before a reboot, indicating that a
+# HUP likely has just run. If a reboot were to occur before the HUP here completes,
+# installation of the new OS image may be corrupted.
+if systemctl -q is-active "$safe_reboot_unit"; then
+    # Reuse exit code 9 to avoid reporting HUP failed, which could allow a follow-up
+    # proxy-based HUP. We expect safe_reboot already is reporting on the wait.
+    log "Special case for locks; waiting on reboot for app locks"
+    exit 9
+fi
 
 # Enforce required arguments. See comment above at 'Script start'.
 if [ -z "$target_version" ] && [ -z "$app_uuid" ]; then
