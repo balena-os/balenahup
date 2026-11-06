@@ -510,6 +510,8 @@ function post_update_jetson_fix {
 # Earlier supervisors might have set it to "", and
 # that doesn't validate on newer supervisor versions.
 # Convert into proper false value.
+# This runs after hostapp-update has switched the device to the new OS, so an
+# API failure only logs a warning rather than abort the update.
 # Globals:
 #   API_ENDPOINT
 #   APIKEY
@@ -519,17 +521,22 @@ function post_update_jetson_fix {
 #   None
 #######################################
 function persistent_logging_config_var {
-    PROBLEMATIC_ENV_VAR=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} "${API_ENDPOINT}/${API_VERSION}/device_config_variable?\$filter=device/uuid%20eq%20'${UUID}'" -H "Content-Type: application/json" -H "Authorization: Bearer ${APIKEY}" | jq -r '.d[] | select((.name == "RESIN_SUPERVISOR_PERSISTENT_LOGGING") and (.value == "")) | .id')
+    if ! PROBLEMATIC_ENV_VAR=$(CURL_CA_BUNDLE="${TMPCRT}" ${CURL} "${API_ENDPOINT}/${API_VERSION}/device_config_variable?\$filter=device/uuid%20eq%20'${UUID}'" -H "Content-Type: application/json" -H "Authorization: Bearer ${APIKEY}" | jq -r '.d[] | select((.name == "RESIN_SUPERVISOR_PERSISTENT_LOGGING") and (.value == "")) | .id'); then
+        log WARN "Could not query config variables, skipping RESIN_SUPERVISOR_PERSISTENT_LOGGING check."
+        return 0
+    fi
     if [ -n "${PROBLEMATIC_ENV_VAR}" ]; then
         local tmpfile
         log "Updating problematic RESIN_SUPERVISOR_PERSISTENT_LOGGING config variable"
-        CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -X PATCH \
+        if ! CURL_CA_BUNDLE="${TMPCRT}" ${CURL} -X PATCH \
             "${API_ENDPOINT}/${API_VERSION}/device_config_variable(${PROBLEMATIC_ENV_VAR})" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${APIKEY}" \
             --data '{
                 "value": "false"
-            }' >> /dev/null
+            }' >> /dev/null; then
+            log WARN "Could not update RESIN_SUPERVISOR_PERSISTENT_LOGGING config variable."
+        fi
         log "Updating config.json with sanitized '.persistentLogging' value."
         tmpfile=$(mktemp -t configjson.XXXXXXXX)
         jq '.persistentLogging="false"' < "${CONFIGJSON}" > "${tmpfile}"
