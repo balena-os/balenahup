@@ -1,4 +1,19 @@
 - commits:
+    - subject: Abort update if waiting for reboot from application lock
+      hash: 09ad12b4f805724ee0c61b6aa662c5bc6c62786b
+      body: |
+        Waiting likely initiated by a previous update run.
+      footer:
+        Change-type: patch
+        change-type: patch
+        Signed-off-by: Ken Bannister <kb2ma@runbox.com>
+        signed-off-by: Ken Bannister <kb2ma@runbox.com>
+      author: Ken Bannister
+      nested: []
+  version: 4.1.42
+  title: ""
+  date: 2026-11-08T23:20:06.783Z
+- commits:
     - subject: Update tests/bats digest to 9c153ec
       hash: 2bfc00578e92123b914c01378e155ed3f060fa62
       body: |
