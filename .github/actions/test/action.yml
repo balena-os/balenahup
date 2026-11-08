@@ -13,7 +13,8 @@ runs:
           upgrade-takeover.sh \
           entry.sh \
           tests/test_helper.bash \
-          tests/stubs/releases/curl
+          tests/stubs/releases/curl \
+          tests/stubs/config-vars/curl
 
     - name: Run bats suite
       shell: bash

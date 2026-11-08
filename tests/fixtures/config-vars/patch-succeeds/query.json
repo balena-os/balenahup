@@ -1,0 +1,14 @@
+{
+  "d": [
+    {
+      "id": 1234,
+      "name": "RESIN_SUPERVISOR_PERSISTENT_LOGGING",
+      "value": ""
+    },
+    {
+      "id": 1235,
+      "name": "BALENA_SUPERVISOR_LOCAL_MODE",
+      "value": ""
+    }
+  ]
+}
