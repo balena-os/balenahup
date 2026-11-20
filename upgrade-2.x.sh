@@ -1006,13 +1006,16 @@ _prepare_locking
 # Try to get lock, and exit if cannot, meaning another instance is running already
 exlock_now || exit 9
 
-# Also exit if waiting on application locks before a reboot, indicating that a
-# HUP likely has just run. If a reboot were to occur before the HUP here completes,
-# installation of the new OS image may be corrupted.
-if systemctl -q is-active "$safe_reboot_unit"; then
-    # Reuse exit code 9 to avoid reporting HUP failed, which could allow a follow-up
-    # proxy-based HUP. We expect safe_reboot already is reporting on the wait.
-    log "Special case for locks; waiting on reboot for app locks"
+# Also exit if an upgrade already is available, indicating that a HUP likely has
+# run recently and may be awaiting reboot. If a reboot were to occur before the
+# HUP here completes, installation of the new OS image may be corrupted.
+# A common case for an upgrade to be available is while waiting on application
+# locks to be released after the earlier HUP. For historical proxy triggered HUPs,
+# notification messages to the cloud prohibit triggering a second HUP while waiting
+# on the locks. However, Supervisor triggered HUPs do not send those messages.
+# So we check for upgrade availability here as a transitional mechanism.
+if (. /usr/bin/rollback-parse-bootloader && [ "${upgrade_available}" = 1 ]) >/dev/null 2>&1; then
+    log WARN "Bailing out - an update already is staged and awaits a reboot."
     exit 9
 fi
 
