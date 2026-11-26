@@ -143,3 +143,30 @@ run_version_scheme() {
             version_scheme "$2"
         ' _ "${REPO_ROOT}/upgrade-2.x.sh" "${version}"
 }
+
+#######################################
+# Run a function from upgrade-takeover.sh at the top level of a shell with the
+# errexit, errtrace and ERR trap the script sets up, as its main body would.
+# Prints "done" last if the function returned.
+# Globals:
+#   TAKEOVER_STUBS: optional directory to put first on PATH
+# Arguments:
+#   function: function to run, followed by its arguments
+#######################################
+run_takeover_function() {
+    # shellcheck disable=SC2016
+    run env \
+        PATH="${TAKEOVER_STUBS:+${TAKEOVER_STUBS}:}${PATH}" \
+        bash -c '
+            set -o errexit
+            set -E
+            set -o pipefail
+            BALENAHUP_LIB_ONLY=1
+            source "$1"
+            shift
+            _err_handler() { log ERROR "Interrupted on error"; }
+            trap _err_handler ERR
+            "$@"
+            echo "done"
+        ' _ "${REPO_ROOT}/upgrade-takeover.sh" "$@"
+}

@@ -27,14 +27,6 @@ set -o errexit
 set -E
 set -o pipefail
 
-# Define variables about running balenaOS, including VERSION and SLUG (device type)
-# shellcheck disable=SC1091
-source /etc/os-release
-
-# Set PATH for binary lookups
-# shellcheck disable=SC1091
-source /etc/profile
-
 # Prevent running multiple instances of upgrade
 LOCKFILE="/var/lock/resinhup.lock"
 LOCKFD=99
@@ -287,6 +279,20 @@ function download_target_image() {
 ###
 # Script start
 ###
+
+# The test suite sources this script to exercise individual functions, so
+# everything below runs only for a real update.
+if [ -n "${BALENAHUP_LIB_ONLY:-}" ]; then
+    return 0
+fi
+
+# Define variables about running balenaOS, including VERSION and SLUG (device type)
+# shellcheck disable=SC1091
+source /etc/os-release
+
+# Set PATH for binary lookups
+# shellcheck disable=SC1091
+source /etc/profile
 
 # If no arguments passed, just display the help
 if [ $# -eq 0 ]; then
