@@ -1,4 +1,53 @@
 - commits:
+    - subject: "upgrade-2.x: don't fail a finished update over the persistent logging
+        fix"
+      hash: 35d9c868d9854361abfc058a631d91b828d36c48
+      body: >
+        persistent_logging_config_var cleans up a legacy empty
+
+        RESIN_SUPERVISOR_PERSISTENT_LOGGING value and rewrites config.json to
+
+        match. It runs at the end of upgrade_supervisor, after hostapp-update
+        has
+
+        already switched the device to the new OS. Any failure in it, whether a
+
+        failed API request or jq firing the ERR trap, or a failed cp or mv
+
+        calling "log ERROR", made the script report "OS update failed" and skip
+
+        the reboot. The device then booted the new OS whenever it next
+
+        restarted.
+
+
+        Make the function return 1 when a step fails, and let the caller decide
+
+        what that means: upgrade_supervisor logs a warning and carries on.
+
+        Testing the result in the caller turns off errexit inside the function,
+
+        so each step now checks its own status. config.json is replaced only
+
+        with a complete rewrite, and the temporary files are removed.
+
+
+        The config.json fix needs no network, so it no longer depends on the API
+
+        query finding the empty variable: config.json is checked for an empty
+
+        persistentLogging on its own, and fixed even when the API query or PATCH
+
+        fails.
+      footer:
+        Change-type: patch
+        change-type: patch
+      author: Pagan Gazzard
+      nested: []
+  version: 4.1.45
+  title: ""
+  date: 2026-11-26T20:51:29.122Z
+- commits:
     - subject: Update tests/bats digest to e3175e2
       hash: 0d74a46be56e2029012abe15bb7013c23c090d65
       body: |
